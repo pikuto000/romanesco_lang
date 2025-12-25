@@ -1,0 +1,18 @@
+write + 1 2
+write / 1 2
+:- test _ + 1 1
+write test
+:- inc _ \ x + x 1 _
+write inc 10
+:- double _ \ x * x 2 _
+write double 5
+
+
+// ラムダ式の即時使用
+write \ x + x 100 1
+
+// 部分適用のテスト
+:- add _ \ x \ y + x y _ //_が1つだと...
+:- add1 _ add 1
+//↓この式がaddを返してしまう！
+write add1 10
