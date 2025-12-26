@@ -16,7 +16,10 @@ class rParser(sym:SymbolTable) extends RegexParsers,Positional,PackratParsers{
   override protected val whiteSpace: Regex = """(\s|//.*|(?m)/\*(\n|.)*?\*/)+""".r
   lazy val program:PackratParser[List[Node]] = rep(expr)
   lazy val expr:PackratParser[Node] = paren_expr|application|atom
-  lazy val paren_expr:PackratParser[Node] = "(" ~> expr <~ ")"
+  lazy val paren_expr:PackratParser[Node] = "(" ~> opt(expr) <~ ")" ^^{
+    case None => Atom("")
+    case Some(node) => node
+  }
   //括弧と空白以外のすべての文字をパースする。
   lazy val atom:PackratParser[Node] = """[^\s()]+""".r ^^ {
     case s:String => Atom(s)
@@ -26,12 +29,15 @@ class rParser(sym:SymbolTable) extends RegexParsers,Positional,PackratParsers{
     if(sym.getTabKeys.exists(_ == name)){
       val defNode = sym.look(name)
       defNode match {
-        case Apply(_, defArgs, funcExpr) =>
-          repN(defArgs.length, expr).flatMap { args =>
-            val node = Apply(name, args.toArray, funcExpr)
+        case defApply: Apply =>
+          repN(defApply.args.length, expr).flatMap { args =>
+            val node = Apply(name, args.toArray, defApply.func)
             val (ok, msg) = parseEq(node, defNode)
-            if(ok) success(node)
-            else failure(msg)
+            if(ok) {
+              success(node)
+            } else {
+              failure(msg)
+            }
           }
         case _ => failure(s"$name is not an Apply node")
       }

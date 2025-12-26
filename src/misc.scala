@@ -246,23 +246,6 @@ object init{
       }
     }))
 
-    // Structural Application (Juxtaposition)
-    sym.set(
-      "",
-      Apply(
-        "",
-        Array(Atom("Func"), Atom("Arg")),
-        (args, s) => {
-          val funcVal = interpreter.eval(args(0), s)
-          val func = funcVal match {
-            case f: Function2[_,_,_] => f.asInstanceOf[(Array[Node], SymbolTable) => Any]
-            case _ => throw new IllegalArgumentException(s"Expected a function in structural application, got $funcVal")
-          }
-          func(Array(args(1)), s)
-        }
-      )
-    )
-
     sym.set(
     "write",
     Apply(

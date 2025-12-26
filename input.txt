@@ -3,10 +3,10 @@ write + 1 2
 write test
 
 // アンダーバー1つによる部分適用 (組み込み関数への対応)
-:- inc _ + 1 _
+:- inc _ \ x + 1 x _
 write inc 10
 
-:- double _ * 2 _
+:- double _ \ x * 2 x _
 write double 5
 
 // ラムダ式 (3引数定義: Arg, Expr, ApplyArg)
@@ -17,3 +17,6 @@ write add1 10
 
 // 3引数ラムダによる即時実行 (IIFE)
 write \ x + x 100 1
+
+// 空の括弧は空文字のAtomとして出力される
+write ()
