@@ -13,7 +13,7 @@ object interpreter{
       } catch {
         case _:NumberFormatException => {
           if (sym.getTabKeys.exists(_ == s)) {
-            val resolved = sym.look(s)
+            lazy val resolved = sym.look(s)
             eval(resolved, sym)
           } else {
             s
