@@ -8,12 +8,36 @@ object init{
   def setup:SymbolTable={
     val sym = new SymbolTable
 
-    // Helper for strict evaluation (standard operators)
+    // Helper for strict evaluation with Auto-Currying logic
     def strict(f: Array[Any] => Any): (Array[Node], SymbolTable) => Any = {
-      (nodes, s) => {
-        val args = nodes.map(interpreter.eval(_, s))
-        f(args)
+      def wrapper(nodes: Array[Node], s: SymbolTable): Any = {
+        // Check for placeholders (_) in arguments
+        val hasPlaceholder = nodes.exists {
+          case Atom("_") => true
+          case _ => false
+        }
+
+        if (hasPlaceholder) {
+          // Return a partially applied function (Closure)
+          (extraNodes: Array[Node], callerSym: SymbolTable) => {
+            var extraIdx = 0
+            val mergedNodes = nodes.map {
+              case Atom("_") if extraIdx < extraNodes.length =>
+                val n = extraNodes(extraIdx)
+                extraIdx += 1
+                n
+              case other => other
+            }
+            // Recurse to check if we still have placeholders
+            wrapper(mergedNodes, callerSym)
+          }
+        } else {
+          // No placeholders: Evaluate all arguments and execute the core logic
+          val args = nodes.map(interpreter.eval(_, s))
+          f(args)
+        }
       }
+      wrapper
     }
 
     sym.set(
@@ -159,17 +183,18 @@ object init{
       val expr = interpreter.eval(exprNode, s)
 
       val funcOpt = expr match {
-        // Since we now use (Array[Node], SymbolTable) => Any, check for that type
+        // Functions now use (Array[Node], SymbolTable) => Any
         case f: Function2[_,_,_] => Some(f.asInstanceOf[(Array[Node], SymbolTable) => Any])
         case _ => None
       }
 
       if (funcOpt.isDefined) {
-        sym.set(name, Apply(name, Array(Atom("Arg")), funcOpt.get))
+        // Register as a 1-argument operator. Use the original name.
+        s.set(name, Apply(name, Array(Atom("Arg")), funcOpt.get))
       } else {
-        // Value wrapper (Thunk)
-        // Wraps 'expr' value. When called, it returns 'expr' value.
-        sym.set(name, Apply(name, Array(), (nodes, s) => expr))
+        // Register as a 0-argument operator (variable).
+        // The thunk just returns the evaluated 'expr'
+        s.set(name, Apply(name, Array(), (nodes, s2) => expr))
       }
       expr
       }))
@@ -190,74 +215,53 @@ object init{
         case _ => throw new IllegalArgumentException(s"Lambda argument must be an Atom, got $argNode")
       }
 
-      // Capture current environment (lexical scoping)
+      // Capture environment for closure
       val capturedSym = s
 
-      // The lambda function itself
-      val lambdaFunc: (Array[Node], SymbolTable) => Any = (lambdaArgs, _) => {
-         // Note: We ignore the SymbolTable passed at call time (except maybe for some dynamic scoping if needed, but for lexical we use capturedSym)
-         // Actually, typically we might want to chain them or use capturedSym.
-         // In standard closure, we extend capturedSym.
-         
-         if (lambdaArgs.length != 1) {
-             throw new IllegalArgumentException(s"Lambda expects 1 argument, but got ${lambdaArgs.length}")
-         }
-
-         val lambdaSym = new SymbolTable
-         // Copy captured environment
-         capturedSym.getTabKeys.foreach(key => lambdaSym.set(key, capturedSym.look(key)))
-
-         // Evaluate argument (strict evaluation for now, or we can make it lazy if we pass Node)
-         // Since this is called by Apply logic which might pass raw Nodes if we want lazy... 
-         // But strict() helper evaluates.
-         // Here, lambdaFunc is called by 'eval' or 'applyArg' logic.
-         // If called by 'eval' (via Apply node), 'lambdaArgs' are NODES.
-         // So we should evaluate them here if we want strict, or wrap them if we want lazy.
-         // Let's stick to strict for arguments for now.
-         val argValue = interpreter.eval(lambdaArgs(0), capturedSym) // Evaluate in caller's scope? Or captured? Caller's scope usually.
-         // Wait. The `lambdaArgs` are Nodes passed from the call site.
-         // The call site context is passed as `_` (ignored above).
-         // We should use the CALL SITE symbol table to evaluate arguments!
-         
-         // Rethink:
-         // val lambdaFunc: (Array[Node], SymbolTable) => Any = (lambdaArgs, callerSym) => ...
-         // val argValue = interpreter.eval(lambdaArgs(0), callerSym)
-         
-         // But wait! If we use `strict` helper for OTHER functions, they evaluate args using `s` (call site sym).
-         // So `lambdaFunc` receives `callerSym`.
-      }
-      
-      // Let's refine lambdaFunc
-      val finalLambdaFunc: (Array[Node], SymbolTable) => Any = (lambdaNodes, callerSym) => {
+      val lambdaFunc: (Array[Node], SymbolTable) => Any = (lambdaNodes, callerSym) => {
           if (lambdaNodes.length != 1) {
              throw new IllegalArgumentException(s"Lambda expects 1 argument, but got ${lambdaNodes.length}")
           }
           
-          // Evaluate argument in CALLER scope
+          // Evaluate argument in caller's scope
           val argVal = interpreter.eval(lambdaNodes(0), callerSym)
           
-          // Create new scope extending CAPTURED scope
+          // New scope extending definition scope
           val lambdaSym = new SymbolTable
           capturedSym.getTabKeys.foreach(key => lambdaSym.set(key, capturedSym.look(key)))
           
-          // Bind argument
-          // Use Thunk wrapper to preserve type
+          // Bind argument using a thunk to preserve value/type
           val valueWrapper = Apply("val", Array(), (nodes, s) => argVal)
           lambdaSym.set(argName, valueWrapper)
           
-          // Evaluate body in LAMBDA scope
           interpreter.eval(body, lambdaSym)
       }
-
+      
       applyArg match {
-        case Atom("_") => finalLambdaFunc
+        case Atom("_") => lambdaFunc
         case _ => 
           // Immediate application
-          // We treat `applyArg` as the argument node.
-          // We call finalLambdaFunc with this node and the CURRENT scope `s`.
-          finalLambdaFunc(Array(applyArg), s)
+          // Call lambdaFunc with applyArg node and current scope
+          lambdaFunc(Array(applyArg), s)
       }
     }))
+
+    // Structural Application (Juxtaposition)
+    sym.set(
+      "",
+      Apply(
+        "",
+        Array(Atom("Func"), Atom("Arg")),
+        (args, s) => {
+          val funcVal = interpreter.eval(args(0), s)
+          val func = funcVal match {
+            case f: Function2[_,_,_] => f.asInstanceOf[(Array[Node], SymbolTable) => Any]
+            case _ => throw new IllegalArgumentException(s"Expected a function in structural application, got $funcVal")
+          }
+          func(Array(args(1)), s)
+        }
+      )
+    )
 
     sym.set(
     "write",

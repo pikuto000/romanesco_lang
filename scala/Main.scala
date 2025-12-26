@@ -3,6 +3,7 @@ import parser.init._
 import parser.interpreter._
 import java.io.File
 import scala.util.parsing.input.CharSequenceReader
+import scala.util.parsing.combinator.Parsers.Failure
 
 object Main{
     //コマンドライン引数か、標準入力からファイル名を取得、ファイルのテキストをパースする
@@ -36,11 +37,16 @@ object Main{
             } else {
                 val input = new CharSequenceReader(source, offset)
                 val packratInput = new parser.PackratReader(input)
-                parser.parse(parser.expr, packratInput) match {
-                    case parser.Success(node, next) =>
+                val currentParser = new rParser(sym)
+                currentParser.parse(currentParser.expr, packratInput) match {
+                    case currentParser.Success(node, next) =>
                         eval(node, sym)
                         offset = next.offset
-                    case parser.NoSuccess(msg, next) =>
+                    case currentParser.NoSuccess(msg, next) =>
+                        println(s"Parse error at line ${next.pos.line}, column ${next.pos.column}: $msg")
+                        println(next.pos.longString)
+                        continue = false
+                    case Failure(msg, next) => 
                         println(s"Parse error at line ${next.pos.line}, column ${next.pos.column}: $msg")
                         println(next.pos.longString)
                         continue = false

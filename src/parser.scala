@@ -6,7 +6,7 @@ import scala.util.boundary
 import java.lang.invoke.SerializedLambda
 
 trait Node(name:String)
-case class Apply(fun:String,args:Array[Node],func: (Array[Node], SymbolTable) => Any) extends Node(fun)
+case class Apply(fun:String,args:Array[Node],func: (Array[Node], SymbolTable) => Any) extends Node(if(fun=="") "apply" else fun)
 case class Atom(s:String) extends Node(s)
 
 
@@ -61,7 +61,9 @@ class SymbolTable{
   private var tab:Map[String,Node] = Map.empty
   def look(key:String):Node = tab(key)
   def getTabKeys: Iterable[String] = tab.keys // Changed from tab.keys to tab.keys
-  def set(key:String,value:Node)=tab+=key->value
+  def set(key:String,value:Node)={
+    tab+=key->value
+  }
   //Nodeのラムダ式を取得する。
   def getFunc(key:String): (Array[Node], SymbolTable) => Any = tab(key).asInstanceOf[Apply].func
 }
@@ -72,7 +74,8 @@ def prettyPrint(node:Node):Unit={
     val indentStr = "  " * indent
     node match {
       case Apply(fun, args, _) =>
-      println(s"${indentStr}Apply(fun=' $fun ', args=[")
+      val name = if(fun == "") "apply" else fun
+      println(s"${indentStr}Apply(fun=' $name ', args=[")
       args.foreach(arg => _prettyPrint(arg, indent + 1))
       println(s"${indentStr}])")
       case Atom(s) =>
