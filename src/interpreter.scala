@@ -4,20 +4,20 @@ package parser
 object interpreter{
   def eval(node:Node,sym:SymbolTable):Any = node match {
     case Apply(fun,args,func) => {
-      // Direct invocation: All logic (partial application, structural apply) is handled by the function itself.
+      // Direct invocation
       func(args, sym)
     }
-    case Atom(s) => {
-      try {
-        BigDecimal(s)
-      } catch {
-        case _:NumberFormatException => {
-          if (sym.getTabKeys.exists(_ == s)) {
-            lazy val resolved = sym.look(s)
-            eval(resolved, sym)
-          } else {
-            s
-          }
+    case a @ Atom(s) => {
+      // Try to parse as number first
+      val asNumber = try { Some(BigDecimal(s)) } catch { case _: NumberFormatException => None }
+      
+      asNumber.getOrElse {
+        // Hygienic lookup based on the Atom's birth scope
+        val resolvedNode = sym.lookHygienic(a)
+        resolvedNode match {
+          case `a` => s // If it resolved to itself, it's a literal string
+          case Apply(_, defArgs, func) if defArgs.length > 0 => func // Operator value
+          case other => eval(other, sym) // Constant or variable
         }
       }
     }

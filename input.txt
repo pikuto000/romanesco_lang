@@ -1,22 +1,18 @@
-write + 1 2
-:- test _ + 1 1
-write test
+// 1. 静的な事前計算マクロ (ラムダなし)
+comptime calc-static (+ 10 20)
 
-// アンダーバー1つによる部分適用 (組み込み関数への対応)
-:- inc _ \ x + 1 x _
-write inc 10
+write calc-static
 
-:- double _ \ x * 2 x _
-write double 5
+// 2. 静的なAST変換マクロ (ラムダなし)
+macro-ast hello-macro (make-atom HelloMacro)
 
-// ラムダ式 (3引数定義: Arg, Expr, ApplyArg)
-// ネストする場合はそれぞれにApplyArgが必要
-:- add _ \ x \ y + x y _ _
-:- add1 _ add 1
-write add1 10
+write hello-macro
 
-// 3引数ラムダによる即時実行 (IIFE)
-write \ x + x 100 1
+// 3. 既存の動的マクロ (引数を使う場合はラムダが必要)
+macro-ast id-macro \ args (get-arg 0) _
 
-// 空の括弧は空文字のAtomとして出力される
-write ()
+write id-macro (+ 1 2)
+
+// 4. 通常の定義
+:- secret _ 42
+write secret
