@@ -1,73 +1,43 @@
 package parser
-import com.microsoft.z3._
-import scala.collection.mutable.Map
 
 object RomanescoSolver {
-
-  /**
-   * Translates a Romanesco AST into a Z3 Expression based on environment properties.
-   */
-  def toZ3(node: Node, sym: SymbolTable): Expr[?] = {
-    val z3 = sym.z3
-    
-    node match {
-      case a @ Atom(v) =>
-        // Try parsing as integer literal
-        try { z3.mkInt(v.toInt) }
-        catch { case _: Exception => 
-          // Otherwise, treat as a logical variable
-          getOrCreateVar(v, sym)
-        }
-
-      case Apply(fun, args, _, _) =>
-        // Dispatch based on "smt-op" property in the SymbolTable
-        sym.getProp(fun, "smt-op") match {
-          case Some("add") => z3.mkAdd(toZ3(args(0), sym).asInstanceOf[ArithExpr[?]], toZ3(args(1), sym).asInstanceOf[ArithExpr[?]])
-          case Some("sub") => z3.mkSub(toZ3(args(0), sym).asInstanceOf[ArithExpr[?]], toZ3(args(1), sym).asInstanceOf[ArithExpr[?]])
-          case Some("mul") => z3.mkMul(toZ3(args(0), sym).asInstanceOf[ArithExpr[?]], toZ3(args(1), sym).asInstanceOf[ArithExpr[?]])
-          case Some("eq")  => z3.mkEq(toZ3(args(0), sym), toZ3(args(1), sym))
-          case Some("and") => z3.mkAnd(toZ3(args(0), sym).asInstanceOf[BoolExpr], toZ3(args(1), sym).asInstanceOf[BoolExpr])
-          case Some("or")  => z3.mkOr(toZ3(args(0), sym).asInstanceOf[BoolExpr], toZ3(args(1), sym).asInstanceOf[BoolExpr])
-          case Some("not") => z3.mkNot(toZ3(args(0), sym).asInstanceOf[BoolExpr])
-          case Some("gt")  => z3.mkGt(toZ3(args(0), sym).asInstanceOf[ArithExpr[?]], toZ3(args(1), sym).asInstanceOf[ArithExpr[?]])
-          case Some("lt")  => z3.mkLt(toZ3(args(0), sym).asInstanceOf[ArithExpr[?]], toZ3(args(1), sym).asInstanceOf[ArithExpr[?]])
-          
-          // Special case for '?' (logical variable declaration)
-          case _ if fun == "?" =>
-            val name = args(0) match {
-              case Atom(n) => n
-              case _ => interpreter.eval(args(0), sym).toString
-            }
-            getOrCreateVar(name, sym)
-            
-          case other => throw new RuntimeException(s"Symbol '$fun' has no SMT mapping (property 'smt-op' is missing or unknown: $other)")
-        }
-      
-      case other => throw new RuntimeException(s"Unsupported node type in SMT: ${other.getClass.getName}")
-    }
-  }
-
-  /**
-   * Retrieves or creates a Z3 IntExpr associated with the given name in the current SymbolTable.
-   */
-  def getOrCreateVar(name: String, sym: SymbolTable): IntExpr = {
+  def getOrCreateVar(name: String, sym: SymbolTable): com.microsoft.z3.IntExpr = {
     sym.logicalVars.getOrElseUpdate(name, sym.z3.mkIntConst(name))
   }
 
-  /**
-   * Solves the given constraint and returns the result as a Romanesco data structure.
-   */
-  def solve(constraintNode: Node, sym: SymbolTable): Any = {
+  def solve(node: Node, sym: SymbolTable): Any = {
     val solver = sym.z3.mkSolver()
-    val constraint = toZ3(constraintNode, sym).asInstanceOf[BoolExpr]
-    solver.add(constraint)
-    
-    if (solver.check() == Status.SATISFIABLE) {
+    val constraint = buildConstraint(node, sym)
+    solver.add(constraint.asInstanceOf[com.microsoft.z3.BoolExpr])
+    if (solver.check() == com.microsoft.z3.Status.SATISFIABLE) {
       val model = solver.getModel()
-      // For now, return the model string. Future: convert to Romanesco AST.
-      model.toString
-    } else {
-      "UNSAT"
-    }
+      sym.logicalVars.map { case (name, v) => name -> model.evaluate(v, false).toString }
+    } else "unsat"
+  }
+
+  private def buildConstraint(node: Node, sym: SymbolTable): com.microsoft.z3.Expr[?] = node match {
+    case Atom(s) =>
+      try { sym.z3.mkInt(s.toInt) }
+      catch { case _: Exception => getOrCreateVar(s, sym) }
+    case Apply(fun, args, _, _) =>
+      val symProp = sym.getProp(fun, "smt-op")
+      symProp match {
+        case Some("add") => sym.z3.mkAdd(buildConstraint(args(0), sym).asInstanceOf[com.microsoft.z3.ArithExpr[com.microsoft.z3.IntSort]], buildConstraint(args(1), sym).asInstanceOf[com.microsoft.z3.ArithExpr[com.microsoft.z3.IntSort]])
+        case Some("sub") => sym.z3.mkSub(buildConstraint(args(0), sym).asInstanceOf[com.microsoft.z3.ArithExpr[com.microsoft.z3.IntSort]], buildConstraint(args(1), sym).asInstanceOf[com.microsoft.z3.ArithExpr[com.microsoft.z3.IntSort]])
+        case Some("mul") => sym.z3.mkMul(buildConstraint(args(0), sym).asInstanceOf[com.microsoft.z3.ArithExpr[com.microsoft.z3.IntSort]], buildConstraint(args(1), sym).asInstanceOf[com.microsoft.z3.ArithExpr[com.microsoft.z3.IntSort]])
+        case Some("eq")  => sym.z3.mkEq(buildConstraint(args(0), sym), buildConstraint(args(1), sym))
+        case Some("gt")  => sym.z3.mkGt(buildConstraint(args(0), sym).asInstanceOf[com.microsoft.z3.ArithExpr[com.microsoft.z3.IntSort]], buildConstraint(args(1), sym).asInstanceOf[com.microsoft.z3.ArithExpr[com.microsoft.z3.IntSort]])
+        case Some("lt")  => sym.z3.mkLt(buildConstraint(args(0), sym).asInstanceOf[com.microsoft.z3.ArithExpr[com.microsoft.z3.IntSort]], buildConstraint(args(1), sym).asInstanceOf[com.microsoft.z3.ArithExpr[com.microsoft.z3.IntSort]])
+        case Some("and") => sym.z3.mkAnd(buildConstraint(args(0), sym).asInstanceOf[com.microsoft.z3.BoolExpr], buildConstraint(args(1), sym).asInstanceOf[com.microsoft.z3.BoolExpr])
+        case Some("or")  => sym.z3.mkOr(buildConstraint(args(0), sym).asInstanceOf[com.microsoft.z3.BoolExpr], buildConstraint(args(1), sym).asInstanceOf[com.microsoft.z3.BoolExpr])
+        case Some("not") => sym.z3.mkNot(buildConstraint(args(0), sym).asInstanceOf[com.microsoft.z3.BoolExpr])
+        case _ => throw new RuntimeException(s"Unsupported SMT op: $fun")
+      }
+    case ConstantNode(v) => 
+      v match {
+        case b: Boolean => if (b) sym.z3.mkTrue() else sym.z3.mkFalse()
+        case n: BigDecimal => sym.z3.mkInt(n.toBigInt.toString)
+        case _ => throw new RuntimeException("Unsupported constant in SMT")
+      }
   }
 }

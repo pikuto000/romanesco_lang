@@ -26,7 +26,7 @@ object Main{
         }
 
         // --- Execute via Context ---
-        val ctx = ContextManager.create("main", sym)
+        val ctx = new RomanescoContext("main", sym)
         ctx.run(source)
     }
 }

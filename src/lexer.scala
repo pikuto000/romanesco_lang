@@ -1,61 +1,42 @@
 package parser
 import scala.util.parsing.combinator._
-import scala.util.parsing.input.CharSequenceReader
 import scala.util.matching.Regex
 
-// --- Lexical Configuration ---
 class LexerTable(val parent: Option[LexerTable] = None) {
-  private val delimiters: collection.mutable.Set[Char] = collection.mutable.Set.empty
-
-  def addDelimiter(c: Char): Unit = delimiters += c
-  
-  def getDelimiters: Set[Char] = {
-    val inherited = parent.map(_.getDelimiters).getOrElse(Set.empty)
-    inherited ++ delimiters
-  }
+  private val delimiters = collection.mutable.Set[Char]()
+  def addDelimiter(c: Char): Unit = delimiters.add(c)
+  def getDelimiters: Set[Char] = delimiters.toSet ++ parent.map(_.getDelimiters).getOrElse(Set.empty)
 }
 
-// Mutable wrapper for token reader
-class rTokenStream(var reader: scala.util.parsing.input.Reader[rToken]) {
-  def first: rToken = reader.first
-  def atEnd: Boolean = reader.atEnd
-  def consume(): rToken = {
-    val t = reader.first
-    reader = reader.rest
-    t
-  }
+class rTokenStream(var tokens: List[rToken]) {
+  def atEnd: Boolean = tokens.isEmpty
+  def first: rToken = tokens.head
+  def consume(): rToken = { val t = tokens.head; tokens = tokens.tail; t }
 }
 
-// --- Lexer ---
-class rLexer(config: LexerTable) extends RegexParsers with PackratParsers {
-  override val skipWhitespace = true
-  override protected val whiteSpace: Regex = "(\\s|//.*|(?m)/\\*(\\n|.)*?\\*/)+" .r
+class rLexer(lexerTable: LexerTable) extends RegexParsers {
+  override val whiteSpace: Regex = """([ \t\r\n]+|//.*)+""".r
 
-  // Dynamic word regex: matches sequences that are NOT whitespace and NOT delimiters
-  private def wordRegex: Regex = {
-    val delims = config.getDelimiters.mkString
-    if (delims.isEmpty) {
-      """[^\s]+""".r 
-    } else {
-      val escaped = Regex.quote(delims)
-      s"""[^\\s$escaped]+""".r
-    }
+  def tokens: Parser[List[rToken]] = rep(token)
+
+  def token: Parser[rToken] = positioned {
+    val ds = lexerTable.getDelimiters
+    val dsParser = if (ds.isEmpty) failure("") else ds.map(c => literal(c.toString)).reduce(_ | _)
+    dsParser ^^ { s => TWord(s) } |
+    word
   }
 
-  lazy val word: PackratParser[TWord] = wordRegex ^^ TWord.apply
-
-  // Matches a single character delimiter using Regex to benefit from automatic whitespace handling
-  lazy val delimiter: PackratParser[TWord] = {
-    val delims = config.getDelimiters.mkString
-    if (delims.isEmpty) failure("no delimiters")
-    else s"[${Regex.quote(delims)}]".r ^^ TWord.apply
+  def word: Parser[TWord] = {
+    val ds = lexerTable.getDelimiters
+    val dsEscaped = ds.map {
+      case '\\' => "\\\\"
+      case ']'  => "\\]"
+      case '-'  => "\\-"
+      case '^'  => "\\^"
+      case c    => c.toString
+    }.mkString("")
+    s"[^\\s$dsEscaped]+".r ^^ { s => TWord(s) }
   }
 
-  lazy val token: PackratParser[rToken] = positioned(delimiter | word)
-  lazy val tokens: PackratParser[List[rToken]] = rep(token)
-
-  def lex(input: String): ParseResult[List[rToken]] = {
-    val reader = new PackratReader(new CharSequenceReader(input))
-    parseAll(tokens, reader)
-  }
+  def lex(input: String): ParseResult[List[rToken]] = parseAll(tokens, input)
 }
