@@ -2,14 +2,10 @@ package parser
 
 object interpreter {
   private val MAX_EVAL_DEPTH = 1000
-  private var count=0
+  
   def eval(node: Any, sym: SymbolTable, depth: Int = 0): Any = {
     if (depth > MAX_EVAL_DEPTH) throw new RuntimeException(s"Stack overflow: $node")
-    if (count==100000){
-      println("loop detected")
-      sys.exit(1)
-    }
-    count+=1
+    
     node match {
       case app: Apply => 
         app.func(app.args, sym)
