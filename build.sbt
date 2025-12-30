@@ -7,5 +7,8 @@ lazy val jvm= project
       baseDirectory.value / ".." / "src",
       baseDirectory.value
     ),
-    libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0"
+    libraryDependencies ++= Seq(
+      "org.scala-lang.modules" %% "scala-parser-combinators" % "2.4.0",
+      "tools.aqua" % "z3-turnkey" % "4.14.1"
+    )
   )

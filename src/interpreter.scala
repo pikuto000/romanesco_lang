@@ -3,7 +3,7 @@ package parser
 //シンボルテーブルに登録されたラムダ式に基づいて評価する。
 object interpreter{
   def eval(node:Node,sym:SymbolTable):Any = node match {
-    case Apply(fun,args,func) => {
+    case Apply(fun,args,func,_) => {
       // Direct invocation
       func(args, sym)
     }
@@ -16,7 +16,7 @@ object interpreter{
         val resolvedNode = sym.lookHygienic(a)
         resolvedNode match {
           case `a` => s // If it resolved to itself, it's a literal string
-          case Apply(_, defArgs, func) if defArgs.length > 0 => func // Operator value
+          case Apply(_, defArgs, func, _) if defArgs.length > 0 => func // Operator value
           case other => eval(other, sym) // Constant or variable
         }
       }

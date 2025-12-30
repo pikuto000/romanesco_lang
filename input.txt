@@ -1,18 +1,8 @@
-// 1. 静的な事前計算マクロ (ラムダなし)
-comptime calc-static (+ 10 20)
+// SMT 制約解決テスト
+// ?x + 5 = 10 を解く
+// 1回目パス: ?x は TWord("?x") -> LexerTable変化
+// リトライパス: ? x に分離
+write solve (== (+ (? x) 5) 10)
 
-write calc-static
-
-// 2. 静的なAST変換マクロ (ラムダなし)
-macro-ast hello-macro (make-atom HelloMacro)
-
-write hello-macro
-
-// 3. 既存の動的マクロ (引数を使う場合はラムダが必要)
-macro-ast id-macro \ args (get-arg 0) _
-
-write id-macro (+ 1 2)
-
-// 4. 通常の定義
-:- secret _ 42
-write secret
+// 別の制約
+write solve (== (* (? y) 2) 42)
