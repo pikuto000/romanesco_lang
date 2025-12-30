@@ -1,8 +1,7 @@
-macro-ast defn \ args (
-  set-in (get-macro-env) (head (get-arg 0)) (head (tail (get-arg 0)))
-) _
+macro-ast defn \ args 
+  set-in get-macro-env head get-arg 0 head tail get-arg 0 
+_
 
-// 明示的に cons リストとして渡す
-defn (cons my-var (cons 99999 nil))
+defn cons my-var cons 99999 nil
 
 write my-var
