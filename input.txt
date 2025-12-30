@@ -1,8 +1,12 @@
-macro-ast defn \ args (
-  set-in (get-macro-env) (head (get-arg 0)) (head (tail (get-arg 0)))
-) _
+(:- x _ 10)
+(write x)
 
-// 明示的に cons リストとして渡す
-defn (cons my-var (cons 99999 nil))
+// my-macro: (get-arg 0) + x
+// ここでの x は実行時の環境 (100) を参照するはず（プレーンな状態）
+(macro-ast my-macro ( \ args 
+  (make-apply + (cons x (cons (get-arg 0) nil)))
+_ ))
 
-write my-var
+(:- x _ 100)
+
+(write (my-macro 5))
