@@ -44,21 +44,11 @@ class rLexer(config: LexerTable) extends RegexParsers with PackratParsers {
 
   lazy val word: PackratParser[TWord] = wordRegex ^^ TWord.apply
 
-  // Matches a single character delimiter from LexerTable
-  lazy val delimiter: PackratParser[TWord] = new Parser[TWord] {
-    def apply(in: Input): ParseResult[TWord] = {
-      val delims = config.getDelimiters
-      if (delims.isEmpty) Failure("no delimiters", in)
-      else {
-        val source = in.source
-        val offset = in.offset
-        if (offset < source.length && delims.contains(source.charAt(offset))) {
-          Success(TWord(source.charAt(offset).toString), in.rest)
-        } else {
-          Failure("not a delimiter", in)
-        }
-      }
-    }
+  // Matches a single character delimiter using Regex to benefit from automatic whitespace handling
+  lazy val delimiter: PackratParser[TWord] = {
+    val delims = config.getDelimiters.mkString
+    if (delims.isEmpty) failure("no delimiters")
+    else s"[${Regex.quote(delims)}]".r ^^ TWord.apply
   }
 
   lazy val token: PackratParser[rToken] = positioned(delimiter | word)

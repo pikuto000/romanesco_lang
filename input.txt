@@ -1,8 +1,8 @@
-// SMT 制約解決テスト
-// ?x + 5 = 10 を解く
-// 1回目パス: ?x は TWord("?x") -> LexerTable変化
-// リトライパス: ? x に分離
-write solve (== (+ (? x) 5) 10)
+macro-ast defn \ args (
+  set-in (get-macro-env) (head (get-arg 0)) (head (tail (get-arg 0)))
+) _
 
-// 別の制約
-write solve (== (* (? y) 2) 42)
+// 明示的に cons リストとして渡す
+defn (cons my-var (cons 99999 nil))
+
+write my-var
