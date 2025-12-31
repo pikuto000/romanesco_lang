@@ -36,6 +36,7 @@ object init {
   def core(): SymbolTable = {
     val sym = new SymbolTable
     val bs = 92.toChar.toString
+    // 初期特殊記号の登録
     sym.tokens.addSpecial("("); sym.tokens.addSpecial(")"); sym.tokens.addSpecial("?")
     injectMacroTools(sym)
 
@@ -60,10 +61,9 @@ object init {
     sym.set("write", Apply("write", Array(Atom("V")), (a, s) => { val v = interpreter.eval(a(0), s); println(v); v }))
 
     // --- quote / unquote (Hygiene) ---
-    // quote: 現在のスコープIDを刻印しつつ AST を保留する
     sym.set("quote", Apply("quote", Array(Atom("NODE")), (args, s) => {
       def mark(n: Any): Node = n match {
-        case Atom(name, None) => Atom(name, Some(s.id)) // 未刻印のAtomに現在のIDを刻印
+        case Atom(name, None) => Atom(name, Some(s.id))
         case Apply(f, as, func, cp) => Apply(f, as.map(mark), func, cp)
         case other: Node => other
         case v => new Node { override def eval(sy: SymbolTable): Any = v; override def rawName: String = v.toString }
@@ -71,7 +71,6 @@ object init {
       QuotedNode(mark(args(0)))
     }), Map("phase" -> "ast"))
 
-    // unquote: quote の中で評価を再開する (実際には展開時に処理される)
     sym.set("unquote", Apply("unquote", Array(Atom("NODE")), (args, s) => {
       interpreter.eval(args(0), s)
     }))
@@ -125,12 +124,8 @@ object init {
         interpreter.eval(body, lSym)
       }
       if (applyArg == Atom("_", None)) lambdaFunc
-      else lambdaFunc(Array(applyArg match {
-        case n: Node => n
-        /*case other => new Node {
-          override def eval(s: SymbolTable): Any = other
-          override def rawName: String = other.toString
-        }*/
+      else lambdaFunc(Array(applyArg match { case n: Node => n case other => 
+        new Node { override def eval(s: SymbolTable): Any = other; override def rawName: String = other.toString }
       }), s)
     }), Map("phase" -> "ast"))
 
@@ -141,10 +136,10 @@ object init {
       val impl = interpreter.eval(args(1), macroBaseSym).asInstanceOf[(Array[Node], SymbolTable) => Any]
       
       s.set(name, Apply(name, Array(Atom("Args")), (a, callerSym) => {
-        val macroExecSym = macroBaseSym.extend()
-        macroExecSym.set("__macro_env__", callerSym)
-        macroExecSym.set("__macro_args__", a)
-        impl(a, macroExecSym)
+        val macroSym = macroBaseSym.extend()
+        macroSym.set("__macro_env__", callerSym)
+        macroSym.set("__macro_args__", a)
+        impl(a, macroSym)
       }), Map("phase" -> "ast"))
       name
     }), Map("phase" -> "ast"))

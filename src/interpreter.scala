@@ -1,7 +1,7 @@
 package parser
 
 object interpreter {
-  private val MAX_EVAL_DEPTH = 1000
+  private lazy val MAX_EVAL_DEPTH = 1000
   
   def eval(node: Any, sym: SymbolTable, depth: Int = 0): Any = {
     if (depth > MAX_EVAL_DEPTH) throw new RuntimeException(s"Stack overflow: $node")

@@ -6,11 +6,11 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
   private val tab = collection.mutable.Map[String, SymbolEntry]()
   
   // 各環境にユニークなIDを付与
-  val id: Int = SymbolTable.nextID()
+  lazy val id: Int = SymbolTable.nextID()
   
-  val tokens: TokenTable = new TokenTable(parent.map(_.tokens))
-  val z3: com.microsoft.z3.Context = parent.map(_.z3).getOrElse(new com.microsoft.z3.Context())
-  val logicalVars = collection.mutable.Map[String, com.microsoft.z3.IntExpr]()
+  lazy val tokens: TokenTable = new TokenTable(parent.map(_.tokens))
+  lazy val z3: com.microsoft.z3.Context = parent.map(_.z3).getOrElse(new com.microsoft.z3.Context())
+  lazy val logicalVars = collection.mutable.Map[String, com.microsoft.z3.IntExpr]()
 
   def get(key: String): Option[Any] = tab.get(key).map(_.node).orElse(parent.flatMap(_.get(key)))
   def getProp(key: String, p: String): Option[String] = tab.get(key).flatMap(_.props.get(p)).orElse(parent.flatMap(_.getProp(key, p)))

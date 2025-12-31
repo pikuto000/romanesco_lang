@@ -6,11 +6,11 @@ object RomanescoSolver {
   }
 
   def solve(node: Node, sym: SymbolTable): Any = {
-    val solver = sym.z3.mkSolver()
-    val constraint = buildConstraint(node, sym)
+    lazy val solver = sym.z3.mkSolver()
+    lazy val constraint = buildConstraint(node, sym)
     solver.add(constraint.asInstanceOf[com.microsoft.z3.BoolExpr])
     if (solver.check() == com.microsoft.z3.Status.SATISFIABLE) {
-      val model = solver.getModel()
+      lazy val model = solver.getModel()
       sym.logicalVars.map { case (name, v) => name -> model.evaluate(v, false).toString }
     } else "unsat"
   }
