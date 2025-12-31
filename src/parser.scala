@@ -18,23 +18,17 @@ case class Apply(
   override def rawName: String = fun
 }
 
-// Atom に scopeID を追加（マングリング用）
 case class Atom(s: String, scopeID: Option[Int] = None) extends Node {
   override def eval(sym: SymbolTable): Any = interpreter.eval(this, sym)
   override def rawName: String = s
   
-  // マングリングされた名前を返す
   def mangledName: String = scopeID match {
     case Some(id) => s"${s}__$id"
     case None => s
   }
 }
 
-// クォートされたノード（未評価の AST）
-case class QuotedNode(node: Node) extends Node {
-  override def eval(sym: SymbolTable): Any = node
-  override def rawName: String = s"quoted(${node.rawName})"
-}
+// QuotedNode は廃止。匿名ノードによって代替する。
 
 type CustomParser = (rParser, scala.util.parsing.input.Reader[rToken]) => scala.util.parsing.combinator.PackratParsers#ParseResult[Node]
 
@@ -51,7 +45,7 @@ class rParser(sym: SymbolTable) extends Parsers with PackratParsers {
   override type Elem = rToken
   
   lazy val wordName: PackratParser[String] = accept("word", { case TWord(s) => s })
-  lazy val  anyName: PackratParser[String] = accept("any name", { case t: rToken if t.s != "(" && t.s != ")" => t.s })
+  lazy val anyName: PackratParser[String] = accept("any name", { case t: rToken if t.s != "(" && t.s != ")" => t.s })
   def lit(s:String): PackratParser[String] ={
     accept(s"literal '$s'", { case t: rToken if t.s == s => t.s })
   }
@@ -103,7 +97,6 @@ def prettyPrint(node:Node):Unit={
     val s = "  " * i; n match { 
       case a: Apply => println(s"$s Apply(${a.fun})"); a.args.foreach(_p(_, i + 1)) 
       case a: Atom => println(s"$s Atom(${a.s}, scope=${a.scopeID})") 
-      case q: QuotedNode => println(s"$s Quoted"); _p(q.node, i + 1)
       case other => println(s"$s AnonymousNode($other)")
     }
   }

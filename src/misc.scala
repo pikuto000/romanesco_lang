@@ -68,7 +68,13 @@ object init {
         case other: Node => other
         case v => new Node { override def eval(sy: SymbolTable): Any = v; override def rawName: String = v.toString }
       }
-      QuotedNode(mark(args(0)))
+      val marked = mark(args(0))
+      // 匿名ノードを生成して、eval 時に marked を返す（実質的な QuotedNode）
+      new Node {
+        override def eval(sy: SymbolTable): Any = marked
+        override def rawName: String = s"quoted(${marked.rawName})"
+        override def toString: String = s"Quoted($marked)"
+      }
     }), Map("phase" -> "ast"))
 
     sym.set("unquote", Apply("unquote", Array(Atom("NODE")), (args, s) => {
@@ -124,7 +130,7 @@ object init {
         interpreter.eval(body, lSym)
       }
       if (applyArg == Atom("_", None)) lambdaFunc
-      else lambdaFunc(Array(applyArg), s)
+      else lambdaFunc(Array(applyArg match { case n: Node => n }), s)
     }), Map("phase" -> "ast"))
 
     sym.set("macro-ast", Apply("macro-ast", Array(Atom("Name"), Atom("Impl")), (args, s) => {
