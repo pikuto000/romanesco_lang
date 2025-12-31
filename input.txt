@@ -1,12 +1,20 @@
 macro-reader [ ] (\ items items _)
 
-// defn を定義
 macro-ast defn (\ args (
   set-in get-macro-env head get-arg 0 head tail get-arg 0 
 ) _)
 
-// comptime で計算を行う。
-// 実行時には既に '100000' という値に置き換わっているはず。
-defn [my-var comptime (:- tmp _ 100000)]
+// 内部で 'tmp' という変数を使うマクロ
+// quote を使っているため、この 'tmp' はマクロ実行時の固有IDでマングリングされるはず
+macro-ast set-999 (\ args (
+  quote (:- tmp _ 999)
+) _)
 
-write my-var
+// ユーザー側の 'tmp'
+:- tmp _ 111
+
+// マクロを実行。内部で 'tmp' が 999 にセットされるが...
+set-999 _
+
+// ユーザー側の 'tmp' が 111 のままなら、衛生性が保たれている（衝突が回避された）
+write tmp

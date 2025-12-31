@@ -10,23 +10,19 @@ object interpreter {
       case app: Apply => 
         app.func(app.args, sym)
 
-      case a @ Atom(s) =>
-        try { BigDecimal(s.trim) }
-        catch { case _: NumberFormatException =>
-          sym.get(s) match {
-            case Some(v: Node) => if (v == node) v else eval(v, sym, depth + 1)
-            case Some(v) => v 
-            case None => s
-          }
+      case a @ Atom(s, scopeID) =>
+        // マングリングされた名前を先に試す
+        val nameToTry = a.mangledName
+        sym.get(nameToTry).orElse(sym.get(s)) match {
+          case Some(v: Node) => if (v == node) v else eval(v, sym, depth + 1)
+          case Some(v) => v 
+          case None => 
+            // 数値リテラルの判定
+            try { BigDecimal(s.trim) }
+            catch { case _: NumberFormatException => s }
         }
 
-      case n: Node =>
-        // Node トレイトを実装した無名オブジェクトや、その他の Node
-        val res = n.eval(sym)
-        // もし eval した結果が自分自身（無名ノードなら other を返すように実装する）なら
-        // その値を返す。
-        res
-
+      case n: Node => n.eval(sym)
       case other => other
     }
   }

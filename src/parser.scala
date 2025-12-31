@@ -18,9 +18,22 @@ case class Apply(
   override def rawName: String = fun
 }
 
-case class Atom(s: String) extends Node {
+// Atom に scopeID を追加（マングリング用）
+case class Atom(s: String, scopeID: Option[Int] = None) extends Node {
   override def eval(sym: SymbolTable): Any = interpreter.eval(this, sym)
   override def rawName: String = s
+  
+  // マングリングされた名前を返す
+  def mangledName: String = scopeID match {
+    case Some(id) => s"${s}__$id"
+    case None => s
+  }
+}
+
+// クォートされたノード（未評価の AST）
+case class QuotedNode(node: Node) extends Node {
+  override def eval(sym: SymbolTable): Any = node
+  override def rawName: String = s"quoted(${node.rawName})"
 }
 
 type CustomParser = (rParser, scala.util.parsing.input.Reader[rToken]) => scala.util.parsing.combinator.Parsers#ParseResult[Node]
@@ -87,7 +100,8 @@ def prettyPrint(node:Node):Unit={
   def _p(n: Node, i: Int): Unit = {
     val s = "  " * i; n match { 
       case a: Apply => println(s"$s Apply(${a.fun})"); a.args.foreach(_p(_, i + 1)) 
-      case a: Atom => println(s"$s Atom(${a.s})") 
+      case a: Atom => println(s"$s Atom(${a.s}, scope=${a.scopeID})") 
+      case q: QuotedNode => println(s"$s Quoted"); _p(q.node, i + 1)
       case other => println(s"$s AnonymousNode($other)")
     }
   }

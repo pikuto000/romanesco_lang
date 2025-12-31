@@ -5,9 +5,10 @@ case class SymbolEntry(node: Any, props: Map[String, String] = Map.empty)
 class SymbolTable(val parent: Option[SymbolTable] = None) {
   private val tab = collection.mutable.Map[String, SymbolEntry]()
   
-  // 明示的な型指定で再帰的な推論エラーを回避
-  val tokens: TokenTable = new TokenTable(parent.map(_.tokens))
+  // 各環境にユニークなIDを付与
+  val id: Int = SymbolTable.nextID()
   
+  val tokens: TokenTable = new TokenTable(parent.map(_.tokens))
   val z3: com.microsoft.z3.Context = parent.map(_.z3).getOrElse(new com.microsoft.z3.Context())
   val logicalVars = collection.mutable.Map[String, com.microsoft.z3.IntExpr]()
 
@@ -26,14 +27,13 @@ class SymbolTable(val parent: Option[SymbolTable] = None) {
   }
 
   def gensym(prefix: String = "g"): String = {
-    var id = 0
-    def f(): String = { 
-      val n = s"${prefix}_$id"; id += 1
-      if (id > 10000) throw new RuntimeException("gensym overflow")
-      if (get(n).isDefined) f() else n 
-    }
-    f()
+    s"${prefix}_${SymbolTable.nextID()}"
   }
 
   def close(): Unit = if (parent.isEmpty) z3.close()
+}
+
+object SymbolTable {
+  private var count = 0
+  def nextID(): Int = { synchronized { count += 1; count } }
 }

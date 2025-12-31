@@ -16,9 +16,9 @@ object RomanescoSolver {
   }
 
   private def buildConstraint(node: Any, sym: SymbolTable): com.microsoft.z3.Expr[?] = node match {
-    case Atom(s) =>
+    case a @ Atom(s, _) =>
       try { sym.z3.mkInt(s.toInt) }
-      catch { case _: Exception => getOrCreateVar(s, sym) }
+      catch { case _: Exception => getOrCreateVar(a.mangledName, sym) }
     case Apply(fun, args, _, _) =>
       val symProp = sym.getProp(fun, "smt-op")
       symProp match {
