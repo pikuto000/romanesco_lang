@@ -1,20 +1,16 @@
+/* 
+  複数行のブロックコメントのテスト
+  ここにあるコードは実行されないはず:
+  write "THIS_SHOULD_NOT_BE_PRINTED"
+*/
+
 macro-reader [ ] (\ items items _)
 
 macro-ast defn (\ args (
   set-in get-macro-env head get-arg 0 head tail get-arg 0 
 ) _)
 
-// 内部で 'tmp' という変数を使うマクロ
-// quote を使っているため、この 'tmp' はマクロ実行時の固有IDでマングリングされるはず
-macro-ast set-999 (\ args (
-  quote (:- tmp _ 999)
-) _)
+// /* ネストされたコメントのような見た目のテスト */
+defn [my-var 12345]
 
-// ユーザー側の 'tmp'
-:- tmp _ 111
-
-// マクロを実行。内部で 'tmp' が 999 にセットされるが...
-set-999 _
-
-// ユーザー側の 'tmp' が 111 のままなら、衛生性が保たれている（衝突が回避された）
-write tmp
+write my-var

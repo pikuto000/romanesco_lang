@@ -23,7 +23,7 @@ class TokenTable(val parent: Option[TokenTable] = None) {
 
 // --- Lexer ---
 class rLexer(val table: TokenTable) extends RegexParsers {
-  override val whiteSpace: Regex = "([ \t\r\n]+|//.*)+".r
+  override val whiteSpace: Regex = """(\s|//.*|(?s)/\*.*?\*/)+""".r
 
   def tokens: Parser[List[rToken]] = rep(token)
 
