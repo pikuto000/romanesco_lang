@@ -1,10 +1,12 @@
-// リーダーマクロをカッコで囲んで確実に 1 つの Node として渡す
 macro-reader [ ] (\ items items _)
 
+// defn を定義
 macro-ast defn (\ args (
   set-in get-macro-env head get-arg 0 head tail get-arg 0 
 ) _)
 
-defn [my-var 99999]
+// comptime で計算を行う。
+// 実行時には既に '100000' という値に置き換わっているはず。
+defn [my-var comptime (:- tmp _ 100000)]
 
 write my-var

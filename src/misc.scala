@@ -22,6 +22,12 @@ object init {
       val value = interpreter.eval(args(2), s) match { case n: Node => n case v => v }
       env.set(name, value); value
     }))
+    // 任意の環境で評価を行う eval-in
+    sym.set("eval-in", Apply("eval-in", Array(Atom("ENV"), Atom("NODE")), (args, s) => {
+      val env = interpreter.eval(args(0), s).asInstanceOf[SymbolTable]
+      val node = interpreter.eval(args(1), s)
+      interpreter.eval(node, env)
+    }))
   }
 
   def core(): SymbolTable = {
@@ -34,13 +40,15 @@ object init {
     sym.set("cons", Apply("cons", Array(Atom("H"), Atom("T")), (a, s) => Apply("cons", a, sym.getFunc("cons"))))
     
     sym.set("head", Apply("head", Array(Atom("L")), (a, s) => {
-      interpreter.eval(a(0), s) match {
+      val res = interpreter.eval(a(0), s)
+      res match {
         case Apply("cons", inner, _, _) => inner(0)
         case other => throw new RuntimeException(s"head needs cons, but got $other")
       }
     }))
     sym.set("tail", Apply("tail", Array(Atom("L")), (a, s) => {
-      interpreter.eval(a(0), s) match {
+      val res = interpreter.eval(a(0), s)
+      res match {
         case Apply("cons", inner, _, _) => inner(1)
         case other => throw new RuntimeException(s"tail needs cons, but got $other")
       }
@@ -48,15 +56,17 @@ object init {
 
     sym.set("write", Apply("write", Array(Atom("V")), (a, s) => { val v = interpreter.eval(a(0), s); println(v); v }))
 
-    // --- macro-reader: [startSymbol] [endSymbol] [transformerLambda] ---
+    // --- comptime: 展開時に評価を実行し、結果を AST に埋め込む ---
+    sym.set("comptime", Apply("comptime", Array(Atom("E")), (args, s) => {
+      interpreter.eval(args(0), s)
+    }), Map("phase" -> "ast"))
+
+    // --- macro-reader ---
     sym.set("macro-reader", Apply("macro-reader", Array(Atom("S"), Atom("E"), Atom("L")), (args, s) => {
       val start = nameOf(interpreter.eval(args(0), s))
       val end = nameOf(interpreter.eval(args(1), s))
       val transformer = interpreter.eval(args(2), s).asInstanceOf[(Array[Node], SymbolTable) => Any]
-
-      s.tokens.addSpecial(start)
-      s.tokens.addSpecial(end)
-
+      s.tokens.addSpecial(start); s.tokens.addSpecial(end)
       val custom: CustomParser = (p, in) => {
         val result = p.rep(p.expr)(in)
         result match {
@@ -74,7 +84,6 @@ object init {
           case ns: p.NoSuccess => ns.asInstanceOf[p.ParseResult[Node]]
         }
       }
-
       s.set(start, Apply(start, Array(), (a, s) => (), Some(custom)))
       start
     }))
@@ -102,8 +111,9 @@ object init {
 
     sym.set("macro-ast", Apply("macro-ast", Array(Atom("Name"), Atom("Impl")), (args, s) => {
       val name = nameOf(interpreter.eval(args(0), s))
-      val impl = interpreter.eval(args(1), s).asInstanceOf[(Array[Node], SymbolTable) => Any]
-      
+      val regSym = s.extend(); injectMacroTools(regSym)
+      regSym.set("__macro_args__", Array(Atom("Args"))) 
+      val impl = interpreter.eval(args(1), regSym).asInstanceOf[(Array[Node], SymbolTable) => Any]
       s.set(name, Apply(name, Array(Atom("Args")), (a, callerSym) => {
         val macroSym = callerSym.extend(); injectMacroTools(macroSym)
         macroSym.set("__macro_env__", callerSym)
