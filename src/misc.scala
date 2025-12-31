@@ -124,9 +124,7 @@ object init {
         interpreter.eval(body, lSym)
       }
       if (applyArg == Atom("_", None)) lambdaFunc
-      else lambdaFunc(Array(applyArg match { case n: Node => n case other => 
-        new Node { override def eval(s: SymbolTable): Any = other; override def rawName: String = other.toString }
-      }), s)
+      else lambdaFunc(Array(applyArg match { case n: Node => n}), s)
     }), Map("phase" -> "ast"))
 
     sym.set("macro-ast", Apply("macro-ast", Array(Atom("Name"), Atom("Impl")), (args, s) => {
