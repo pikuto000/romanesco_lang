@@ -7,6 +7,16 @@ import parser.interpreter
 object init {
   private def nameOf(v: Any): String = v match { case Atom(s, _) => s case s: String => s case other => other.toString }
 
+  // 値を Node インターフェースで包む補助関数
+  def wrap(v: Any): Node = v match {
+    case n: Node => n
+    case other => new Node {
+      override def eval(s: SymbolTable): Any = other
+      override def rawName: String = other.toString
+      override def toString: String = s"Wrapped($other)"
+    }
+  }
+
   def injectMacroTools(sym: SymbolTable): Unit = {
     sym.set("get-env", Apply("get-env", Array(), (a, s) => s))
     sym.set("get-macro-env", Apply("get-macro-env", Array(), (a, s) => {
@@ -19,7 +29,7 @@ object init {
     sym.set("set-in", Apply("set-in", Array(Atom("E"), Atom("N"), Atom("V")), (args, s) => {
       val env = interpreter.eval(args(0), s).asInstanceOf[SymbolTable]
       val name = nameOf(interpreter.eval(args(1), s))
-      val value = interpreter.eval(args(2), s) match { case n: Node => n case v => v }
+      val value = interpreter.eval(args(2), s)
       env.set(name, value); value
     }))
     sym.set("eval-in", Apply("eval-in", Array(Atom("ENV"), Atom("NODE")), (args, s) => {
@@ -36,7 +46,6 @@ object init {
   def core(): SymbolTable = {
     val sym = new SymbolTable
     val bs = 92.toChar.toString
-    // 初期特殊記号の登録
     sym.tokens.addSpecial("("); sym.tokens.addSpecial(")"); sym.tokens.addSpecial("?")
     injectMacroTools(sym)
 
@@ -60,21 +69,14 @@ object init {
 
     sym.set("write", Apply("write", Array(Atom("V")), (a, s) => { val v = interpreter.eval(a(0), s); println(v); v }))
 
-    // --- quote / unquote (Hygiene) ---
     sym.set("quote", Apply("quote", Array(Atom("NODE")), (args, s) => {
       def mark(n: Any): Node = n match {
         case Atom(name, None) => Atom(name, Some(s.id))
         case Apply(f, as, func, cp) => Apply(f, as.map(mark), func, cp)
         case other: Node => other
-        case v => new Node { override def eval(sy: SymbolTable): Any = v; override def rawName: String = v.toString }
+        case v => wrap(v)
       }
-      val marked = mark(args(0))
-      // 匿名ノードを生成して、eval 時に marked を返す（実質的な QuotedNode）
-      new Node {
-        override def eval(sy: SymbolTable): Any = marked
-        override def rawName: String = s"quoted(${marked.rawName})"
-        override def toString: String = s"Quoted($marked)"
-      }
+      wrap(mark(args(0))) // クォートされた AST を匿名ノードとして返す
     }), Map("phase" -> "ast"))
 
     sym.set("unquote", Apply("unquote", Array(Atom("NODE")), (args, s) => {
@@ -90,9 +92,9 @@ object init {
       val end = nameOf(interpreter.eval(args(1), s))
       val transformer = interpreter.eval(args(2), s).asInstanceOf[(Array[Node], SymbolTable) => Any]
       s.tokens.addSpecial(start); s.tokens.addSpecial(end)
+      
       val custom: CustomParser = (p, in) => {
-        val result = p.rep(p.expr)(in)
-        result match {
+        p.rep(p.expr)(in) match {
           case p.Success(nodes, next) =>
             p.lit(end)(next) match {
               case p.Success(_, after) =>
@@ -100,10 +102,7 @@ object init {
                   case h :: t => Apply("cons", Array(h, toCons(t)), sym.getFunc("cons"))
                   case Nil => sym.get("nil").get.asInstanceOf[Node]
                 }
-                val res = transformer(Array(toCons(nodes)), s)
-                p.Success(res match { case n: Node => n case other => 
-                  new Node { override def eval(s: SymbolTable): Any = other; override def rawName: String = other.toString }
-                }, after)
+                p.Success(wrap(transformer(Array(toCons(nodes)), s)), after)
               case _ => p.Failure(s"Expected '$end'", next)
             }
           case ns: p.NoSuccess => ns.asInstanceOf[p.ParseResult[Node]]
@@ -130,7 +129,7 @@ object init {
         interpreter.eval(body, lSym)
       }
       if (applyArg == Atom("_", None)) lambdaFunc
-      else lambdaFunc(Array(applyArg match { case n: Node => n }), s)
+      else lambdaFunc(Array(wrap(interpreter.eval(applyArg, s))), s)
     }), Map("phase" -> "ast"))
 
     sym.set("macro-ast", Apply("macro-ast", Array(Atom("Name"), Atom("Impl")), (args, s) => {

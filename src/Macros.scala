@@ -9,24 +9,23 @@ class RomanescoContext(val name: String, val sym: SymbolTable) {
     var currentSource = source
     
     while (currentSource.trim.nonEmpty) {
-      lazy val lexer = new rLexer(sym.tokens)
+      val lexer = new rLexer(sym.tokens)
       lexer.lex(currentSource) match {
         case lexer.Success(tokens: List[rToken], _) =>
-          lazy val rParserInst = new rParser(sym)
-          lazy val reader = new rParserInst.PackratReader(new rTokenReader(tokens))
+          val rParserInst = new rParser(sym)
+          val reader = new rParserInst.PackratReader(new rTokenReader(tokens))
           
           rParserInst.expr(reader) match {
             case rParserInst.Success(node, next) =>
-              lazy val expanded = Expander.expand(node, this)
+              val expanded = Expander.expand(node, this)
               interpreter.eval(expanded, sym)
               
               if (hasSyntaxChanged()) {
-                lazy val consumedOffset = if (next.atEnd) currentSource.length else getOffset(currentSource, next.pos)
-                lazy val rest = currentSource.substring(consumedOffset)
-                return run(rest)
+                val consumedOffset = if (next.atEnd) currentSource.length else getOffset(currentSource, next.pos)
+                return run(currentSource.substring(consumedOffset))
               }
 
-              lazy val consumedOffset = if (next.atEnd) currentSource.length else getOffset(currentSource, next.pos)
+              val consumedOffset = if (next.atEnd) currentSource.length else getOffset(currentSource, next.pos)
               if (consumedOffset == 0) return
               currentSource = currentSource.substring(consumedOffset)
               
@@ -42,8 +41,8 @@ class RomanescoContext(val name: String, val sym: SymbolTable) {
   }
 
   private def hasSyntaxChanged(): Boolean = {
-    lazy val currentMacros = getMacroKeys()
-    lazy val currentDelims = sym.tokens.getSpecials
+    val currentMacros = getMacroKeys()
+    val currentDelims = sym.tokens.getSpecials
     if (currentMacros != lastMacroKeys || currentDelims != lastDelimiters) {
       lastMacroKeys = currentMacros
       lastDelimiters = currentDelims
@@ -72,19 +71,13 @@ object Expander {
       case app @ Apply(fun, args, _, _) =>
         ctx.sym.getProp(fun, "phase") match {
           case Some("ast") =>
-            lazy val f = ctx.sym.getFunc(fun)
-            lazy val res = f(args, ctx.sym)
+            val f = ctx.sym.getFunc(fun)
+            val res = f(args, ctx.sym)
             expand(res, ctx, depth + 1)
           case _ => 
             Apply(fun, args.map(arg => expand(arg, ctx, depth) match {
               case n: Node => n
-              case other => 
-                // 無名ノードクラス。eval 時に中身 (other) を返す。
-                new Node {
-                  override def eval(s: SymbolTable): Any = other
-                  override def rawName: String = other.toString
-                  override def toString: String = s"Wrapped($other)"
-                }
+              case other => init.wrap(other)
             }), ctx.sym.getFunc(fun), app.customParser)
         }
       case other => other
