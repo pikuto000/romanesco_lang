@@ -91,7 +91,7 @@ class rParser(sym: SymbolTable) extends Parsers with PackratParsers {
 
   def parseProgram(tokens: List[rToken]): ParseResult[List[Node]] = program(new PackratReader(new rTokenReader(tokens)))
 }
-
+/*
 def prettyPrint(node:Node):Unit={
   def _p(n: Node, i: Int): Unit = {
     val s = "  " * i; n match { 
@@ -102,3 +102,4 @@ def prettyPrint(node:Node):Unit={
   }
   _p(node, 0)
 }
+*/

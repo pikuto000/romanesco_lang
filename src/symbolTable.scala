@@ -3,8 +3,7 @@ package parser
 case class SymbolEntry(node: Any, props: Map[String, String] = Map.empty)
 
 class SymbolTable(val parent: Option[SymbolTable] = None) {
-  private val tab = collection.mutable.Map[String, SymbolEntry]()
-  
+  private var tab = collection.mutable.Map[String, SymbolEntry]()
   // 各環境にユニークなIDを付与
   lazy val id: Int = SymbolTable.nextID()
   
