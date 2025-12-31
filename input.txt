@@ -1,7 +1,10 @@
-macro-ast defn \ args 
-  set-in get-macro-env head get-arg 0 head tail get-arg 0 
-_
+// リーダーマクロをカッコで囲んで確実に 1 つの Node として渡す
+macro-reader [ ] (\ items items _)
 
-defn cons my-var cons 99999 nil
+macro-ast defn (\ args (
+  set-in get-macro-env head get-arg 0 head tail get-arg 0 
+) _)
+
+defn [my-var 99999]
 
 write my-var

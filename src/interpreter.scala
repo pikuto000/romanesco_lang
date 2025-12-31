@@ -20,6 +20,13 @@ object interpreter {
           }
         }
 
+      case n: Node =>
+        // Node トレイトを実装した無名オブジェクトや、その他の Node
+        val res = n.eval(sym)
+        // もし eval した結果が自分自身（無名ノードなら other を返すように実装する）なら
+        // その値を返す。
+        res
+
       case other => other
     }
   }

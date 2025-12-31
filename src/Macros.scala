@@ -3,14 +3,15 @@ import scala.util.parsing.input.{Reader, Position}
 
 class RomanescoContext(val name: String, val sym: SymbolTable) {
   private var lastMacroKeys = getMacroKeys()
+  private var lastDelimiters = sym.tokens.getSpecials
 
   def run(source: String): Unit = {
     var currentSource = source
     
     while (currentSource.trim.nonEmpty) {
-      val lexer = new rLexer(sym.lex)
+      val lexer = new rLexer(sym.tokens)
       lexer.lex(currentSource) match {
-        case lexer.Success(tokens, _) =>
+        case lexer.Success(tokens: List[rToken], _) =>
           val rParserInst = new rParser(sym)
           val reader = new rParserInst.PackratReader(new rTokenReader(tokens))
           
@@ -19,11 +20,15 @@ class RomanescoContext(val name: String, val sym: SymbolTable) {
               val expanded = Expander.expand(node, this)
               interpreter.eval(expanded, sym)
               
+              if (hasSyntaxChanged()) {
+                val consumedOffset = if (next.atEnd) currentSource.length else getOffset(currentSource, next.pos)
+                val rest = currentSource.substring(consumedOffset)
+                return run(rest)
+              }
+
               val consumedOffset = if (next.atEnd) currentSource.length else getOffset(currentSource, next.pos)
               if (consumedOffset == 0) return
               currentSource = currentSource.substring(consumedOffset)
-              
-              lastMacroKeys = getMacroKeys()
               
             case ns: rParserInst.NoSuccess =>
               println(s"Parse error: ${ns.msg} at ${ns.next.pos}")
@@ -34,6 +39,16 @@ class RomanescoContext(val name: String, val sym: SymbolTable) {
           return
       }
     }
+  }
+
+  private def hasSyntaxChanged(): Boolean = {
+    val currentMacros = getMacroKeys()
+    val currentDelims = sym.tokens.getSpecials
+    if (currentMacros != lastMacroKeys || currentDelims != lastDelimiters) {
+      lastMacroKeys = currentMacros
+      lastDelimiters = currentDelims
+      true
+    } else false
   }
 
   private def getMacroKeys(): Set[String] = {
@@ -63,7 +78,13 @@ object Expander {
           case _ => 
             Apply(fun, args.map(arg => expand(arg, ctx, depth) match {
               case n: Node => n
-              case other => ConstantNode(other)
+              case other => 
+                // 無名ノードクラス。eval 時に中身 (other) を返す。
+                new Node {
+                  override def eval(s: SymbolTable): Any = other
+                  override def rawName: String = other.toString
+                  override def toString: String = s"Wrapped($other)"
+                }
             }), ctx.sym.getFunc(fun), app.customParser)
         }
       case other => other

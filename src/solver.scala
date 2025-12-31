@@ -15,7 +15,7 @@ object RomanescoSolver {
     } else "unsat"
   }
 
-  private def buildConstraint(node: Node, sym: SymbolTable): com.microsoft.z3.Expr[?] = node match {
+  private def buildConstraint(node: Any, sym: SymbolTable): com.microsoft.z3.Expr[?] = node match {
     case Atom(s) =>
       try { sym.z3.mkInt(s.toInt) }
       catch { case _: Exception => getOrCreateVar(s, sym) }
@@ -33,11 +33,9 @@ object RomanescoSolver {
         case Some("not") => sym.z3.mkNot(buildConstraint(args(0), sym).asInstanceOf[com.microsoft.z3.BoolExpr])
         case _ => throw new RuntimeException(s"Unsupported SMT op: $fun")
       }
-    case ConstantNode(v) => 
-      v match {
-        case b: Boolean => if (b) sym.z3.mkTrue() else sym.z3.mkFalse()
-        case n: BigDecimal => sym.z3.mkInt(n.toBigInt.toString)
-        case _ => throw new RuntimeException("Unsupported constant in SMT")
-      }
+    case b: Boolean => if (b) sym.z3.mkTrue() else sym.z3.mkFalse()
+    case n: BigDecimal => sym.z3.mkInt(n.toBigInt.toString)
+    case n: Int => sym.z3.mkInt(n)
+    case other => throw new RuntimeException(s"Unsupported value in SMT: $other")
   }
 }
