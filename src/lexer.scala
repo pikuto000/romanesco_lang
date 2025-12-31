@@ -22,23 +22,22 @@ class TokenTable(val parent: Option[TokenTable] = None) {
 }
 
 // --- Lexer ---
-class rLexer(val table: TokenTable) extends RegexParsers {
+class rLexer(val table: TokenTable) extends RegexParsers with PackratParsers {
   override val whiteSpace: Regex = """(\s|//.*|(?s)/\*.*?\*/)+""".r
 
-  def tokens: Parser[List[rToken]] = rep(token)
+  lazy val tokens: PackratParser[List[rToken]] = rep(token)
 
-  def token: Parser[rToken] = positioned {
+  lazy val token: PackratParser[rToken] = positioned {
     val sRegex = table.getSpecialsRegex
     if (sRegex.nonEmpty) (sRegex.r ^^ { s => TSpecial(s) }) | word else word
   }
-
   // word は、空白および特殊記号に当たらない文字の連続
-  def word: Parser[TWord] = new Parser[TWord] {
+  lazy val word: PackratParser[TWord] = new PackratParser[TWord] {
     def apply(in: Input): ParseResult[TWord] = {
-      val source = in.source
+      lazy val source = in.source
       var offset = in.offset
-      val start = offset
-      val specials = table.getSpecials
+      lazy val start = in.offset
+      lazy val specials = table.getSpecials
       
       while (offset < source.length && 
              !source.charAt(offset).isWhitespace && 

@@ -36,7 +36,7 @@ case class QuotedNode(node: Node) extends Node {
   override def rawName: String = s"quoted(${node.rawName})"
 }
 
-type CustomParser = (rParser, scala.util.parsing.input.Reader[rToken]) => scala.util.parsing.combinator.Parsers#ParseResult[Node]
+type CustomParser = (rParser, scala.util.parsing.input.Reader[rToken]) => scala.util.parsing.combinator.PackratParsers#ParseResult[Node]
 
 // --- Reader ---
 class rTokenReader(tokens: Seq[rToken]) extends Reader[rToken] {
@@ -50,9 +50,11 @@ class rTokenReader(tokens: Seq[rToken]) extends Reader[rToken] {
 class rParser(sym: SymbolTable) extends Parsers with PackratParsers {
   override type Elem = rToken
   
-  def wordName: PackratParser[String] = accept("word", { case TWord(s) => s })
-  def anyName: PackratParser[String] = accept("any name", { case t: rToken if t.s != "(" && t.s != ")" => t.s })
-  def lit(s: String): PackratParser[String] = accept(s"literal '$s'", { case t: rToken if t.s == s => t.s })
+  lazy val wordName: PackratParser[String] = accept("word", { case TWord(s) => s })
+  lazy val  anyName: PackratParser[String] = accept("any name", { case t: rToken if t.s != "(" && t.s != ")" => t.s })
+  def lit(s:String): PackratParser[String] ={
+    accept(s"literal '$s'", { case t: rToken if t.s == s => t.s })
+  }
 
   lazy val program: PackratParser[List[Node]] = rep(expr)
   lazy val expr: PackratParser[Node] = paren_apply | bare_apply | atom
@@ -63,7 +65,7 @@ class rParser(sym: SymbolTable) extends Parsers with PackratParsers {
     sym.get(funName).collect { case a: Apply => a } match {
       case Some(defApply) =>
         if (defApply.customParser.isDefined) {
-          new Parser[Node] {
+          new PackratParser[Node] {
             def apply(in: Input): ParseResult[Node] = {
               defApply.customParser.get(rParser.this, in).asInstanceOf[ParseResult[Node]]
             }
@@ -79,7 +81,7 @@ class rParser(sym: SymbolTable) extends Parsers with PackratParsers {
     sym.get(funName).collect { case a: Apply => a } match {
       case Some(defApply) =>
         if (defApply.customParser.isDefined) {
-          new Parser[Node] {
+          new PackratParser[Node] {
             def apply(in: Input): ParseResult[Node] = {
               defApply.customParser.get(rParser.this, in).asInstanceOf[ParseResult[Node]]
             }

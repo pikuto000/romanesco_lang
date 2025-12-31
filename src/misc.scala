@@ -125,8 +125,12 @@ object init {
         interpreter.eval(body, lSym)
       }
       if (applyArg == Atom("_", None)) lambdaFunc
-      else lambdaFunc(Array(applyArg match { case n: Node => n case other => 
-        new Node { override def eval(s: SymbolTable): Any = other; override def rawName: String = other.toString }
+      else lambdaFunc(Array(applyArg match {
+        case n: Node => n
+        /*case other => new Node {
+          override def eval(s: SymbolTable): Any = other
+          override def rawName: String = other.toString
+        }*/
       }), s)
     }), Map("phase" -> "ast"))
 
