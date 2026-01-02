@@ -28,5 +28,6 @@ object Main{
         // --- Execute via Context ---
         lazy val ctx = new RomanescoContext("main", sym)
         ctx.run(source)
+        sym.close()
     }
 }
