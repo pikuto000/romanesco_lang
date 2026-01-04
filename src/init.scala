@@ -14,7 +14,7 @@ object init {
       lexer.database.set(
         "whiteSpace",
         lexer.regex("""\s+""".r) ^^ {
-          ws => lexer.Token.otherwise(ws,Hygenicmarker.bless(s"whiteSpace:${ws}",Some(lexer),true))
+          ws => lexer.Token.otherwise(ws,Hygenicmarker.bless(s"whiteSpace:'${ws}'",Some(lexer),true))
         }
       )
       lexer.database.set(

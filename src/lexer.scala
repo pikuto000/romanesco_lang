@@ -53,7 +53,7 @@ class Lexer(tag:HygenicTag)
 
   //デバッグ用のトークンストリームを出力するメソッド
   def printStream:Unit={
-    dumpResult.foreach((ds,db,dt)=>println(s"printStream: TokenStream($ds), Defined:$db, TagName:${dt.name}, Hash:${dt.hash}, ancestorHash:${dt.ancestorHash}, isOpaque:${dt.isOpaque}"))
+    dumpResult.foreach((ds,db,dt)=>println(s"printStream: TokenStream($ds), Defined:$db, TagName is ${dt.name}, Hash is ${dt.hash}, ancestorHash is ${dt.ancestorHash}, isOpaque:${dt.isOpaque}"))
   }
 
   //データベース。特定のワードやデリミタ、ルールを定義する。

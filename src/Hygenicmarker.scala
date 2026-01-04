@@ -19,7 +19,7 @@ object Hygenicmarker {
             },
             isOpaque
         )
-        logger.log(s"Hygenicmarker marked $name , Hash is ${tag.hash}, ancestorHash is ${tag.ancestorHash}, isOpaque is ${tag.isOpaque}.")
+        logger.log(s"Hygenicmarker marked ${name}, Hash is ${tag.hash}, ancestorHash is ${tag.ancestorHash}, isOpaque is ${tag.isOpaque}.")
         tag
     }
 }
