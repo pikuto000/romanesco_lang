@@ -1,105 +1,19 @@
-package parser
+package romanesco
+import scala.collection.mutable.Map
 import scala.util.parsing.combinator._
-import scala.util.parsing.input.{Position,Positional,Reader}
 
-// --- AST Nodes ---
-trait Node {
-  def eval(sym: SymbolTable): Any
-  def rawName: String
-}
+class Parser(tag:HygenicTag)
+  extends
+    RegexParsers,
+    PackratParsers,
+    HygenicObj(tag)
+{
+  override def skipWhitespace: Boolean = false
+  def importLexer(lex:Lexer):Lexer=lex
 
-case class Apply(
-  fun: String, 
-  args: Array[Node], 
-  func: (Array[Node], SymbolTable) => Any, 
-  customParser: Option[CustomParser] = None
-) extends Node {
-  override def eval(sym: SymbolTable): Any = func(args, sym)
-  override def rawName: String = fun
-}
-
-case class Atom(s: String, scopeID: Option[Int] = None) extends Node {
-  override def eval(sym: SymbolTable): Any = interpreter.eval(this, sym)
-  override def rawName: String = s
-  
-  def mangledName: String = scopeID match {
-    case Some(id) => s"${s}__$id"
-    case None => s
+  object database{
+    private var definedParseRules:Map[String,Parser[Lexer#Token]]=Map.empty
+    private var counter:BigInt=0
+    private var RuleOrder:Map[String,BigInt]=Map.empty
   }
 }
-
-// QuotedNode は廃止。匿名ノードによって代替する。
-
-type CustomParser = (rParser, scala.util.parsing.input.Reader[rToken]) => scala.util.parsing.combinator.PackratParsers#ParseResult[Node]
-
-// --- Reader ---
-class rTokenReader(tokens: Seq[rToken]) extends Reader[rToken] {
-  override def first: rToken = tokens.head
-  override def atEnd: Boolean = tokens.isEmpty
-  override def rest: Reader[rToken] = new rTokenReader(tokens.tail)
-  override def pos: Position = tokens.headOption.map(_.pos).getOrElse(scala.util.parsing.input.NoPosition)
-}
-
-// --- Parser ---
-class rParser(sym: SymbolTable) extends Parsers with PackratParsers {
-  override type Elem = rToken
-  
-  lazy val wordName: PackratParser[String] = accept("word", { case TWord(s) => s })
-  lazy val anyName: PackratParser[String] = accept("any name", { case t: rToken if t.s != "(" && t.s != ")" => t.s })
-  def lit(s:String): PackratParser[String] ={
-    accept(s"literal '$s'", { case t: rToken if t.s == s => t.s })
-  }
-
-  lazy val program: PackratParser[List[Node]] = rep(expr)
-  lazy val expr: PackratParser[Node] = paren_apply | bare_apply | atom
-  
-  lazy val atom: PackratParser[Node] = wordName ^^ { s => Atom(s) }
-
-  lazy val paren_apply: PackratParser[Node] = (lit("(") ~> anyName) >> { funName =>
-    sym.get(funName).collect { case a: Apply => a } match {
-      case Some(defApply) =>
-        if (defApply.customParser.isDefined) {
-          new PackratParser[Node] {
-            def apply(in: Input): ParseResult[Node] = {
-              defApply.customParser.get(rParser.this, in).asInstanceOf[ParseResult[Node]]
-            }
-          }
-        } else {
-          repN(defApply.args.length, expr).map(args => Apply(funName, args.toArray, defApply.func, defApply.customParser))
-        } <~ lit(")")
-      case _ => failure(s"Undefined function: $funName")
-    }
-  }
-
-  lazy val bare_apply: PackratParser[Node] = anyName >> { funName =>
-    sym.get(funName).collect { case a: Apply => a } match {
-      case Some(defApply) =>
-        if (defApply.customParser.isDefined) {
-          new PackratParser[Node] {
-            def apply(in: Input): ParseResult[Node] = {
-              defApply.customParser.get(rParser.this, in).asInstanceOf[ParseResult[Node]]
-            }
-          }
-        } else if (defApply.args.length > 0) {
-          repN(defApply.args.length, expr).map(args => Apply(funName, args.toArray, defApply.func, defApply.customParser))
-        } else {
-          failure("not a bare apply")
-        }
-      case _ => failure("not a bare apply")
-    }
-  }
-
-  def parseProgram(tokens: List[rToken]): ParseResult[List[Node]] = program(new PackratReader(new rTokenReader(tokens)))
-}
-/*
-def prettyPrint(node:Node):Unit={
-  def _p(n: Node, i: Int): Unit = {
-    val s = "  " * i; n match { 
-      case a: Apply => println(s"$s Apply(${a.fun})"); a.args.foreach(_p(_, i + 1)) 
-      case a: Atom => println(s"$s Atom(${a.s}, scope=${a.scopeID})") 
-      case other => println(s"$s AnonymousNode($other)")
-    }
-  }
-  _p(node, 0)
-}
-*/

@@ -1,16 +1,1 @@
-/* 
-  複数行のブロックコメントのテスト
-  ここにあるコードは実行されないはず:
-  write "THIS_SHOULD_NOT_BE_PRINTED"
-*/
-
-macro-reader [ ] (\ items items _)
-
-macro-ast defn (\ args (
-  set-in get-macro-env head get-arg 0 head tail get-arg 0 
-) _)
-
-// /* ネストされたコメントのような見た目のテスト */
-defn [my-var 12345]
-
-write my-var
+a b c

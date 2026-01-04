@@ -1,33 +1,17 @@
-import parser._
-import parser.init._
-import parser.interpreter._
-import java.io.File
+package romanesco
 
-object Main{
-    //コマンドライン引数か、標準入力からファイル名を取得、ファイルのテキストをパースする
-    def main(args: Array[String]): Unit = {
-        lazy val sym = setup
-        lazy val source = if (args.length > 0) {
-            lazy val file = new File(args(0))
-            if (!file.exists()) {
-                println(s"Error: File ${args(0)} not found.")
-                sys.exit(1)
-            }
-            scala.io.Source.fromFile(file).mkString
-        } else {
-            print("input file name > ")
-            lazy val filename = scala.io.StdIn.readLine()
-            lazy val file = new File(filename)
-            if (!file.exists()) {
-                println(s"Error: File $filename not found.")
-                sys.exit(1)
-            }
-            scala.io.Source.fromFile(file).mkString
-        }
-
-        // --- Execute via Context ---
-        lazy val ctx = new RomanescoContext("main", sym)
-        ctx.run(source)
-        sym.close()
+object Main {
+  def main(args: Array[String]): Unit = {
+    //デバッグ用
+    logger.Switch(true)
+    //ファイルをコマンドライン引数から読み込む
+    val filename = if (args.length==1){args(0)}else{
+        scala.io.StdIn.readLine("input file:")
     }
+    val source = scala.io.Source.fromFile(filename)
+    val reader = source.reader()
+    val lexer = InstanceRegistory.launch
+    lexer(reader)
+    lexer.printStream
+  }
 }
