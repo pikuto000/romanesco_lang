@@ -1,102 +1,105 @@
 logger is true
 [logger] Hygenicmarker marked lexer:firstLexer, Hash is -1090799695, ancestorHash is 0, isOpaque is true.
+[logger] Hygenicmarker marked database, Hash is 1461897107, ancestorHash is -1090799695, isOpaque is true.
+[logger] Hygenicmarker marked whiteSpace, Hash is -408077168, ancestorHash is -1090799695, isOpaque is true.
+[logger] Hygenicmarker marked word, Hash is -1291462825, ancestorHash is -1090799695, isOpaque is true.
 [logger] tokenize begin
 [logger] starting ask to database.
 [logger] ask to definedTokenizeRules.
 [logger] current maxchamp is __EMPTY__
-[logger] rule whiteSpace failed.
-[logger] current maxchamp is __EMPTY__
 [logger] Hygenicmarker marked word:a, Hash is 1821643956, ancestorHash is -1090799695, isOpaque is true.
 [logger] rule word succeeded. Length: 1
 [logger] New maxchamp: rule word, length 1
+[logger] current maxchamp is word
+[logger] rule whiteSpace failed.
 [logger] finished ask to database. maxchamp is word
 [logger] Hygenicmarker marked word:a, Hash is 1821643956, ancestorHash is -1090799695, isOpaque is true.
 [logger] starting ask to database.
 [logger] ask to definedTokenizeRules.
 [logger] current maxchamp is __EMPTY__
+[logger] rule word failed.
+[logger] current maxchamp is __EMPTY__
 [logger] Hygenicmarker marked whiteSpace:' ', Hash is 811960758, ancestorHash is -1090799695, isOpaque is true.
 [logger] rule whiteSpace succeeded. Length: 1
 [logger] New maxchamp: rule whiteSpace, length 1
-[logger] current maxchamp is whiteSpace
-[logger] rule word failed.
 [logger] finished ask to database. maxchamp is whiteSpace
 [logger] Hygenicmarker marked whiteSpace:' ', Hash is 811960758, ancestorHash is -1090799695, isOpaque is true.
 [logger] starting ask to database.
 [logger] ask to definedTokenizeRules.
-[logger] current maxchamp is __EMPTY__
-[logger] rule whiteSpace failed.
 [logger] current maxchamp is __EMPTY__
 [logger] Hygenicmarker marked word:b, Hash is -1544675920, ancestorHash is -1090799695, isOpaque is true.
 [logger] rule word succeeded. Length: 1
 [logger] New maxchamp: rule word, length 1
+[logger] current maxchamp is word
+[logger] rule whiteSpace failed.
 [logger] finished ask to database. maxchamp is word
 [logger] Hygenicmarker marked word:b, Hash is -1544675920, ancestorHash is -1090799695, isOpaque is true.
 [logger] starting ask to database.
 [logger] ask to definedTokenizeRules.
 [logger] current maxchamp is __EMPTY__
+[logger] rule word failed.
+[logger] current maxchamp is __EMPTY__
 [logger] Hygenicmarker marked whiteSpace:' ', Hash is 811960758, ancestorHash is -1090799695, isOpaque is true.
 [logger] rule whiteSpace succeeded. Length: 1
 [logger] New maxchamp: rule whiteSpace, length 1
-[logger] current maxchamp is whiteSpace
-[logger] rule word failed.
 [logger] finished ask to database. maxchamp is whiteSpace
 [logger] Hygenicmarker marked whiteSpace:' ', Hash is 811960758, ancestorHash is -1090799695, isOpaque is true.
 [logger] starting ask to database.
 [logger] ask to definedTokenizeRules.
-[logger] current maxchamp is __EMPTY__
-[logger] rule whiteSpace failed.
 [logger] current maxchamp is __EMPTY__
 [logger] Hygenicmarker marked word:c, Hash is -951317598, ancestorHash is -1090799695, isOpaque is true.
 [logger] rule word succeeded. Length: 1
 [logger] New maxchamp: rule word, length 1
+[logger] current maxchamp is word
+[logger] rule whiteSpace failed.
 [logger] finished ask to database. maxchamp is word
 [logger] Hygenicmarker marked word:c, Hash is -951317598, ancestorHash is -1090799695, isOpaque is true.
 [logger] starting ask to database.
 [logger] ask to definedTokenizeRules.
 [logger] current maxchamp is __EMPTY__
+[logger] rule word failed.
+[logger] current maxchamp is __EMPTY__
 [logger] Hygenicmarker marked whiteSpace:' ', Hash is 811960758, ancestorHash is -1090799695, isOpaque is true.
 [logger] rule whiteSpace succeeded. Length: 1
 [logger] New maxchamp: rule whiteSpace, length 1
-[logger] current maxchamp is whiteSpace
-[logger] rule word failed.
 [logger] finished ask to database. maxchamp is whiteSpace
 [logger] Hygenicmarker marked whiteSpace:' ', Hash is 811960758, ancestorHash is -1090799695, isOpaque is true.
 [logger] starting ask to database.
 [logger] ask to definedTokenizeRules.
 [logger] current maxchamp is __EMPTY__
-[logger] rule whiteSpace failed.
-[logger] current maxchamp is __EMPTY__
 [logger] Hygenicmarker marked word:d, Hash is 970333680, ancestorHash is -1090799695, isOpaque is true.
 [logger] rule word succeeded. Length: 1
 [logger] New maxchamp: rule word, length 1
+[logger] current maxchamp is word
+[logger] rule whiteSpace failed.
 [logger] finished ask to database. maxchamp is word
 [logger] Hygenicmarker marked word:d, Hash is 970333680, ancestorHash is -1090799695, isOpaque is true.
 [logger] starting ask to database.
 [logger] ask to definedTokenizeRules.
 [logger] current maxchamp is __EMPTY__
+[logger] rule word failed.
+[logger] current maxchamp is __EMPTY__
 [logger] Hygenicmarker marked whiteSpace:' ', Hash is 811960758, ancestorHash is -1090799695, isOpaque is true.
 [logger] rule whiteSpace succeeded. Length: 1
 [logger] New maxchamp: rule whiteSpace, length 1
-[logger] current maxchamp is whiteSpace
-[logger] rule word failed.
 [logger] finished ask to database. maxchamp is whiteSpace
 [logger] Hygenicmarker marked whiteSpace:' ', Hash is 811960758, ancestorHash is -1090799695, isOpaque is true.
 [logger] starting ask to database.
 [logger] ask to definedTokenizeRules.
 [logger] current maxchamp is __EMPTY__
-[logger] rule whiteSpace failed.
-[logger] current maxchamp is __EMPTY__
 [logger] Hygenicmarker marked word:e, Hash is 1458092408, ancestorHash is -1090799695, isOpaque is true.
 [logger] rule word succeeded. Length: 1
 [logger] New maxchamp: rule word, length 1
+[logger] current maxchamp is word
+[logger] rule whiteSpace failed.
 [logger] finished ask to database. maxchamp is word
 [logger] Hygenicmarker marked word:e, Hash is 1458092408, ancestorHash is -1090799695, isOpaque is true.
 [logger] starting ask to database.
 [logger] ask to definedTokenizeRules.
 [logger] current maxchamp is __EMPTY__
-[logger] rule whiteSpace failed.
-[logger] current maxchamp is __EMPTY__
 [logger] rule word failed.
+[logger] current maxchamp is __EMPTY__
+[logger] rule whiteSpace failed.
 [logger] ask to otherwisetokenizeRules.
 [logger] finished ask to database. maxchamp is __EMPTY__
 [logger] tokenize end
