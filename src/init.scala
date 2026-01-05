@@ -12,13 +12,13 @@ object init {
 
     def core(lexer:Lexer):Unit={
       lexer.database.set(
-        "whiteSpace",
+        Hygenicmarker.bless("whiteSpace",Some(lexer),true),
         lexer.regex("""\s+""".r) ^^ {
           ws => lexer.Token.otherwise(ws,Hygenicmarker.bless(s"whiteSpace:'${ws}'",Some(lexer),true))
         }
       )
       lexer.database.set(
-        "word",
+        Hygenicmarker.bless("word",Some(lexer),true),
         lexer.regex("""\S+""".r) ^^ {
           word => lexer.Token.otherwise(word,Hygenicmarker.bless(s"word:${word}",Some(lexer),true))
         }
