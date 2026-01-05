@@ -10,7 +10,7 @@ object Main {
     }
     val source = scala.io.Source.fromFile(filename)
     val reader = source.reader()
-    val lexer = InstanceRegistory.launch
+    val lexer = InstanceRegistory.launch()
     lexer(reader)
     lexer.printStream
   }

@@ -1,5 +1,7 @@
 package romanesco
 import scala.util.parsing.combinator._
+import scala.util.parsing.input.OffsetPosition
+import scala.util.parsing.input.Positional
 
 object init {
   
@@ -13,14 +15,38 @@ object init {
     def core(lexer:Lexer):Unit={
       lexer.database.set(
       Hygenicmarker.bless("whiteSpace",Some(lexer),true),
-      lexer.regex("""\s+""".r) ^^ {
-        ws => lexer.Token.otherwise(ws,Hygenicmarker.bless(s"whiteSpace:'${ws}'",Some(lexer),true))
+      new lexer.Parser[lexer.Token] {
+        def apply(in: lexer.Input) = {
+          val start = in.pos
+          lexer.regex("""\s+""".r)(in) match {
+            case lexer.Success(ws, next) =>
+              val row = start.line
+              val col = start.column
+              lexer.Success(
+                lexer.Token.otherwise(ws,Hygenicmarker.bless(s"whiteSpace:'${ws}', row:${row}, column:${col}",Some(lexer),true)),
+                next
+              )
+            case ns: lexer.NoSuccess => ns
+          }
+        }
       }
       )
       lexer.database.set(
       Hygenicmarker.bless("word",Some(lexer),true),
-      lexer.regex("""\S+""".r) ^^ {
-        word => lexer.Token.otherwise(word,Hygenicmarker.bless(s"word:${word}",Some(lexer),true))
+      new lexer.Parser[lexer.Token] {
+        def apply(in: lexer.Input) = {
+          val start = in.pos
+          lexer.regex("""\S+""".r)(in) match {
+            case lexer.Success(word, next) =>
+              val row = start.line
+              val col = start.column
+              lexer.Success(
+                lexer.Token.otherwise(word,Hygenicmarker.bless(s"word:'${word}', row:${row}, column:${col}",Some(lexer),true)),
+                next
+              )
+            case ns: lexer.NoSuccess => ns
+          }
+        }
       }
       )
     }

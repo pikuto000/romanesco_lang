@@ -30,7 +30,7 @@ class HygenicTag(
     val ancestorHash:Int,
     val isOpaque:Boolean
 ){
-    def mangledName(name:String):String=s"${name}_#$hash"
+    def mangledName:String=s"${name}_#$hash"
 }
 
 trait HygenicObj(t:HygenicTag){

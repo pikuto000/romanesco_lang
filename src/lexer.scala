@@ -2,13 +2,14 @@ package romanesco
 import scala.collection.mutable.Map
 import scala.util.parsing.combinator._
 //ソースの位置情報を把握できるようにする。
-import scala.util.parsing.input._
+import scala.util.parsing.input.OffsetPosition
+import scala.util.parsing.input.Positional
 
 
 class Lexer(tag:HygenicTag)
-extends HygenicObj(tag)
-with RegexParsers
+extends RegexParsers
 with PackratParsers
+with HygenicObj(tag)
 {
   override def skipWhitespace: Boolean = false
   
@@ -55,8 +56,13 @@ with PackratParsers
   })
   
   //デバッグ用のトークンストリームを出力するメソッド
-  def printStream:Unit={
-    dumpResult.foreach((ds,db,dt)=>println(s"printStream: TokenStream($ds), Defined:$db, TagName is ${dt.name}, Hash is ${dt.hash}, ancestorHash is ${dt.ancestorHash}, isOpaque:${dt.isOpaque}"))
+  def printStream: Unit = {
+    dumpResult.foreach(s=>
+      s match {
+        case (content, isDefined, tag) =>
+          println(s"printStream: Token: '${content}', isDefined: $isDefined, Name: ${tag.mangledName}, ancestorHash: ${tag.ancestorHash}".replace("\n", "\\n").replace("\r", "\\r"))
+      }
+    )
   }
   //データベース。特定のワードやデリミタ、ルールを定義する。ハッシュ値の親はこのLexerクラスにする。
   val database=new d(Hygenicmarker.bless("database",Some(this),true))
@@ -71,13 +77,14 @@ with PackratParsers
     //
     def set(t:HygenicTag,p:Parser[Token]): Unit = {
       //pが返すTokenの状態に応じてマップの保存先を変える。
+      val pp = positioned(p)
       p match{
         case p if p.isInstanceOf[Parser[Token.Defined]] =>
-        definedTokenizeRules += (t -> p)
+        definedTokenizeRules += (t -> pp)
         RuleOrder += (t -> counter)
         counter += 1
         case p if p.isInstanceOf[Parser[Token.otherwise]] =>
-        otherwisetokenizeRules += (t -> p)
+        otherwisetokenizeRules += (t -> pp)
         RuleOrder += (t -> counter)
         counter += 1
         case _ => throw new AssertionError("Token enumuation has 2 cases, neither of which")
@@ -113,7 +120,7 @@ with PackratParsers
           logger.log(s"New maxchamp: rule ${t.name}, length ${len}")
         } else {
           if (len > maxLen) {
-            logger.log(s"rule ${t} length ($len) > maxchamp rule ${bestRuleName} length ($maxLen). Update.")
+            logger.log(s"rule ${t.name} length ($len) > maxchamp rule ${bestRuleName} length ($maxLen). Update.")
             maxLen = len
             bestRuleName = t.name
             bestTag = Some(t)
@@ -166,7 +173,9 @@ with PackratParsers
   }
   //定義されたトークンとそうでないトークンを区別するenum
   //主な使い道はデリミタとただのワードの区別
-  enum Token{
+  //特別に定義されたデリミタを中心にDefinedを用いる。
+  //それ以外の場合はotherwiseを用いる。
+  enum Token extends Positional{
     case Defined(s:String,tag:HygenicTag)
     case otherwise(s:String,tag:HygenicTag)
   }

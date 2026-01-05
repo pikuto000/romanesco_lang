@@ -9,7 +9,7 @@ object logger {
   }
   def log(s:String):Unit={
     if (Enable){
-      println(s"[logger] $s")
+      println(s"[logger] $s".replace("\n", "\\n").replace("\r", "\\r"))
     }
   }
 }
