@@ -31,9 +31,11 @@ object Main {
     
     // パース実行
     val parseResult = parser(lattice.asInstanceOf[Map[Int, Array[parser.lexer.Token]]])
-    
+    val parseEnd = Instant.now()
+    val parseDuration = Duration.between(start, parseEnd)
+    println(s"parse took ${parseDuration.toMillis()} ms")
     if (debugflag) parser.printStream
-
+    val solveStart = Instant.now()
     // 制約解決の実行
     val solver = new Solver()
     parseResult match {
@@ -42,9 +44,12 @@ object Main {
       case _ =>
         println("Skipping execution due to parse failure.")
     }
-
+    val solveEnd = Instant.now()
+    val solveDuration = Duration.between(solveStart, solveEnd)
+    println(s"solve took ${solveDuration.toMillis()} ms")
+    //計測終了
     val end = Instant.now()
-    val duration = Duration.between(start, end)
-    println(s"opertion took ${duration.toMillis()} ms")
+    val to = Duration.between(start, end)
+    println(s"total took ${to.toMillis()} ms")
   }
 }
