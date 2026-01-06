@@ -14,32 +14,60 @@ with HygenicObj(tag)
   
   
   //トークナイズをするメソッド
-  private def Stream(input:Input): ParseResult[Array[Token]] = {
-    logger.log("[token] tokenize begin")
-    lazy val tokenizer: Parser[Token] ={
-      input => {
-        database.whoAreYou(input) match {
-          case Some(p) => p(input)
-          case None => Failure("No matching token rule found", input)
+  private def Stream(input:Input): Iterator[Token] = {
+    new Iterator[Token] {
+      var currentInput = input
+      var finished = false
+
+      def fetchNext(): Option[Token] = {
+        if (currentInput.atEnd) {
+          finished = true
+          None
+        } else {
+          database.whoAreYou(currentInput) match {
+            case Some(p) => 
+              p(currentInput) match {
+                case Success(token, next) =>
+                  currentInput = next
+                  Some(token)
+                case _ => 
+                  finished = true
+                  None
+              }
+            case None => 
+              finished = true
+              None
+          }
         }
       }
+
+      var nextToken: Option[Token] = None
+
+      override def hasNext: Boolean = {
+        if (finished) false
+        else if (nextToken.isDefined) true
+        else {
+          nextToken = fetchNext()
+          nextToken.isDefined
+        }
+      }
+
+      override def next(): Token = {
+        if (!hasNext) throw new NoSuchElementException("next on empty iterator")
+        val t = nextToken.get
+        nextToken = None
+        t
+      }
     }
-    lazy val parseRes = phrase(rep(tokenizer)) (input) match {
-      case Success(res, next) =>
-      result = res.toArray
-      Success(res.toArray, next)
-      case NoSuccess(msg, next) =>
-      Error(msg, next)
-    }
-    logger.log("[token] tokenize end")
-    parseRes
   }
+  
   def apply(reader: java.io.Reader): Array[Token] = {
-    lazy val in=scala.util.parsing.input.StreamReader(reader)
-    Stream(in) match {
-      case Success(res, next) => {result=res;res}
-      case NoSuccess(msg, next) => throw new Exception(msg)
-    }
+    logger.log("[token] tokenize begin")
+    val in = scala.util.parsing.input.StreamReader(reader)
+    val tokens = Stream(in).toArray
+    result = tokens
+    logger.log("[token] tokenize end")
+    tokens
   }
   //一旦パース結果をおいておく場所。
   //主にデバッグやマクロによる編集のために使用される。
