@@ -20,7 +20,9 @@ with HygenicObj(tag)
       var finished = false
 
       def fetchNext(): Option[Token] = {
+        logger.log("[token] fetchNext begin")
         if (currentInput.atEnd) {
+          logger.log("[token] fetchNext: input at end")
           finished = true
           None
         } else {
@@ -28,13 +30,16 @@ with HygenicObj(tag)
             case Some(p) => 
               p(currentInput) match {
                 case Success(token, next) =>
+                  logger.log(s"[token] fetchNext: success, token: '${token.s}'")
                   currentInput = next
                   Some(token)
                 case _ => 
+                  logger.log("[token] fetchNext: parser failure")
                   finished = true
                   None
               }
             case None => 
+              logger.log("[token] fetchNext: no matching rule found")
               finished = true
               None
           }
@@ -63,8 +68,8 @@ with HygenicObj(tag)
   
   def apply(reader: java.io.Reader): Array[Token] = {
     logger.log("[token] tokenize begin")
-    val in = scala.util.parsing.input.StreamReader(reader)
-    val tokens = Stream(in).toArray
+    lazy val in = scala.util.parsing.input.StreamReader(reader)
+    lazy val tokens = Stream(in).toArray
     result = tokens
     logger.log("[token] tokenize end")
     tokens
@@ -135,8 +140,8 @@ with HygenicObj(tag)
     
         def whoAreYou(w:Input):Option[Parser[Token]]={
           logger.log("[token] whoAreYou begin")
-          val currentDefinedRules = cachedDefinedRules
-          val currentOtherwiseRules = cachedOtherwiseRules
+          lazy val currentDefinedRules = cachedDefinedRules
+          lazy val currentOtherwiseRules = cachedOtherwiseRules
           var maxMatchRes: Token = null
           var maxMatchNext: Input = null
           var maxLen = -1
