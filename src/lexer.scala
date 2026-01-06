@@ -4,10 +4,6 @@ import scala.util.parsing.combinator._
 //ソースの位置情報を把握できるようにする。
 import scala.util.parsing.input.OffsetPosition
 import scala.util.parsing.input.Positional
-//トークンルールの投機的並行処理を行うためのライブラリ
-import scala.concurrent.{Future, Await}
-import scala.concurrent.duration.Duration
-
 
 
 class Lexer(tag:HygenicTag)
@@ -19,14 +15,11 @@ with HygenicObj(tag)
   
   //トークナイズをするメソッド
   private def Stream(input:Input): ParseResult[Array[Token]] = {
-    logger.log("[token] tokenize begin")
+    // logger.log("[token] tokenize begin")
     lazy val tokenizer: Parser[Token] ={
       input => {
         database.whoAreYou(input) match {
-          case Some(p) => p(input) match {
-            case Success(res, next) => Success(res, next)
-            case NoSuccess(msg, next) => Failure(msg, next)
-          }
+          case Some(p) => p(input)
           case None => Failure("No matching token rule found", input)
         }
       }
@@ -76,8 +69,8 @@ with HygenicObj(tag)
     private var otherwisetokenizeRules:Map[HygenicTag,Parser[Token]]=Map.empty
     
     // パフォーマンスのためのキャッシュ
-    private var cachedDefinedRules: Seq[(HygenicTag, Parser[Token])] = Seq.empty
-    private var cachedOtherwiseRules: Seq[(HygenicTag, Parser[Token])] = Seq.empty
+    private var cachedDefinedRules: Array[(HygenicTag, Parser[Token])] = Array.empty
+    private var cachedOtherwiseRules: Array[(HygenicTag, Parser[Token])] = Array.empty
     
     private var counter:BigInt=0
     private var update=false
@@ -109,158 +102,84 @@ with HygenicObj(tag)
     //どのルールでパースするか判断する
     //最長一致原則と登録順(RuleOrder)を用いて解決する。
     //definedToknizeRulesを用いて解決できないときは、otherwisetokenizeRulesを用いて解決する。
-    //イテレーターでの処理ではなく、並行処理によって競わせる。
-    //並行処理はdefinedTokenRulesとotherwisetokenRulesを投機的に実行する。
     def whoAreYou(w:Input):Option[Parser[Token]]={
-      logger.log("[token] whoAreYou begin")
       if (update){
-        logger.log("[token] update database")
-        // ここでシーケンスに変換してキャッシュしておく
-        cachedDefinedRules = definedTokenizeRules.toSeq
-        cachedOtherwiseRules = otherwisetokenizeRules.toSeq
+        // logger.log("[token] update database")
+        // 配列に変換してキャッシュ (Mapのイテレーションより高速)
+        cachedDefinedRules = definedTokenizeRules.toArray
+        cachedOtherwiseRules = otherwisetokenizeRules.toArray
         updateswitchable(false)
       }
       
-      import scala.concurrent.ExecutionContext.Implicits.global
+      var maxMatchRes: Token = null
+      var maxMatchNext: Input = null
+      // var maxMatchTag: HygenicTag = null // 未使用
+      var maxLen = -1
+      var maxOrder: BigInt = -1
 
-      // シーケンシャルに最長一致を探す
-      def findBestMatch(rules: Seq[(HygenicTag, Parser[Token])], input: Input): Option[(Token, Input, HygenicTag)] = {
-        var maxMatch: Option[(Token, Input, HygenicTag)] = None
-        lazy val it = rules.iterator
-        while(it.hasNext) {
-          lazy val (tag, parser) = it.next()
-          logger.log(s"[token] trying parser for tag: ${tag.mangledName}")
-          parser(input) match {
-            case Success(res, next) =>
-              logger.log(s"[token] matched with parser for tag: ${tag.mangledName}")
-              lazy val currentLen = res.s.length
-              lazy val isBetter = maxMatch match {
-                case None => true
-                case Some((prevRes, _, prevTag)) =>
-                  lazy val prevLen = prevRes.s.length
-                  // より長いマッチ、または同じ長さなら登録順が後のもの (RuleOrderが大きいもの) を優先
-                  if (currentLen > prevLen) {
-                    logger.log(s"[token] new longest match for tag: ${tag.mangledName}, length: ${currentLen}")
-                    true
-                  } else if (currentLen == prevLen && RuleOrder(tag) > RuleOrder(prevTag)) {
-                    logger.log(s"[token] same length match but newer rule for tag: ${tag.mangledName}, length: ${currentLen}")
-                    true
-                  } else {
-                    logger.log(s"[token] match discarded (shorter or older rule) for tag: ${tag.mangledName}")
-                    false
-                  }
+      // 定義済みルールを探索 (高速なwhileループ)
+      var i = 0
+      val defLen = cachedDefinedRules.length
+      while (i < defLen) {
+        val (tag, parser) = cachedDefinedRules(i)
+        parser(w) match {
+          case Success(res, next) =>
+            val len = res.s.length
+            if (len > maxLen) {
+              maxLen = len
+              maxMatchRes = res
+              maxMatchNext = next
+              // maxMatchTag = tag
+              maxOrder = RuleOrder(tag)
+            } else if (len == maxLen) {
+              val order = RuleOrder(tag)
+              if (order > maxOrder) {
+                maxMatchRes = res
+                maxMatchNext = next
+                // maxMatchTag = tag
+                maxOrder = order
               }
-              if (isBetter) {
-                maxMatch = Some((res, next, tag))
+            }
+          case _ =>
+        }
+        i += 1
+      }
+
+      // その他ルールを探索
+      i = 0
+      val otherLen = cachedOtherwiseRules.length
+      while (i < otherLen) {
+        val (tag, parser) = cachedOtherwiseRules(i)
+        parser(w) match {
+          case Success(res, next) =>
+            val len = res.s.length
+            if (len > maxLen) {
+              maxLen = len
+              maxMatchRes = res
+              maxMatchNext = next
+              // maxMatchTag = tag
+              maxOrder = RuleOrder(tag)
+            } else if (len == maxLen) {
+              val order = RuleOrder(tag)
+              if (order > maxOrder) {
+                maxMatchRes = res
+                maxMatchNext = next
+                // maxMatchTag = tag
+                maxOrder = order
               }
-            case NoSuccess(_, _) =>
-              logger.log(s"[token] no success for tag: ${tag.mangledName}")
-          }
+            }
+          case _ =>
         }
-        maxMatch
+        i += 1
       }
 
-      // 並列に最長一致を探す
-      def parallelFindBestMatch(rules: Seq[(HygenicTag, Parser[Token])], input: Input, minRulesPerThread: Int): Option[(Token, Input, HygenicTag)] = {
-        lazy val numProcessors = Runtime.getRuntime.availableProcessors()
-        // バッチサイズを計算。ルール数/プロセッサ数 と minRulesPerThread の大きい方を採用
-        lazy val optimalBatchSize = Math.ceil(rules.size.toDouble / numProcessors).toInt
-        lazy val batchSize = Math.max(optimalBatchSize, minRulesPerThread)
-
-        lazy val futures = rules.grouped(batchSize).map { batch =>
-          Future {
-            findBestMatch(batch, input)
-          }
-        }
-        
-        lazy val results = Await.result(Future.sequence(futures), Duration.Inf)
-
-        // 結果のマージ
-        results.foldLeft[Option[(Token, Input, HygenicTag)]](None) { (acc, resOpt) =>
-          resOpt match {
-            case Some((res, next, tag)) =>
-              acc match {
-                case None => resOpt
-                case Some((prevRes, _, prevTag)) =>
-                  lazy val currentLen = res.s.length
-                  lazy val prevLen = prevRes.s.length
-                  if (currentLen > prevLen) resOpt
-                  else if (currentLen == prevLen && RuleOrder(tag) > RuleOrder(prevTag)) resOpt
-                  else acc
-              }
-            case None => acc
-          }
-        }
-      }
-
-      // ルール数と入力サイズに基づいて検索戦略を選択する
-      def search(rules: Seq[(HygenicTag, Parser[Token])]): Option[(Token, Input, HygenicTag)] = {
-        if (rules.isEmpty) return None
-
-        // 入力サイズを取得（CharSequenceReaderの場合のみ有効、それ以外はInt.Maxlazy valueとする）
-        lazy val inputLength = w match {
-          case csr: scala.util.parsing.input.CharSequenceReader => csr.source.length()
-          case _ => Int.MaxValue
-        }
-
-        // 入力サイズに応じて、1スレッドあたりに割り当てる最小ルール数を調整
-        // 入力が短い場合は、オーバーヘッドを避けるために1スレッドあたりの担当ルール数を増やす（並列度を下げる、あるいはシーケンシャルにする）
-        // 例: 入力が1000文字未満なら、1スレッドあたり最低100ルールは処理させる
-        lazy val minRulesPerThread = if (inputLength < 1000) 100 else 10
-        lazy val numProcessors = Runtime.getRuntime.availableProcessors()
-
-        // 並列化すべきか判定
-        // プロセッサが複数あり、かつルール数が(プロセッサ数 * minRulesPerThread)を超える場合など
-        // ここでは単純に、ルール数が minRulesPerThread 未満ならシーケンシャルにする
-        if (numProcessors <= 1 || rules.size < minRulesPerThread) {
-          logger.log("[token] running sequentially")
-          findBestMatch(rules, w)
-        } else {
-          logger.log("[token] running in parallel")
-          parallelFindBestMatch(rules, w, minRulesPerThread)
-        }
-      }
-
-      // definedTokenizeRulesから最長一致を試みる
-      logger.log("[token] attempting to match with definedTokenizeRules")
-      lazy val definedMatch = search(cachedDefinedRules)
-      
-      //otherwiseTokenizeRulesの最長一致を試みる
-      logger.log("[token] attempting to match with otherwisetokenizeRules")
-      lazy val otherwiseMatch = search(cachedOtherwiseRules)
-
-      // 最終的な結果を決定
-      lazy val finalMatch = (definedMatch, otherwiseMatch) match {
-        case (Some((dRes, dNext, dTag)), Some((oRes, oNext, oTag))) =>
-          // 両方マッチした場合、より長い方を優先。同じ長さならDefinedを優先
-          if (dRes.s.length > oRes.s.length) {
-            logger.log(s"[token] definedMatch is longer. Tag: ${dTag.mangledName}")
-            definedMatch
-          } else if (oRes.s.length > dRes.s.length) {
-            logger.log(s"[token] otherwiseMatch is longer. Tag: ${oTag.mangledName}")
-            otherwiseMatch
-          } else {
-            logger.log(s"[token] definedMatch and otherwiseMatch have same length. Prioritizing definedMatch. Tag: ${dTag.mangledName}")
-            definedMatch // 長さが同じならDefinedを優先
-          }
-        case (Some(_), None) => 
-          logger.log(s"[token] only definedMatch found. Tag: ${definedMatch.get._3.mangledName}")
-          definedMatch
-        case (None, Some(_)) => 
-          logger.log(s"[token] only otherwiseMatch found. Tag: ${otherwiseMatch.get._3.mangledName}")
-          otherwiseMatch
-        case (None, None) => 
-          logger.log("[token] no match found in either definedTokenizeRules or otherwiseTokenizeRules")
-          None
-      }
-      logger.log("[token] whoAreYou end")
-      finalMatch match {
-        case Some((res, _, tag)) =>
-          // 最終的に選ばれたパーサーを返す
-          // res.isInstanceOf[Token.Defined] のチェックは型消去の影響で信頼できない場合があるため、
-          // 両方のマップから検索して見つかった方を返す。
-          definedTokenizeRules.get(tag).orElse(otherwisetokenizeRules.get(tag))
-        case None => None
+      if (maxMatchRes != null) {
+        // 結果を直接返すパーサーを生成して返す (二重パース回避)
+        Some(new Parser[Token] {
+          def apply(in: Input) = Success(maxMatchRes, maxMatchNext)
+        })
+      } else {
+        None
       }
     }
     
