@@ -15,7 +15,7 @@ with HygenicObj(tag)
   
   //トークナイズをするメソッド
   private def Stream(input:Input): ParseResult[Array[Token]] = {
-    logger.log("[token] tokenize begin")
+    // logger.log("[token] tokenize begin")
     lazy val tokenizer: Parser[Token] ={
       input => {
         database.whoAreYou(input) match {
