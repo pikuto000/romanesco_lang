@@ -28,17 +28,17 @@ class Solver {
     def mkTrue(): BoolExpr = ctx.mkTrue()
     def mkFalse(): BoolExpr = ctx.mkFalse()
 
-    def mkAnd(args: BoolExpr*): BoolExpr = ctx.mkAnd(args: _*)
-    def mkOr(args: BoolExpr*): BoolExpr = ctx.mkOr(args: _*)
+    def mkAnd(args: BoolExpr*): BoolExpr = ctx.mkAnd(args*)
+    def mkOr(args: BoolExpr*): BoolExpr = ctx.mkOr(args*)
     def mkNot(arg: BoolExpr): BoolExpr = ctx.mkNot(arg)
     def mkImplies(arg1: BoolExpr, arg2: BoolExpr): BoolExpr = ctx.mkImplies(arg1, arg2)
     def mkIff(arg1: BoolExpr, arg2: BoolExpr): BoolExpr = ctx.mkIff(arg1, arg2)
 
-    def mkEq(arg1: Expr[_], arg2: Expr[_]): BoolExpr = ctx.mkEq(arg1, arg2)
-    def mkDistinct(args: Expr[_]*): BoolExpr = ctx.mkDistinct(args: _*)
-    def mkGt(arg1: ArithExpr[_], arg2: ArithExpr[_]): BoolExpr = ctx.mkGt(arg1, arg2)
-    def mkGe(arg1: ArithExpr[_], arg2: ArithExpr[_]): BoolExpr = ctx.mkGe(arg1, arg2)
-    def mkLt(arg1: ArithExpr[_], arg2: ArithExpr[_]): BoolExpr = ctx.mkLt(arg1, arg2)
-    def mkLe(arg1: ArithExpr[_], arg2: ArithExpr[_]): BoolExpr = ctx.mkLe(arg1, arg2)
+    def mkEq(arg1: Expr[?], arg2: Expr[?]): BoolExpr = ctx.mkEq(arg1, arg2)
+    def mkDistinct(args: Expr[?]*): BoolExpr = ctx.mkDistinct(args*)
+    def mkGt(arg1: ArithExpr[?], arg2: ArithExpr[?]): BoolExpr = ctx.mkGt(arg1, arg2)
+    def mkGe(arg1: ArithExpr[?], arg2: ArithExpr[?]): BoolExpr = ctx.mkGe(arg1, arg2)
+    def mkLt(arg1: ArithExpr[?], arg2: ArithExpr[?]): BoolExpr = ctx.mkLt(arg1, arg2)
+    def mkLe(arg1: ArithExpr[?], arg2: ArithExpr[?]): BoolExpr = ctx.mkLe(arg1, arg2)
   }
 }

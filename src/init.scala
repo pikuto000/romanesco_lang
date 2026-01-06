@@ -54,6 +54,18 @@ object init {
   }
   
   object parse{
-    ???
+    def setup(parseName: String, lexer: Lexer) = {
+      val parser = new Parser(lexer, Hygenicmarker.bless(s"parser:${parseName}", None, true))
+      core(parser)
+      parser
+    }
+
+    def core(parser: Parser): Unit = {
+      val testTag = Hygenicmarker.bless("anyWord", Some(parser), true)
+      // どんなトークンにも1つマッチするルール
+      parser.addSyntax(testTag)(parser.acceptIf(_ => true)(_ => "Expected any token"))
+      
+      logger.log(s"[parse] core setup for ${parser.tag.mangledName}")
+    }
   }
 }

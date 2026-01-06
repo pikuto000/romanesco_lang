@@ -4,7 +4,10 @@ import scala.util.parsing.combinator._
 //ソースの位置情報を把握できるようにする。
 import scala.util.parsing.input.OffsetPosition
 import scala.util.parsing.input.Positional
-
+import scala.concurrent.{Future, Await, ExecutionContext}
+import scala.concurrent.duration.Duration
+import java.util.concurrent.ConcurrentHashMap
+import scala.jdk.CollectionConverters._
 
 class Lexer(tag:HygenicTag)
 extends RegexParsers
@@ -12,87 +15,60 @@ with HygenicObj(tag)
 {
   override def skipWhitespace: Boolean = false
   
-  
-  //トークナイズをするメソッド
-  private def Stream(input:Input): Iterator[Token] = {
-    new Iterator[Token] {
-      var currentInput = input
-      var finished = false
+  // 並行処理用のコンテキスト
+  implicit val ec: ExecutionContext = ExecutionContext.global
 
-      def fetchNext(): Option[Token] = {
-        logger.log("[token] fetchNext begin")
-        if (currentInput.atEnd) {
-          logger.log("[token] fetchNext: input at end")
-          finished = true
-          None
+  // 全ての可能性を含んだトークン格子を並行して構築するメソッド
+  private def Lattice(input:Input): scala.collection.immutable.Map[Int, Array[Token]] = {
+    val lattice = new ConcurrentHashMap[Int, Array[Token]]()
+    val visited = ConcurrentHashMap.newKeySet[Int]()
+
+    def explore(current: Input): Future[Unit] = {
+      val offset = current.offset
+      if (current.atEnd || !visited.add(offset)) {
+        Future.successful(())
+      } else {
+        val matches = database.whoAreYou(current)
+        if (matches.nonEmpty) {
+          lattice.put(offset, matches.map(_._1))
+          // マッチした各ブランチを並行して探索
+          val futures = matches.map { case (_, next) => explore(next) }
+          Future.sequence(futures.toSeq).map(_ => ())
+        } else if (!current.atEnd) {
+          // どのルールにもマッチしない場合、1文字飛ばして並行探索を継続
+          explore(current.rest)
         } else {
-          database.whoAreYou(currentInput) match {
-            case Some(p) => 
-              p(currentInput) match {
-                case Success(token, next) =>
-                  logger.log(s"[token] fetchNext: success, token: '${token.s}'")
-                  currentInput = next
-                  Some(token)
-                case _ => 
-                  logger.log("[token] fetchNext: parser failure")
-                  finished = true
-                  None
-              }
-            case None => 
-              logger.log("[token] fetchNext: no matching rule found")
-              finished = true
-              None
-          }
+          Future.successful(())
         }
-      }
-
-      var nextToken: Option[Token] = None
-
-      override def hasNext: Boolean = {
-        if (finished) false
-        else if (nextToken.isDefined) true
-        else {
-          nextToken = fetchNext()
-          nextToken.isDefined
-        }
-      }
-
-      override def next(): Token = {
-        if (!hasNext) throw new NoSuchElementException("next on empty iterator")
-        val t = nextToken.get
-        nextToken = None
-        t
       }
     }
+
+    // 探索の開始と待機
+    Await.result(explore(input), Duration.Inf)
+    lattice.asScala.toMap
   }
   
-  def apply(reader: java.io.Reader): Array[Token] = {
-    logger.log("[token] tokenize begin")
-    lazy val in = scala.util.parsing.input.StreamReader(reader)
-    lazy val tokens = Stream(in).toArray
-    result = tokens
-    logger.log("[token] tokenize end")
-    tokens
+  // パース結果を保持する型をMap[Int, Array[Token]]に変更（位置 -> その位置から始まる全トークン）
+  var latticeResult: scala.collection.immutable.Map[Int, Array[Token]] = scala.collection.immutable.Map.empty
+
+  def apply(reader: java.io.Reader): scala.collection.immutable.Map[Int, Array[Token]] = {
+    logger.log("[token] build lattice (parallel) begin")
+    val in = scala.util.parsing.input.StreamReader(reader)
+    val res = Lattice(in)
+    latticeResult = res
+    logger.log("[token] build lattice (parallel) end")
+    res
   }
-  //一旦パース結果をおいておく場所。
-  //主にデバッグやマクロによる編集のために使用される。
-  var result:Array[Token]=Array.empty
-  
-  //デバッグ用のトークンを文字列としてダンプするメソッド
-  def dumpResult:Array[(String,Boolean,HygenicTag)]=
-  result.map(x=>x match {
-    case Token.Defined(s,t)=>(s,true,t)
-    case Token.otherwise(s,t)=>(s,false,t)
-  })
-  
-  //デバッグ用のトークンストリームを出力するメソッド
+
+  // デバッグ用のトークンストリームを出力するメソッドを格子対応に変更
   def printStream: Unit = {
-    dumpResult.foreach(s=>
-      s match {
-        case (content, isDefined, tag) =>
-          println(s"printStream: Token: '${content}', isDefined: $isDefined, Name: ${tag.mangledName}, ancestorHash: ${tag.ancestorHash}".replace("\n", "\\n").replace("\r", "\\r"))
+    latticeResult.keys.toSeq.sorted.foreach { offset =>
+      val tokens = latticeResult(offset)
+      println(s"Position $offset:")
+      tokens.foreach { t =>
+        println(s"  - Token: '${t.s}', Tag: ${t.tag.mangledName}")
       }
-    )
+    }
   }
   //データベース。特定のワードやデリミタ、ルールを定義する。ハッシュ値の親はこのLexerクラスにする。
   lazy val database=new d(Hygenicmarker.bless("database",Some(this),true))
@@ -132,98 +108,44 @@ with HygenicObj(tag)
       updateswitchable(true)
     }
     
-        //どのルールでパースするか判断する
-    
-        //最長一致原則と登録順(RuleOrder)を用いて解決する。
-    
-        //definedToknizeRulesを用いて解決できないときは、otherwisetokenizeRulesを用いて解決する。
-    
-        def whoAreYou(w:Input):Option[Parser[Token]]={
-          logger.log("[token] whoAreYou begin")
-          lazy val currentDefinedRules = cachedDefinedRules
-          lazy val currentOtherwiseRules = cachedOtherwiseRules
-          var maxMatchRes: Token = null
-          var maxMatchNext: Input = null
-          var maxLen = -1
-          var maxOrder: BigInt = -1
-          // 定義済みルールを探索 (高速なwhileループ)
-          var i = 0
-          lazy val defLen = currentDefinedRules.length
-          while (i < defLen) {
-            lazy val (tag, parser) = currentDefinedRules(i)
-            logger.log(s"[token] trying toknizer for tag: ${tag.mangledName}")
-            parser(w) match {
-              case Success(res, next) =>
-                logger.log(s"[token] matched with parser for tag: ${tag.mangledName}")
-                lazy val len = res.s.length
-                if (len > maxLen) {
-                  logger.log(s"[token] new longest match for tag: ${tag.mangledName}, length: ${len}")
-                  maxLen = len
-                  maxMatchRes = res
-                  maxMatchNext = next
-                  maxOrder = RuleOrder(tag)
-                } else if (len == maxLen) {
-                  lazy val order = RuleOrder(tag)
-                  if (order > maxOrder) {
-                    logger.log(s"[token] same length match but newer rule for tag: ${tag.mangledName}, length: ${len}")
-                    maxMatchRes = res
-                    maxMatchNext = next
-                    maxOrder = order
-                  } else {
-                    logger.log(s"[token] match discarded (shorter or older rule) for tag: ${tag.mangledName}")
-                  }
-                } else {
-                   logger.log(s"[token] match discarded (shorter) for tag: ${tag.mangledName}")
-                }
-              case _ =>
-                logger.log(s"[token] no success for tag: ${tag.mangledName}")
-            }
-            i += 1
-          }
-    
-          // その他ルールを探索
-          i = 0
-          lazy val otherLen = currentOtherwiseRules.length
-          while (i < otherLen) {
-            lazy val (tag, parser) = currentOtherwiseRules(i)
-            logger.log(s"[token] trying parser for tag: ${tag.mangledName}")
-            parser(w) match {
-              case Success(res, next) =>
-                logger.log(s"[token] matched with parser for tag: ${tag.mangledName}")
-                lazy val len = res.s.length
-                if (len > maxLen) {
-                  logger.log(s"[token] new longest match for tag: ${tag.mangledName}, length: ${len}")
-                  maxLen = len
-                  maxMatchRes = res
-                  maxMatchNext = next
-                  maxOrder = RuleOrder(tag)
-                } else if (len == maxLen) {
-                  lazy val order = RuleOrder(tag)
-                  if (order > maxOrder) {
-                    logger.log(s"[token] same length match but newer rule for tag: ${tag.mangledName}, length: ${len}")
-                    maxMatchRes = res
-                    maxMatchNext = next
-                    maxOrder = order
-                  } else {
-                     logger.log(s"[token] match discarded (shorter or older rule) for tag: ${tag.mangledName}")
-                  }
-                } else {
-                  logger.log(s"[token] match discarded (shorter) for tag: ${tag.mangledName}")
-                }
-              case _ =>
-                logger.log(s"[token] no success for tag: ${tag.mangledName}")
-            }
-            i += 1
-          }
-      logger.log("[token] whoAreYou end")
-      if (maxMatchRes != null) {
-        // 結果を直接返すパーサーを生成して返す (二重パース回避)
-        Some(new Parser[Token] {
-          def apply(in: Input) = Success(maxMatchRes, maxMatchNext)
-        })
-      } else {
-        None
+    //どのルールでパースするか判断し、マッチした全てを返す
+    def whoAreYou(w:Input): Array[(Token, Input)] = {
+      logger.log("[token] whoAreYou begin (all matches mode)")
+      
+      val currentDefinedRules = cachedDefinedRules
+      val currentOtherwiseRules = cachedOtherwiseRules
+      val matches = scala.collection.mutable.ArrayBuffer[(Token, Input)]()
+
+      // 定義済みルールを全て探索
+      var i = 0
+      val defLen = currentDefinedRules.length
+      while (i < defLen) {
+        val (_, parser) = currentDefinedRules(i)
+        parser(w) match {
+          case Success(res, next) =>
+            logger.log(s"[token] match found: '${res.s}'")
+            matches += ((res, next))
+          case _ =>
+        }
+        i += 1
       }
+
+      // その他ルールを全て探索
+      i = 0
+      val otherLen = currentOtherwiseRules.length
+      while (i < otherLen) {
+        val (_, parser) = currentOtherwiseRules(i)
+        parser(w) match {
+          case Success(res, next) =>
+            logger.log(s"[token] match found: '${res.s}'")
+            matches += ((res, next))
+          case _ =>
+        }
+        i += 1
+      }
+      
+      logger.log(s"[token] whoAreYou end, found ${matches.size} matches")
+      matches.toArray
     }
     def dumpDataBase: (Array[(HygenicTag, Parser[Token])],Array[(HygenicTag, Parser[Token])]) = (definedTokenizeRules.toArray,otherwisetokenizeRules.toArray)
   }
@@ -233,6 +155,7 @@ with HygenicObj(tag)
   //それ以外の場合はotherwiseを用いる。
   enum Token extends Positional{
     def s: String
+    def tag: HygenicTag
     case Defined(val s:String,val tag:HygenicTag)
     case otherwise(val s:String,val tag:HygenicTag)
   }

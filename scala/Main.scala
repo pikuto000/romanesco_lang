@@ -14,10 +14,17 @@ object Main {
     lazy val source = scala.io.Source.fromFile(filename)
     lazy val reader = source.reader()
     lazy val lexer = InstanceRegistory.launch()
+    lazy val parser = InstanceRegistory.launchParser(lexer)
     //計測開始
     val start = Instant.now()
-    lexer(reader)
+    val lattice = lexer(reader)
     if (true==debugflag)lexer.printStream
+    
+    // パース実行
+    val parseResult = parser(lattice.asInstanceOf[Map[Int, Array[parser.lexer.Token]]])
+    
+    if (debugflag) parser.printStream
+
     lazy val end = Instant.now()
     lazy val duration = Duration.between(start, end)
     println(s"opertion took ${duration.toMillis()} ms")
