@@ -3,7 +3,7 @@ package romanesco
 object logger {
   //これはデバッグ用
   private var Enable=false
-  def Switch(enable:Boolean):Unit={
+  def Switch(enable:Boolean=false):Unit={
     Enable=enable
     println(s"logger is $Enable")
   }

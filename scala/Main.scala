@@ -1,17 +1,25 @@
 package romanesco
+//時間を測る
+import java.time.Instant
+import java.time.Duration
 
 object Main {
   def main(args: Array[String]): Unit = {
-    //デバッグ用
-    logger.Switch(true)
     //ファイルをコマンドライン引数から読み込む
-    val filename = if (args.length==1){args(0)}else{
+    lazy val filename = if (args.length>=1){args(0)}else{
         scala.io.StdIn.readLine("input file:")
     }
-    val source = scala.io.Source.fromFile(filename)
-    val reader = source.reader()
-    val lexer = InstanceRegistory.launch()
+    lazy val debugflag = if (args.length==2){args(1)=="debug"}else{false}
+    if (debugflag){logger.Switch(true)}
+    lazy val source = scala.io.Source.fromFile(filename)
+    lazy val reader = source.reader()
+    lazy val lexer = InstanceRegistory.launch()
+    //計測開始
+    val start = Instant.now()
     lexer(reader)
-    lexer.printStream
+    if (true==debugflag)lexer.printStream
+    lazy val end = Instant.now()
+    lazy val duration = Duration.between(start, end)
+    println(s"opertion took ${duration.toMillis()} ms")
   }
 }

@@ -7,7 +7,7 @@ object init {
   
   object lex{
     def setup(lexName:String)={
-      val lexer=new Lexer(Hygenicmarker.bless(s"lexer:${lexName}",None,true))
+      lazy val lexer=new Lexer(Hygenicmarker.bless(s"lexer:${lexName}",None,true))
       core(lexer)
       lexer
     }
@@ -17,11 +17,11 @@ object init {
       Hygenicmarker.bless("whiteSpace",Some(lexer),true),
       new lexer.Parser[lexer.Token] {
         def apply(in: lexer.Input) = {
-          val start = in.pos
+          lazy val start = in.pos
           lexer.regex("""\s+""".r)(in) match {
             case lexer.Success(ws, next) =>
-              val row = start.line
-              val col = start.column
+              lazy val row = start.line
+              lazy val col = start.column
               lexer.Success(
                 lexer.Token.otherwise(ws,Hygenicmarker.bless(s"whiteSpace:'${ws}', row:${row}, column:${col}",Some(lexer),true)),
                 next
@@ -35,11 +35,11 @@ object init {
       Hygenicmarker.bless("word",Some(lexer),true),
       new lexer.Parser[lexer.Token] {
         def apply(in: lexer.Input) = {
-          val start = in.pos
+          lazy val start = in.pos
           lexer.regex("""\S+""".r)(in) match {
             case lexer.Success(word, next) =>
-              val row = start.line
-              val col = start.column
+              lazy val row = start.line
+              lazy val col = start.column
               lexer.Success(
                 lexer.Token.otherwise(word,Hygenicmarker.bless(s"word:'${word}', row:${row}, column:${col}",Some(lexer),true)),
                 next
