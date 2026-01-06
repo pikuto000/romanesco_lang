@@ -23,7 +23,6 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     }
 
     override def atEnd: Boolean = {
-      // offsetが格子の最大キーを超えている場合は終了
       !lattice.keys.exists(_ >= offset)
     }
 
@@ -44,60 +43,7 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     }
   }
 
-  // 格子の分岐を考慮したディスパッチャー
-  // 入力位置にある全トークン候補に対し、登録された全ルールをバックトラッキングで試す
-  def dispatch: Parser[Any] = new Parser[Any] {
-    def apply(in: Input): ParseResult[Any] = {
-      val offset = in.pos match {
-        case op: OffsetPosition => op.offset
-        case _ => in.offset
-      }
-
-      // 空白スキップ
-      var currentOffset = offset
-      var tokensAtThisPos = lastLattice.getOrElse(currentOffset, Array.empty[lexer.Token])
-      while (tokensAtThisPos.nonEmpty && tokensAtThisPos.forall(_.tag.name.startsWith("whiteSpace"))) {
-        val wsLen = tokensAtThisPos(0).s.length
-        currentOffset += wsLen
-        tokensAtThisPos = lastLattice.getOrElse(currentOffset, Array.empty[lexer.Token])
-      }
-
-      val currentRules = database.getRules
-
-      if (tokensAtThisPos.isEmpty) {
-        if (in.atEnd) Success((), in) else Failure(s"No tokens at $currentOffset", in)
-      } else {
-        // 実質的なトークン候補（空白以外）
-        val contentTokens = tokensAtThisPos.filterNot(_.tag.name.startsWith("whiteSpace"))
-        
-        def tryTokens(tIdx: Int): ParseResult[Any] = {
-          if (tIdx >= contentTokens.length) Failure("No match in lattice", in)
-          else {
-            val t = contentTokens(tIdx)
-            val readerWithToken = new LatticeReader(currentOffset, lastLattice).select(tokensAtThisPos.indexOf(t))
-            
-            def tryRules(rIdx: Int): ParseResult[Any] = {
-              if (rIdx >= currentRules.length) tryTokens(tIdx + 1)
-              else {
-                val (tag, ruleParser) = currentRules(rIdx)
-                ruleParser(new PackratReader(readerWithToken)) match {
-                  case s: Success[_] => 
-                    logger.log(s"[parse] matched: ${tag.mangledName} with '${t.s}'")
-                    s
-                  case _ => tryRules(rIdx + 1)
-                }
-              }
-            }
-            tryRules(0)
-          }
-        }
-        tryTokens(0)
-      }
-    }
-  }
-
-  private var lastLattice: Map[Int, Array[lexer.Token]] = Map.empty
-
+  // 特定のトークンにマッチするユーティリティ
   def token(name: String): Parser[lexer.Token] = acceptIf(_.s == name)(t => s"Expected '$name' found '${t.s}'")
 
   val database = new d(Hygenicmarker.bless("database", Some(this), true))
@@ -126,17 +72,54 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
 
   def addSyntax(t: HygenicTag)(p: PackratParser[Any]): Unit = database.set(t, p)
 
+  // --- 最適化のためのキャッシュ ---
+  private var lastLattice: Map[Int, Array[lexer.Token]] = Map.empty
+  private var lastLatticeArray: Array[Array[lexer.Token]] = Array.empty
+  private var nextContentOffset: Array[Int] = Array.empty
+
   def apply(lattice: Map[Int, Array[lexer.Token]]): ParseResult[Array[Any]] = {
+    if (lattice.isEmpty) return Success(Array.empty, new LatticeReader(0, Map.empty))
     lastLattice = lattice
+
+    // 1. 高速化のための配列化 (O(1) lookup)
+    val maxOffset = lattice.keys.max
+    lastLatticeArray = new Array[Array[lexer.Token]](maxOffset + 1)
+    lattice.foreach { case (off, tokens) => lastLatticeArray(off) = tokens }
+
+    // 2. 空白スキップ用のジャンプテーブル
+    nextContentOffset = new Array[Int](maxOffset + 1)
+    var lastContent = maxOffset + 1
+    var i = maxOffset
+    while (i >= 0) {
+      val tokens = lastLatticeArray(i)
+      if (tokens != null && tokens.exists(!_.tag.name.startsWith("whiteSpace"))) {
+        lastContent = i
+      }
+      nextContentOffset(i) = lastContent
+      i -= 1
+    }
+
     var currentReader: Reader[lexer.Token] = new PackratReader(new LatticeReader(0, lattice))
     val results = scala.collection.mutable.ArrayBuffer[Any]()
     
     while (!currentReader.atEnd) {
-      dispatch(currentReader) match {
-        case Success(res, next) =>
-          if (res != ()) results += res
-          currentReader = next
-        case f: NoSuccess => return Failure(f.msg, currentReader)
+      // 空白スキップ
+      val startOffset = currentReader.offset
+      if (startOffset < nextContentOffset.length) {
+        val nextContent = nextContentOffset(startOffset)
+        if (nextContent != startOffset) {
+          currentReader = new PackratReader(new LatticeReader(nextContent, lattice))
+        }
+      }
+
+      if (currentReader.atEnd) { /* Done */ } 
+      else {
+        dispatch(currentReader) match {
+          case Success(res, next) =>
+            if (res != ()) results += res
+            currentReader = next
+          case f: NoSuccess => return Failure(f.msg, currentReader)
+        }
       }
     }
     val finalRes = results.toArray
@@ -144,12 +127,45 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     Success(finalRes, currentReader)
   }
 
+  def dispatch: Parser[Any] = new Parser[Any] {
+    def apply(in: Input): ParseResult[Any] = {
+      val offset = in.offset
+      if (offset >= lastLatticeArray.length) return Failure("EOF", in)
+      
+      val tokens = lastLatticeArray(offset)
+      if (tokens == null) return Failure(s"No tokens at $offset", in)
+
+      val currentRules = Parser.this.database.getRules
+      val rulesLen = currentRules.length
+      
+      var tIdx = 0
+      val tLen = tokens.length
+      while (tIdx < tLen) {
+        val t = tokens(tIdx)
+        if (!t.tag.name.startsWith("whiteSpace")) {
+          val readerWithToken = new LatticeReader(offset, lastLattice).select(tIdx)
+          val packratIn = new PackratReader(readerWithToken)
+          
+          var rIdx = 0
+          while (rIdx < rulesLen) {
+            currentRules(rIdx)._2(packratIn) match {
+              case s: Success[_] => return s
+              case _ =>
+            }
+            rIdx += 1
+          }
+        }
+        tIdx += 1
+      }
+      Failure("No match", in)
+    }
+  }
+
   var result: Array[Any] = Array.empty
 
   def printStream: Unit = {
-    result.foreach {
-      res =>
-        println(s"printStream: Result: $res".replace("\n", "\\n").replace("\r", "\\r"))
+    result.foreach { res =>
+      println(s"printStream: Result: $res".replace("\n", "\\n").replace("\r", "\\r"))
     }
   }
 
