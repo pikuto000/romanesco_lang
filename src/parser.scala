@@ -9,41 +9,37 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
   with PackratParsers
   with HygenicObj(tag) {
 
-  // パーサーが扱う要素の型をLexerのTokenに設定
   type Elem = lexer.Token
 
-  // トークン格子を読み取るためのReader実装
-  class LatticeReader(override val offset: Int, val lattice: Map[Int, Array[lexer.Token]]) extends Reader[lexer.Token] {
-    val availableTokens: Array[lexer.Token] = lattice.getOrElse(offset, Array.empty[lexer.Token])
-    var currentTokenIdx = 0
+  // LatticeReader: 空白スキップを一切行わない「純粋な」リーダー
+  class LatticeReader(override val offset: Int, val lattice: Map[Int, Array[lexer.Token]], val tIdx: Int = 0) extends Reader[lexer.Token] {
+    val availableTokens = lattice.getOrElse(offset, Array.empty[lexer.Token])
 
-    override def first: lexer.Token = {
-      if (atEnd || availableTokens.isEmpty) null
-      else availableTokens(currentTokenIdx)
-    }
+    override def first: lexer.Token = if (availableTokens.isDefinedAt(tIdx)) availableTokens(tIdx) else null
 
     override def atEnd: Boolean = {
-      !lattice.keys.exists(_ >= offset)
+      // 現在の位置にトークンがなく、かつこれ以降にもトークンがない場合に終了
+      availableTokens.isEmpty && !lattice.keys.exists(_ > offset)
     }
 
+    // 単純に次の位置へ進むだけ
     override def rest: Reader[lexer.Token] = {
-      if (atEnd || availableTokens.isEmpty) this
-      else new LatticeReader(offset + availableTokens(currentTokenIdx).s.length, lattice)
+      if (atEnd) this
+      else {
+        val nextRawOff = offset + first.s.length
+        new LatticeReader(nextRawOff, lattice, 0)
+      }
     }
 
-    override def pos: Position = {
-      if (availableTokens.isEmpty) NoPosition
-      else availableTokens(currentTokenIdx).pos
-    }
-    
-    def select(idx: Int): LatticeReader = {
-      val nr = new LatticeReader(offset, lattice)
-      nr.currentTokenIdx = idx
-      nr
-    }
+    override def pos: Position = if (first != null) first.pos else NoPosition
+    def select(newTIdx: Int): LatticeReader = new LatticeReader(offset, lattice, newTIdx)
   }
 
-  // 特定のトークンにマッチするユーティリティ
+  // --- 明示的な空白スキップ ---
+  // 0個以上の空白トークンにマッチする
+  def _S: Parser[List[lexer.Token]] = rep(acceptIf(_.isWhiteSpace)(_ => "whitespace expected"))
+
+  // --- ユーティリティ ---
   def token(name: String): Parser[lexer.Token] = acceptIf(_.s == name)(t => s"Expected '$name' found '${t.s}'")
 
   val database = new d(Hygenicmarker.bless("database", Some(this), true))
@@ -51,125 +47,64 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     private var rules: MutableMap[HygenicTag, PackratParser[Any]] = MutableMap.empty
     private var RuleOrder: MutableMap[HygenicTag, BigInt] = MutableMap.empty
     private var counter: BigInt = 0
-    private var cachedRules: Array[(HygenicTag, PackratParser[Any])] = Array.empty
     private var update = true
-
     def set(t: HygenicTag, p: PackratParser[Any]): Unit = {
       rules += (t -> p)
       RuleOrder += (t -> counter)
       counter += 1
       update = true
     }
-
     def getRules: Array[(HygenicTag, PackratParser[Any])] = {
-      if (update) {
-        cachedRules = rules.toArray.sortBy(x => RuleOrder(x._1))
-        update = false
-      }
+      if (update) { cachedRules = rules.toArray.sortBy(x => RuleOrder(x._1)); update = false }
       cachedRules
     }
+    private var cachedRules: Array[(HygenicTag, PackratParser[Any])] = Array.empty
   }
 
   def addSyntax(t: HygenicTag)(p: PackratParser[Any]): Unit = database.set(t, p)
 
-  // --- 最適化のためのキャッシュ ---
   private var lastLattice: Map[Int, Array[lexer.Token]] = Map.empty
-  private var lastLatticeArray: Array[Array[lexer.Token]] = Array.empty
-  private var nextContentOffset: Array[Int] = Array.empty
 
-  def apply(lattice: Map[Int, Array[lexer.Token]]): ParseResult[Array[Any]] = {
-    if (lattice.isEmpty) return Success(Array.empty, new LatticeReader(0, Map.empty))
-    lastLattice = lattice
-
-    // 1. 高速化のための配列化 (O(1) lookup)
-    val maxOffset = lattice.keys.max
-    lastLatticeArray = new Array[Array[lexer.Token]](maxOffset + 1)
-    lattice.foreach { case (off, tokens) => lastLatticeArray(off) = tokens }
-
-    // 2. 空白スキップ用のジャンプテーブル
-    nextContentOffset = new Array[Int](maxOffset + 1)
-    var lastContent = maxOffset + 1
-    var i = maxOffset
-    while (i >= 0) {
-      val tokens = lastLatticeArray(i)
-      if (tokens != null && tokens.exists(!_.tag.name.startsWith("whiteSpace"))) {
-        lastContent = i
-      }
-      nextContentOffset(i) = lastContent
-      i -= 1
-    }
-
-    var currentReader: Reader[lexer.Token] = new PackratReader(new LatticeReader(0, lattice))
-    val results = scala.collection.mutable.ArrayBuffer[Any]()
-    
-    while (!currentReader.atEnd) {
-      // 空白スキップ
-      val startOffset = currentReader.offset
-      if (startOffset < nextContentOffset.length) {
-        val nextContent = nextContentOffset(startOffset)
-        if (nextContent != startOffset) {
-          currentReader = new PackratReader(new LatticeReader(nextContent, lattice))
+  def combinedDispatch: Parser[Any] = new Parser[Any] {
+    def apply(in: Input): ParseResult[Any] = {
+      val currentRules = database.getRules
+      var bestRes: Option[ParseResult[Any]] = None
+      var maxOff = -1
+      
+      var i = 0
+      while (i < currentRules.length) {
+        val (tag, rule) = currentRules(i)
+        rule(in) match {
+          case s: Success[Any] =>
+            if (s.next.offset > maxOff) {
+              maxOff = s.next.offset
+              bestRes = Some(s)
+            }
+          case _ => 
         }
+        i += 1
       }
-
-      if (currentReader.atEnd) { /* Done */ } 
-      else {
-        dispatch(currentReader) match {
-          case Success(res, next) =>
-            if (res != ()) results += res
-            currentReader = next
-          case f: NoSuccess => return Failure(f.msg, currentReader)
-        }
-      }
+      bestRes.getOrElse(Failure("No rule matched", in))
     }
-    val finalRes = results.toArray
-    result = finalRes
-    Success(finalRes, currentReader)
   }
 
-  def dispatch: Parser[Any] = new Parser[Any] {
-    def apply(in: Input): ParseResult[Any] = {
-      val offset = in.offset
-      if (offset >= lastLatticeArray.length) return Failure("EOF", in)
-      
-      val tokens = lastLatticeArray(offset)
-      if (tokens == null) return Failure(s"No tokens at $offset", in)
-
-      val currentRules = Parser.this.database.getRules
-      val rulesLen = currentRules.length
-      
-      var tIdx = 0
-      val tLen = tokens.length
-      while (tIdx < tLen) {
-        val t = tokens(tIdx)
-        if (!t.tag.name.startsWith("whiteSpace")) {
-          val readerWithToken = new LatticeReader(offset, lastLattice).select(tIdx)
-          val packratIn = new PackratReader(readerWithToken)
-          
-          var rIdx = 0
-          while (rIdx < rulesLen) {
-            currentRules(rIdx)._2(packratIn) match {
-              case s: Success[_] => return s
-              case _ =>
-            }
-            rIdx += 1
-          }
-        }
-        tIdx += 1
-      }
-      Failure("No match", in)
+  def apply(lattice: Map[Int, Array[lexer.Token]]): ParseResult[Array[Any]] = {
+    lastLattice = lattice
+    // 最初が空白なら飛ばして開始
+    val initialReader = new PackratReader(new LatticeReader(0, lattice))
+    
+    // rep( (空白を飛ばす) ~> dispatch )
+    val program = rep(_S ~> combinedDispatch)
+    
+    logger.log(s"[parse] Starting explicit whitespace parse.")
+    program(initialReader) match {
+      case Success(res, next) =>
+        result = res.toArray
+        Success(result, next)
+      case f: NoSuccess => f.asInstanceOf[ParseResult[Array[Any]]]
     }
   }
 
   var result: Array[Any] = Array.empty
-
-  def printStream: Unit = {
-    result.foreach { res =>
-      println(s"printStream: Result: $res".replace("\n", "\\n").replace("\r", "\\r"))
-    }
-  }
-
-  def eof: Parser[Unit] = new Parser[Unit] {
-    def apply(in: Input) = if (in.atEnd) Success((), in) else Failure("Expected EOF", in)
-  }
+  def printStream: Unit = result.zipWithIndex.foreach { case (res, idx) => println(s"printStream: [$idx] Result: $res") }
 }

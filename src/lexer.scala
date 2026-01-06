@@ -25,21 +25,28 @@ with HygenicObj(tag)
 
     def explore(current: Input): Future[Unit] = {
       val offset = current.offset
-      if (current.atEnd || !visited.add(offset)) {
+      val isNew = visited.add(offset)
+      // logger.log(s"[token] explore at offset $offset, atEnd: ${current.atEnd}, isNew: $isNew")
+      
+      if (current.atEnd || !isNew) {
         Future.successful(())
       } else {
         val matches = database.whoAreYou(current)
+        val tasks = scala.collection.mutable.ArrayBuffer[Future[Unit]]()
+
         if (matches.nonEmpty) {
           lattice.put(offset, matches.map(_._1))
-          // マッチした各ブランチを並行して探索
-          val futures = matches.map { case (_, next) => explore(next) }
-          Future.sequence(futures.toSeq).map(_ => ())
-        } else if (!current.atEnd) {
-          // どのルールにもマッチしない場合、1文字飛ばして並行探索を継続
-          explore(current.rest)
-        } else {
-          Future.successful(())
+          matches.foreach { case (token, next) => 
+            logger.log(s"[token] matched '${token.s.replace("\n", "\\n")}', jumping from $offset to ${next.offset}")
+            tasks += explore(next) 
+          }
         }
+        
+        if (matches.isEmpty && !current.atEnd) {
+          tasks += explore(current.rest)
+        }
+
+        Future.sequence(tasks.toSeq).map(_ => ())
       }
     }
 
@@ -52,8 +59,20 @@ with HygenicObj(tag)
   var latticeResult: scala.collection.immutable.Map[Int, Array[Token]] = scala.collection.immutable.Map.empty
 
   def apply(reader: java.io.Reader): scala.collection.immutable.Map[Int, Array[Token]] = {
+    // ReaderからStringへ変換して正規化（確実なオフセット追跡のため）
+    val sb = new StringBuilder()
+    val buf = new Array[Char](4096)
+    var n = reader.read(buf)
+    while (n != -1) {
+      sb.appendAll(buf, 0, n)
+      n = reader.read(buf)
+    }
+    tokenize(sb.toString)
+  }
+
+  def tokenize(source: String): scala.collection.immutable.Map[Int, Array[Token]] = {
     logger.log("[token] build lattice (parallel) begin")
-    val in = scala.util.parsing.input.StreamReader(reader)
+    val in = new scala.util.parsing.input.CharSequenceReader(source)
     val res = Lattice(in)
     latticeResult = res
     logger.log("[token] build lattice (parallel) end")
@@ -66,12 +85,12 @@ with HygenicObj(tag)
       val tokens = latticeResult(offset)
       println(s"Position $offset:")
       tokens.foreach { t =>
-        println(s"  - Token: '${t.s}', Tag: ${t.tag.mangledName}")
+        println(s"  - Token: '${t.s}', Tag: ${t.tag.mangledName}".replace("\n", "\\n").replace("\r", "\\r"))
       }
     }
   }
   //データベース。特定のワードやデリミタ、ルールを定義する。ハッシュ値の親はこのLexerクラスにする。
-  lazy val database=new d(Hygenicmarker.bless("database",Some(this),true))
+  val database=new d(Hygenicmarker.bless("database",Some(this),true))
   class d(tag:HygenicTag) extends HygenicObj(tag) {
     //基本的なトークナイズルールのマップ
     private var definedTokenizeRules:Map[HygenicTag,Parser[Token]]=Map.empty
@@ -93,7 +112,7 @@ with HygenicObj(tag)
     //
     def set(t:HygenicTag,p:Parser[Token]): Unit = {
       //pが返すTokenの状態に応じてマップの保存先を変える。
-      lazy val pp = positioned(p)
+      val pp = positioned(p)
       p match{
         case p if p.isInstanceOf[Parser[Token.Defined]] =>
         definedTokenizeRules += (t -> pp)
@@ -156,6 +175,7 @@ with HygenicObj(tag)
   enum Token extends Positional{
     def s: String
     def tag: HygenicTag
+    def isWhiteSpace: Boolean = tag.name.startsWith("whiteSpace") || tag.name == "ws"
     case Defined(val s:String,val tag:HygenicTag)
     case otherwise(val s:String,val tag:HygenicTag)
   }

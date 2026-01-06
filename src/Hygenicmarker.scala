@@ -7,7 +7,7 @@ object Hygenicmarker {
         MurmurHash3.stringHash(path)
 
     def bless(name:String,ancestor:Option[HygenicObj],isOpaque:Boolean=false):HygenicTag={
-        lazy val tag=new HygenicTag(
+        val tag=new HygenicTag(
             name,
             MurmurHash3.stringHash(name + (ancestor match{
                 case Some(obj:HygenicObj) => obj.tag.name
@@ -41,6 +41,6 @@ class HygenicTag(
 }
 
 trait HygenicObj(t:HygenicTag){
-    lazy val tag=t
+    val tag=t
     def checkfamily(yaho:HygenicObj)=if (tag.ancestorHash==yaho.tag.hash)true else false
 }
