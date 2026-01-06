@@ -50,6 +50,6 @@ object Main {
     //計測終了
     val end = Instant.now()
     val to = Duration.between(start, end)
-    println(s"total took ${to.toMillis()} ms")
+    println(s"totally operation took ${to.toMillis()} ms")
   }
 }
