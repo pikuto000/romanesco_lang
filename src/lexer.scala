@@ -15,7 +15,7 @@ with HygenicObj(tag)
   
   //トークナイズをするメソッド
   private def Stream(input:Input): ParseResult[Array[Token]] = {
-    // logger.log("[token] tokenize begin")
+    logger.log("[token] tokenize begin")
     lazy val tokenizer: Parser[Token] ={
       input => {
         database.whoAreYou(input) match {
@@ -69,8 +69,8 @@ with HygenicObj(tag)
     private var otherwisetokenizeRules:Map[HygenicTag,Parser[Token]]=Map.empty
     
     // パフォーマンスのためのキャッシュ
-    private var cachedDefinedRules: Array[(HygenicTag, Parser[Token])] = Array.empty
-    private var cachedOtherwiseRules: Array[(HygenicTag, Parser[Token])] = Array.empty
+    def cachedDefinedRules: Array[(HygenicTag, Parser[Token])] = definedTokenizeRules.toArray
+    def cachedOtherwiseRules: Array[(HygenicTag, Parser[Token])] = otherwisetokenizeRules.toArray
     
     private var counter:BigInt=0
     private var update=false
@@ -99,101 +99,90 @@ with HygenicObj(tag)
       updateswitchable(true)
     }
     
-    //どのルールでパースするか判断する
-    //最長一致原則と登録順(RuleOrder)を用いて解決する。
-    //definedToknizeRulesを用いて解決できないときは、otherwisetokenizeRulesを用いて解決する。
-    def whoAreYou(w:Input):Option[Parser[Token]]={
-      logger.log("[token] whoAreYou begin")
-      if (update){
-        logger.log("[token] update database")
-        // 配列に変換してキャッシュ (Mapのイテレーションより高速)
-        cachedDefinedRules = definedTokenizeRules.toArray
-        cachedOtherwiseRules = otherwisetokenizeRules.toArray
-        updateswitchable(false)
-      }
-      
-      var maxMatchRes: Token = null
-      var maxMatchNext: Input = null
-      // var maxMatchTag: HygenicTag = null // 未使用
-      var maxLen = -1
-      var maxOrder: BigInt = -1
-
-      // 定義済みルールを探索 (高速なwhileループ)
-      var i = 0
-      val defLen = cachedDefinedRules.length
-      while (i < defLen) {
-        val (tag, parser) = cachedDefinedRules(i)
-        logger.log(s"[token] trying parser for tag: ${tag.mangledName}")
-        parser(w) match {
-          case Success(res, next) =>
-            logger.log(s"[token] matched with parser for tag: ${tag.mangledName}")
-            val len = res.s.length
-            if (len > maxLen) {
-              logger.log(s"[token] new longest match for tag: ${tag.mangledName}, length: ${len}")
-              maxLen = len
-              maxMatchRes = res
-              maxMatchNext = next
-              // maxMatchTag = tag
-              maxOrder = RuleOrder(tag)
-            } else if (len == maxLen) {
-              val order = RuleOrder(tag)
-              if (order > maxOrder) {
-                logger.log(s"[token] same length match but newer rule for tag: ${tag.mangledName}, length: ${len}")
-                maxMatchRes = res
-                maxMatchNext = next
-                // maxMatchTag = tag
-                maxOrder = order
-              } else {
-                logger.log(s"[token] match discarded (shorter or older rule) for tag: ${tag.mangledName}")
-              }
-            } else {
-               logger.log(s"[token] match discarded (shorter) for tag: ${tag.mangledName}")
+        //どのルールでパースするか判断する
+    
+        //最長一致原則と登録順(RuleOrder)を用いて解決する。
+    
+        //definedToknizeRulesを用いて解決できないときは、otherwisetokenizeRulesを用いて解決する。
+    
+        def whoAreYou(w:Input):Option[Parser[Token]]={
+          logger.log("[token] whoAreYou begin")
+          val currentDefinedRules = cachedDefinedRules
+          val currentOtherwiseRules = cachedOtherwiseRules
+          var maxMatchRes: Token = null
+          var maxMatchNext: Input = null
+          var maxLen = -1
+          var maxOrder: BigInt = -1
+          // 定義済みルールを探索 (高速なwhileループ)
+          var i = 0
+          lazy val defLen = currentDefinedRules.length
+          while (i < defLen) {
+            lazy val (tag, parser) = currentDefinedRules(i)
+            logger.log(s"[token] trying toknizer for tag: ${tag.mangledName}")
+            parser(w) match {
+              case Success(res, next) =>
+                logger.log(s"[token] matched with parser for tag: ${tag.mangledName}")
+                lazy val len = res.s.length
+                if (len > maxLen) {
+                  logger.log(s"[token] new longest match for tag: ${tag.mangledName}, length: ${len}")
+                  maxLen = len
+                  maxMatchRes = res
+                  maxMatchNext = next
+                  maxOrder = RuleOrder(tag)
+                } else if (len == maxLen) {
+                  lazy val order = RuleOrder(tag)
+                  if (order > maxOrder) {
+                    logger.log(s"[token] same length match but newer rule for tag: ${tag.mangledName}, length: ${len}")
+                    maxMatchRes = res
+                    maxMatchNext = next
+                    maxOrder = order
+                  } else {
+                    logger.log(s"[token] match discarded (shorter or older rule) for tag: ${tag.mangledName}")
+                  }
+                } else {
+                   logger.log(s"[token] match discarded (shorter) for tag: ${tag.mangledName}")
+                }
+              case _ =>
+                logger.log(s"[token] no success for tag: ${tag.mangledName}")
             }
-          case _ =>
-            logger.log(s"[token] no success for tag: ${tag.mangledName}")
-        }
-        i += 1
-      }
-
-      // その他ルールを探索
-      i = 0
-      val otherLen = cachedOtherwiseRules.length
-      while (i < otherLen) {
-        val (tag, parser) = cachedOtherwiseRules(i)
-        logger.log(s"[token] trying parser for tag: ${tag.mangledName}")
-        parser(w) match {
-          case Success(res, next) =>
-            logger.log(s"[token] matched with parser for tag: ${tag.mangledName}")
-            val len = res.s.length
-            if (len > maxLen) {
-              logger.log(s"[token] new longest match for tag: ${tag.mangledName}, length: ${len}")
-              maxLen = len
-              maxMatchRes = res
-              maxMatchNext = next
-              // maxMatchTag = tag
-              maxOrder = RuleOrder(tag)
-            } else if (len == maxLen) {
-              val order = RuleOrder(tag)
-              if (order > maxOrder) {
-                logger.log(s"[token] same length match but newer rule for tag: ${tag.mangledName}, length: ${len}")
-                maxMatchRes = res
-                maxMatchNext = next
-                // maxMatchTag = tag
-                maxOrder = order
-              } else {
-                 logger.log(s"[token] match discarded (shorter or older rule) for tag: ${tag.mangledName}")
-              }
-            } else {
-              logger.log(s"[token] match discarded (shorter) for tag: ${tag.mangledName}")
+            i += 1
+          }
+    
+          // その他ルールを探索
+          i = 0
+          lazy val otherLen = currentOtherwiseRules.length
+          while (i < otherLen) {
+            lazy val (tag, parser) = currentOtherwiseRules(i)
+            logger.log(s"[token] trying parser for tag: ${tag.mangledName}")
+            parser(w) match {
+              case Success(res, next) =>
+                logger.log(s"[token] matched with parser for tag: ${tag.mangledName}")
+                lazy val len = res.s.length
+                if (len > maxLen) {
+                  logger.log(s"[token] new longest match for tag: ${tag.mangledName}, length: ${len}")
+                  maxLen = len
+                  maxMatchRes = res
+                  maxMatchNext = next
+                  maxOrder = RuleOrder(tag)
+                } else if (len == maxLen) {
+                  lazy val order = RuleOrder(tag)
+                  if (order > maxOrder) {
+                    logger.log(s"[token] same length match but newer rule for tag: ${tag.mangledName}, length: ${len}")
+                    maxMatchRes = res
+                    maxMatchNext = next
+                    maxOrder = order
+                  } else {
+                     logger.log(s"[token] match discarded (shorter or older rule) for tag: ${tag.mangledName}")
+                  }
+                } else {
+                  logger.log(s"[token] match discarded (shorter) for tag: ${tag.mangledName}")
+                }
+              case _ =>
+                logger.log(s"[token] no success for tag: ${tag.mangledName}")
             }
-          case _ =>
-            logger.log(s"[token] no success for tag: ${tag.mangledName}")
-        }
-        i += 1
-      }
-      
+            i += 1
+          }
       logger.log("[token] whoAreYou end")
-
       if (maxMatchRes != null) {
         // 結果を直接返すパーサーを生成して返す (二重パース回避)
         Some(new Parser[Token] {
@@ -203,7 +192,6 @@ with HygenicObj(tag)
         None
       }
     }
-    
     def dumpDataBase: (Array[(HygenicTag, Parser[Token])],Array[(HygenicTag, Parser[Token])]) = (definedTokenizeRules.toArray,otherwisetokenizeRules.toArray)
   }
   //定義されたトークンとそうでないトークンを区別するenum
