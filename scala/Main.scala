@@ -43,21 +43,71 @@ object Main {
     
         
     
-        if (parseResult.successful) {
+            if (parseResult.successful) {
     
-          val res = parseResult.get
+        
     
-          // Step 2.1 検証: 評価器のテスト
+        
     
-          init.debug.testEvaluator(res)
+        
     
-          
+              val resRaw = parseResult.get
     
-          val solveStart = Instant.now()
+        
     
-          // 制約解決の実行
+        
     
-          val z3Ctx = new com.microsoft.z3.Context()
+        
+    
+              // Step 2.2: コンパイル時計算 (Constant Folding)
+    
+        
+    
+              val res = init.optimization.apply(resRaw)
+    
+        
+    
+              
+    
+        
+    
+              if (debugflag) {
+    
+        
+    
+                println("--- Optimized AST ---")
+    
+        
+    
+                res.zipWithIndex.foreach { case (r, i) => println(s"[$i] $r") }
+    
+        
+    
+                println("---------------------")
+    
+        
+    
+              }
+    
+        
+    
+        
+    
+        
+    
+              val solveStart = Instant.now()
+    
+        
+    
+        
+    
+        
+    
+              // 制約解決の実行
+    
+        
+    
+              val z3Ctx = new com.microsoft.z3.Context()
     
           try {
     

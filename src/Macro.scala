@@ -22,26 +22,30 @@ object Macro {
       foldedNode.kind match {
         case "BinaryOp" =>
           // 両辺が DecimalLiteral なら計算して置換
-          val left = foldedChildren(0)
-          val right = foldedChildren(1)
-          
-          if (left.kind == "DecimalLiteral" && right.kind == "DecimalLiteral") {
-            try {
-              val result = evaluator.eval(foldedNode)
-              result match {
-                case d: BigDecimal =>
-                  logger.log(s"[macro] Folded constant expression: $foldedNode -> $d")
-                  Node("DecimalLiteral", node.tag, Map("value" -> d))
-                case b: Boolean =>
-                  // BoolLiteral はまだ定義していないが、比較演算の結果などを畳み込むなら必要
-                  // 今回は DecimalLiteral への畳み込みを主とする
-                  node 
-                case _ => foldedNode
+          if (foldedChildren.length == 2) {
+            val left = foldedChildren(0)
+            val right = foldedChildren(1)
+            
+            if (left.kind == "DecimalLiteral" && right.kind == "DecimalLiteral") {
+              try {
+                val result = evaluator.eval(foldedNode)
+                result match {
+                  case d: BigDecimal =>
+                    logger.log(s"[macro] Folded constant expression: $foldedNode -> $d")
+                    Node("DecimalLiteral", node.tag, Map("value" -> d))
+                  case b: Boolean =>
+                    // 比較演算の結果（Boolean）は現状ASTで表現できないが、
+                    // BoolLiteralを作るならここで対応可能
+                    foldedNode
+                  case _ => foldedNode
+                }
+              } catch {
+                case e: Exception => 
+                  logger.log(s"[macro] Failed to fold $foldedNode: ${e.getMessage}")
+                  foldedNode
               }
-            } catch {
-              case e: Exception => 
-                logger.log(s"[macro] Failed to fold $foldedNode: ${e.getMessage}")
-                foldedNode
+            } else {
+              foldedNode
             }
           } else {
             foldedNode
