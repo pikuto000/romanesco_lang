@@ -9,22 +9,18 @@ object Main {
     if (debugflag) logger.Switch(true)
     
     val source = scala.io.Source.fromFile(filename)
+    val sourceStr = source.mkString
+    
     val lexer = init.lex.setup("firstLexer")
     init.lex.keywords(lexer)
     init.lex.literals(lexer)
     init.lex.operators(lexer)
 
-    // パーサーのセットアップと機能注入
     val parser = init.parse.setup("firstParser", lexer)
-    init.parse.metaprogramming(parser) // メタプログラミング（syntax等）を最優先
     init.parse.literals(parser)
     init.parse.logic(parser)
 
-    val reader = source.bufferedReader()
     val start = Instant.now()
-    
-    // ソースを読み込んでおく（再トークナイズ用）
-    val sourceStr = source.mkString
     val lattice = lexer.tokenize(sourceStr)
     if (debugflag) lexer.printStream
     
