@@ -4,21 +4,18 @@ object init {
   
   object lex {
     def setup(lexName: String): Lexer = {
-      logger.log(s"[init.lex] Setting up lexer: $lexName")
       val lexer = new Lexer(Hygenicmarker.bless(s"lexer:${lexName}", None, true))
-      common(lexer)
+      common(lexer); keywords(lexer); literals(lexer); operators(lexer)
       lexer
     }
     def common(lexer: Lexer): Unit = {
       import lexer._
-      logger.log("[init.lex] Registering common whitespace")
       val wsTag = Hygenicmarker.bless("whiteSpace", Some(lexer), true)
       lexer.registerWhitespace(wsTag)
       lexer.database.set(wsTag, lexer.positioned(lexer.regex("\\s+".r) ^^ { ws => lexer.Token.otherwise(ws, wsTag) }))
     }
     def keywords(lexer: Lexer): Unit = {
       import lexer._
-      logger.log("[init.lex] Registering primary keywords")
       List("syntax").foreach {
         kw =>
           val tag = Hygenicmarker.bless(s"kw_$kw", Some(lexer), true)
@@ -27,13 +24,11 @@ object init {
     }
     def literals(lexer: Lexer): Unit = {
       import lexer._
-      logger.log("[init.lex] Registering literals (number, ident)")
       lexer.database.set(Hygenicmarker.bless("number", Some(lexer), true), lexer.positioned(lexer.regex("\\d+(\\.\\d+)?".r) ^^ { n => lexer.Token.otherwise(n, Hygenicmarker.bless(s"num:$n", Some(lexer), true)) }))
       lexer.database.set(Hygenicmarker.bless("ident", Some(lexer), true), lexer.positioned(lexer.regex("[a-zA-Z_][a-zA-Z0-9_]*".r) ^^ { id => lexer.Token.otherwise(id, Hygenicmarker.bless(s"id:$id", Some(lexer), true)) }))
     }
     def operators(lexer: Lexer): Unit = {
       import lexer._
-      logger.log("[init.lex] Registering operators and delimiters")
       List("=", "+", "-", "*", ">=", "<=", ">", "<", "(", ")", "{", "}", ";").foreach {
         opStr =>
           val tag = Hygenicmarker.bless(s"op_$opStr", Some(lexer), true)
@@ -43,18 +38,12 @@ object init {
   }
   
   object parse {
-    def setup(parseName: String, lexer: Lexer): Parser = {
-      logger.log(s"[init.parse] Setting up parser: $parseName")
-      new Parser(lexer, Hygenicmarker.bless(s"parser:${parseName}", None, true))
-    }
+    def setup(parseName: String, lexer: Lexer): Parser = new Parser(lexer, Hygenicmarker.bless(s"parser:${parseName}", None, true))
 
     def getProgramParser(parser: Parser): parser.PackratParser[Node] = {
       import parser._
       val stmt = getStatementParser(parser)
-      (rep1(stmt <~ _S)) ^^ { stmts => 
-        logger.log(s"[parser.rule] Program matched with ${stmts.length} statements")
-        Node("Program", Hygenicmarker.bless("program", Some(parser), true), Map.empty, stmts) 
-      }
+      (rep1(stmt <~ _S)) ^^ { stmts => Node("Program", Hygenicmarker.bless("program", Some(parser), true), Map.empty, stmts) }
     }
 
     def getStatementParser(parser: Parser): parser.PackratParser[Node] = {
@@ -72,7 +61,6 @@ object init {
       val expr = getExpressionParser(parser, true)
       ((expr <~ _S) ~ (token("=") <~ _S) ~ expr) ^^ { 
         case lhs ~ _ ~ rhs => 
-          logger.log(s"[parser.rule] Unification matched: kind1=${lhs.kind}, kind2=${rhs.kind}")
           Node("Unification", Hygenicmarker.bless("unify", Some(parser), true), Map.empty, List(lhs, rhs)) 
       }
     }
@@ -81,7 +69,6 @@ object init {
       import parser._
       lazy val stmt = getStatementParser(parser)
       (token("{") ~> _S ~> rep(stmt <~ _S) <~ token("}")) ^^ { stmts => 
-        logger.log(s"[parser.rule] Block matched with ${stmts.length} internal statements")
         Node("Block", Hygenicmarker.bless("block", Some(parser), true), Map.empty, stmts) 
       }
     }
@@ -97,7 +84,6 @@ object init {
 
       (syntaxKeyword ~ _S ~ macroNameP ~ _S ~ rep(argP <~ _S) ~ token("=") ~ _S ~ (block | exprNoMacro)) ^^ {
         case (_ ~ _ ~ (name: String) ~ _ ~ (args: List[String]) ~ _ ~ _ ~ (body: Node)) =>
-          logger.log(s"[init.parse] NEW MACRO detected: $name")
           if (Macro.register(name, args, body)) {
             val mTag = Hygenicmarker.bless(s"macro_token_$name", Some(lexer), true)
             lexer.database.set(mTag, lexer.positioned(lexer.regex(java.util.regex.Pattern.quote(name).r) ^^ { s => lexer.Token.Defined(s, mTag) }))
@@ -128,43 +114,24 @@ object init {
 
     def literals(parser: Parser): Unit = {
       import parser._
-      logger.log("[init.parse] Registering literal syntax rules")
-      val identP = dataToken(_.tag.name.startsWith("id:"), "identifier")
-      val numP = dataToken(_.tag.name.startsWith("num:"), "number")
-      parser.addSyntax(Hygenicmarker.bless("parseLiteral", Some(parser), true))(numP ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s)))
- })
-      parser.addSyntax(Hygenicmarker.bless("parseVariable", Some(parser), true))(identP ^^ { t => Node("Variable", t.tag) })
+      parser.addSyntax(Hygenicmarker.bless("parseLiteral", Some(parser), true))(dataToken(_.tag.name.startsWith("num:"), "number") ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s))) })
+      parser.addSyntax(Hygenicmarker.bless("parseVariable", Some(parser), true))(dataToken(_.tag.name.startsWith("id:"), "identifier") ^^ { t => Node("Variable", t.tag) })
     }
 
     def logic(parser: Parser): Unit = {
       import parser._
-      logger.log("[init.parse] Registering top-level program rule")
       parser.addSyntax(Hygenicmarker.bless("parseProgram", Some(parser), true))(getProgramParser(parser))
     }
   }
 
   object semantics {
     def execute(results: Array[Any], solver: Solver): Unit = {
-      logger.log(s"[init.semantics] Starting semantic execution of ${results.length} root nodes")
-      results.foreach {
-        case node: Node => 
-          logger.log(s"[init.semantics]   Processing node kind=${node.kind}")
-          if (node.kind == "Program" || node.kind == "Block") execute(node.children.toArray, solver) else solver.solve(node)
-        case other => 
-          logger.log(s"[init.semantics]   Skipping unknown result type: $other")
-      }
-      logger.log("[init.semantics] Final check of solver state")
+      results.foreach { case node: Node => if (node.kind == "Program" || node.kind == "Block") execute(node.children.toArray, solver) else solver.solve(node); case _ => }
       solver.check()
     }
   }
 
   object optimization {
-    def apply(results: Array[Any]): Array[Any] = {
-      logger.log("[init.opt] Running optimization pipeline...")
-      val expanded = Macro.expand(results)
-      val folded = Macro.ConstantFolding(expanded)
-      logger.log("[init.opt] Optimization pipeline finished.")
-      folded
-    }
+    def apply(results: Array[Any]): Array[Any] = Macro.ConstantFolding(Macro.expand(results))
   }
 }

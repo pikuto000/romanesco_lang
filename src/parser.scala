@@ -2,6 +2,10 @@ package romanesco
 import scala.collection.mutable.{Map => MutableMap, ArrayBuffer, Queue => MutableQueue, Set => MutableSet}
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._
+import scala.concurrent.{Future, Await, ExecutionContext}
+import scala.concurrent.duration.Duration
+import java.util.concurrent.ConcurrentHashMap
+import scala.jdk.CollectionConverters._
 
 case class ParseEdge(result: Any, nextOffset: Int, ruleTag: HygenicTag) {
   override def toString: String = s"Edge(-> $nextOffset, rule: ${ruleTag.mangledName}, res: $result)"
@@ -13,23 +17,23 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
   with HygenicObj(tag) {
 
   type Elem = lexer.Token
+  implicit val ec: ExecutionContext = ExecutionContext.global
+
+  // 最適化: コンテンツの有無を高速判定するためのフラグ配列
+  private var hasContentSuffix: java.util.BitSet = new java.util.BitSet()
 
   class LatticeReader(override val offset: Int, val lattice: scala.collection.Map[Int, Array[lexer.Token]], val tIdx: Int = 0) extends Reader[lexer.Token] {
     val availableTokens = lattice.getOrElse(offset, Array.empty[lexer.Token])
     override def first: lexer.Token = if (availableTokens.isDefinedAt(tIdx)) availableTokens(tIdx) else null
-    override def atEnd: Boolean = {
-      val res = !lattice.keys.exists(off => off >= offset && lattice(off).exists(t => !lexer.isWhitespace(t)))
-      // logger.log(s"[reader] atEnd at $offset: $res")
-      res
-    }
+    
+    // 最適化: 事前計算されたビットセットにより O(1) で判定
+    override def atEnd: Boolean = !hasContentSuffix.get(offset)
+    
     override def rest: Reader[lexer.Token] = {
-      if (first == null) {
-        logger.log(s"[reader] rest at $offset: current is NULL, returning self")
-        this
-      } else {
+      if (first == null) this
+      else {
         val nextRawOff = offset + first.s.length
         val nextJumpOff = if (nextRawOff < nextContentOffset.length) nextContentOffset(nextRawOff) else nextRawOff
-        // logger.log(s"[reader] rest at $offset: nextRaw=$nextRawOff, nextJump=$nextJumpOff")
         new LatticeReader(nextJumpOff, lattice, 0)
       }
     }
@@ -40,23 +44,11 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
       case other: LatticeReader => offset == other.offset && tIdx == other.tIdx
       case _ => false
     }
-    override def toString = s"Reader(@$offset, tIdx=$tIdx, token='${if(first!=null) first.s else "EOF"}')"
   }
 
-  def _S: Parser[List[lexer.Token]] = {
-    // logger.log("[parser] _S skip start")
-    rep(acceptIf(t => t != null && lexer.isWhitespace(t))(_ => "whitespace expected"))
-  }
-  
-  def token(name: String): Parser[lexer.Token] = {
-    // logger.log(s"[parser] Expecting Defined token: '$name'")
-    acceptIf { case t: lexer.Token.Defined if t.s == name => true case _ => false }(t => s"Expected structural token '$name'")
-  }
-  
-  def dataToken(f: lexer.Token.otherwise => Boolean, msg: String): Parser[lexer.Token] = {
-    // logger.log(s"[parser] Expecting data token: $msg")
-    acceptIf { case t: lexer.Token.otherwise if f(t) => true case _ => false }(t => msg)
-  }
+  def _S: Parser[List[lexer.Token]] = rep(acceptIf(t => t != null && lexer.isWhitespace(t))(_ => "whitespace expected"))
+  def token(name: String): Parser[lexer.Token] = acceptIf { case t: lexer.Token.Defined if t.s == name => true case _ => false }(t => s"Expected structural token '$name'")
+  def dataToken(f: lexer.Token.otherwise => Boolean, msg: String): Parser[lexer.Token] = acceptIf { case t: lexer.Token.otherwise if f(t) => true case _ => false }(t => msg)
 
   val database = new d(Hygenicmarker.bless("database", Some(this), true))
   class d(tag:HygenicTag) extends HygenicObj(tag){
@@ -65,27 +57,15 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     var updated = false 
 
     def set(t: HygenicTag, p: PackratParser[Any]): Unit = { 
-      logger.log(s"[parser.db] Attempting to set rule: ${t.name}")
       if (!registeredHashes.contains(t.hash)) {
-        logger.log(s"[parser.db]   Rule ${t.name} is new (hash=${t.hash}). Adding...")
-        rules += ((t, p))
-        registeredHashes += t.hash
-        updated = true
-        logger.log(s"[parser.db]   Updated flag set to true")
-      } else {
-        logger.log(s"[parser.db]   Rule ${t.name} (hash=${t.hash}) already exists. Skipping")
+        logger.log(s"[parser.db] Adding rule: ${t.name}")
+        rules += ((t, p)); registeredHashes += t.hash; updated = true
       }
     }
     def prepend(t: HygenicTag, p: PackratParser[Any]): Unit = { 
-      logger.log(s"[parser.db] Attempting to prepend rule: ${t.name}")
       if (!registeredHashes.contains(t.hash)) {
-        logger.log(s"[parser.db]   Rule ${t.name} is new. Prepending...")
-        ((t, p)) +=: rules 
-        registeredHashes += t.hash
-        updated = true
-        logger.log(s"[parser.db]   Updated flag set to true")
-      } else {
-        logger.log(s"[parser.db]   Rule ${t.name} already exists. Skipping")
+        logger.log(s"[parser.db] Prepending rule: ${t.name}")
+        ((t, p)) +=: rules; registeredHashes += t.hash; updated = true
       }
     }
     def getRules: Array[(HygenicTag, PackratParser[Any])] = rules.toArray
@@ -95,16 +75,13 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
 
   def anyRule: PackratParser[Node] = new PackratParser[Node] {
     def apply(in: Input): ParseResult[Node] = {
-      // logger.log(s"[parser] anyRule triggered at ${in.offset}")
       val currentRules = database.getRules
       var i = 0
       while (i < currentRules.length) {
         val (tag, rule) = currentRules(i)
         if (tag.name != "parseProgram") {
           rule(in) match {
-            case Success(res: Node, next) if next.offset > in.offset => 
-              logger.log(s"[parser]   anyRule MATCH: rule=${tag.name}, next=${next.offset}")
-              return Success(res, next)
+            case Success(res: Node, next) if next.offset > in.offset => return Success(res, next)
             case _ =>
           }
         }
@@ -115,22 +92,25 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
   }
 
   var nextContentOffset: Array[Int] = Array.empty
-  var parseLattice: Array[Array[ParseEdge]] = Array.empty
+  var parseLattice: java.util.concurrent.ConcurrentHashMap[Int, Array[ParseEdge]] = new java.util.concurrent.ConcurrentHashMap()
   private var sourceCode: String = ""
 
+  // 最適化: Parser格子の構築を並列化
   def buildExhaustiveLattice(lattice: scala.collection.Map[Int, Array[lexer.Token]]): Unit = {
-    val maxOffset = if (lattice.isEmpty) 0 else lattice.keys.max
-    logger.log(s"[parser] buildExhaustiveLattice start (max: $maxOffset)")
-    for (offset <- 0 to maxOffset) {
-      if (lattice.contains(offset)) {
+    val offsets = lattice.keys.toSeq.sorted
+    val maxOffset = if (offsets.isEmpty) 0 else offsets.max
+    logger.log(s"[parser] Parallel lattice build start (offsets: ${offsets.length})")
+    
+    val futures = offsets.map { offset =>
+      Future {
         val edges = dispatchAll(new LatticeReader(offset, lattice), lattice)
         if (edges.nonEmpty) {
-          logger.log(s"[parser]   Populated offset $offset with ${edges.length} edges")
-          parseLattice(offset) = edges
+          parseLattice.put(offset, edges)
         }
       }
     }
-    logger.log("[parser] buildExhaustiveLattice finished")
+    Await.result(Future.sequence(futures), Duration.Inf)
+    logger.log("[parser] Parallel lattice build finished")
   }
 
   def dispatchAll(in: Input, lattice: scala.collection.Map[Int, Array[lexer.Token]]): Array[ParseEdge] = {
@@ -147,9 +127,7 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
         while (rIdx < currentRules.length) {
           val (ruleTag, rule) = currentRules(rIdx)
           rule(packratIn) match {
-            case Success(res, next) => 
-              logger.log(s"[dispatch] MATCH at $offset: rule=${ruleTag.mangledName}, next=${next.offset}")
-              builder.addOne(ParseEdge(res, next.offset, ruleTag))
+            case Success(res, next) => builder.addOne(ParseEdge(res, next.offset, ruleTag))
             case _ => 
           }
           rIdx += 1
@@ -161,10 +139,11 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
   }
 
   private def prepareLattice(lattice: scala.collection.Map[Int, Array[lexer.Token]]): Unit = {
-    logger.log("[parser] prepareLattice start")
     val maxOffset = if (lattice.isEmpty) 0 else lattice.keys.max
     val latticeArr = new Array[Array[lexer.Token]](maxOffset + 1)
     lattice.foreach { case (off, tokens) => if(off < latticeArr.length) latticeArr(off) = tokens }
+    
+    // nextContentOffset の構築
     nextContentOffset = new Array[Int](maxOffset + 1)
     var lastContent = maxOffset + 1
     var i = maxOffset
@@ -174,12 +153,21 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
       nextContentOffset(i) = lastContent
       i -= 1
     }
-    if (parseLattice.length < maxOffset + 2) parseLattice = new Array[Array[ParseEdge]](maxOffset + 2)
-    logger.log(s"[parser] prepareLattice end. Jump table size: ${nextContentOffset.length}")
+
+    // 最適化: hasContentSuffix (これ以降にコンテンツがあるか) をビットセットで構築
+    hasContentSuffix.clear()
+    var runningContent = false
+    i = maxOffset
+    while (i >= 0) {
+      val tokens = latticeArr(i)
+      if (tokens != null && tokens.exists(t => !lexer.isWhitespace(t))) runningContent = true
+      if (runningContent) hasContentSuffix.set(i)
+      i -= 1
+    }
   }
 
   def apply(lattice: Map[Int, Array[lexer.Token]], source: String = ""): ParseResult[Array[Any]] = {
-    logger.log(s"[parser] apply called with source length ${source.length}")
+    logger.log(s"[parser] apply (len=${source.length})")
     if (lattice.isEmpty) return Success(Array.empty, new LatticeReader(0, Map.empty))
     sourceCode = source
     var currentLattice = lattice
@@ -189,66 +177,54 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     var needsReevaluation = true
     var passCount = 0
 
-    while (needsReevaluation && passCount < 5) {
+    while (needsReevaluation && passCount < 10) {
       passCount += 1
       logger.log(s"[parser] === PASS #$passCount START ===")
-      database.updated = false
-      lexer.database.updated = false
+      database.updated = false; lexer.database.updated = false
       prepareLattice(currentLattice)
-      for (j <- 0 until parseLattice.length) parseLattice(j) = null
+      parseLattice.clear()
       
       buildExhaustiveLattice(currentLattice)
 
       val startOff = if (0 < nextContentOffset.length) nextContentOffset(0) else 0
-      val choices = parseLattice(startOff)
+      val choices = parseLattice.get(startOff)
       
       if (choices != null && choices.exists(_.ruleTag.name == "parseProgram")) {
         val programEdge = choices.find(_.ruleTag.name == "parseProgram").get
-        logger.log(s"[parser]   Program rule MATCHED! Length=${programEdge.nextOffset}")
-        val programNode = programEdge.result.asInstanceOf[Node]
-        finalNodes = programNode.children.toArray
+        logger.log(s"[parser]   Program confirmed (${programEdge.nextOffset} bytes)")
+        finalNodes = programEdge.result.asInstanceOf[Node].children.toArray
         lastReader = new LatticeReader(programEdge.nextOffset, currentLattice)
       } else {
-        logger.log("[parser]   Program rule NOT matched. Falling back to fragment stitching...")
+        logger.log("[parser]   Stitching fragments...")
         val results = ArrayBuffer[Any]()
         var p = startOff
-        while (p < parseLattice.length) {
-          val currChoices = parseLattice(p)
+        while (p < maxOffsetSafe(currentLattice)) {
+          val currChoices = parseLattice.get(p)
           if (currChoices == null || currChoices.isEmpty) { 
             val jump = if (p < nextContentOffset.length) nextContentOffset(p) else p + 1
-            logger.log(s"[parser]     Hole at $p. Jumping to $jump")
-            if (jump > p && jump < parseLattice.length) p = jump else p = Int.MaxValue 
+            if (jump > p && jump < nextContentOffset.length + 1) p = jump else p = Int.MaxValue 
           } else {
             val best = currChoices.maxBy(_.nextOffset)
-            logger.log(s"[parser]     Path at $p: selected ${best.ruleTag.name} (next=${best.nextOffset})")
             results += best.result
             val nextRaw = best.nextOffset
             p = if (nextRaw < nextContentOffset.length) nextContentOffset(nextRaw) else nextRaw
           }
         }
         finalNodes = results.toArray
-        lastReader = new LatticeReader(if (p == Int.MaxValue) (if(currentLattice.isEmpty) 0 else currentLattice.keys.max) else p, currentLattice)
+        lastReader = new LatticeReader(if (p == Int.MaxValue) maxOffsetSafe(currentLattice) else p, currentLattice)
       }
 
-      val pUpdated = database.updated
-      val lUpdated = lexer.database.updated
-      logger.log(s"[parser] PASS #$passCount finished. ParserUpdated=$pUpdated, LexerUpdated=$lUpdated")
-      if (pUpdated || lUpdated) {
-        if (lUpdated && sourceCode.nonEmpty) {
-          logger.log("[parser] Re-lexing entire source due to Lexer update...")
-          currentLattice = lexer.tokenize(sourceCode)
-        }
+      if (database.updated || lexer.database.updated) {
+        if (lexer.database.updated && sourceCode.nonEmpty) currentLattice = lexer.tokenize(sourceCode)
         needsReevaluation = true
-      } else {
-        logger.log("[parser] Fixed point reached. Pass iteration stops.")
-        needsReevaluation = false
-      }
+      } else needsReevaluation = false
     }
 
     result = finalNodes
-    logger.log(s"[parser] apply complete. Nodes: ${result.length}")
     Success(result, lastReader)
   }
+
+  private def maxOffsetSafe(l: Map[Int, Array[lexer.Token]]): Int = if (l.isEmpty) 0 else l.keys.max + 1
 
   var result: Array[Any] = Array.empty
   def printStream: Unit = result.zipWithIndex.foreach { case (res, idx) => println(s"printStream: [$idx] Result: $res") }

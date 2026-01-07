@@ -6,51 +6,33 @@ object Macro {
   private val tagCache = scala.collection.mutable.Map[String, HygenicTag]()
 
   def getOrCreateTag(name: String, parser: Parser): HygenicTag = {
-    logger.log(s"[macro.tag] getOrCreateTag: $name")
-    tagCache.getOrElseUpdate(name, {
-      logger.log(s"[macro.tag]   Cache miss. Blessing new tag for $name")
-      Hygenicmarker.bless(name, Some(parser), true)
-    })
+    tagCache.getOrElseUpdate(name, Hygenicmarker.bless(name, Some(parser), true))
   }
 
   def register(name: String, args: List[String], body: Node): Boolean = {
-    logger.log(s"[macro.reg] register: $name with args $args")
     val newData = (args, body)
-    if (macroRegistry.get(name).contains(newData)) {
-      logger.log(s"[macro.reg]   Registration SKIPPED (identical data exists)")
-      false 
-    } else {
-      logger.log(s"[macro.reg]   Registering NEW macro: $name")
-      macroRegistry(name) = newData
-      true 
-    }
+    if (macroRegistry.get(name).contains(newData)) false 
+    else { macroRegistry(name) = newData; logger.log(s"[macro] Reg: $name"); true }
   }
 
   def expand(nodes: Array[Any]): Array[Any] = {
-    logger.log(s"[macro.expand] Expanding ${nodes.length} root nodes...")
-    val res = expandNodes(nodes.toList).toArray
-    logger.log(s"[macro.expand] Final expanded count: ${res.length}")
-    res
+    logger.log(s"[macro] Expanding ${nodes.length} nodes")
+    expandNodesStream(nodes.toList).toArray
   }
 
-  private def expandNodes(nodes: List[Any]): List[Any] = {
+  // 最適化: テールリカージョンを意識したストリーム処理
+  private def expandNodesStream(nodes: List[Any]): List[Any] = {
+    if (nodes.isEmpty) return Nil
+    
     nodes match {
-      case Nil => 
-        logger.log("[macro.expand] Nil nodes encountered")
-        Nil
       case (node: Node) :: rest =>
-        logger.log(s"[macro.node] Visiting node: kind=${node.kind}, children=${node.children.length}")
-        
-        // 1. まず現在のノード自体を再帰的に展開
-        val internalExpanded = node.copy(children = expandNodes(node.children).collect { case n: Node => n })
-        
-        // 2. マクロ呼び出しとしての展開を試みる
-        val (finalNode, remaining) = tryExpand(internalExpanded, rest)
-        
-        finalNode :: expandNodes(remaining)
+        val internal = node.copy(children = expandNodesStream(node.children).collect { case n: Node => n })
+        val (finalNode, remaining) = tryExpand(internal, rest)
+        finalNode :: expandNodesStream(remaining)
       case other :: rest => 
-        logger.log(s"[macro.node] Skipping non-node element: $other")
-        other :: expandNodes(rest)
+        other :: expandNodesStream(rest)
+      case Nil =>
+        throw new Exception("cannot expand because of nil") 
     }
   }
 
@@ -58,70 +40,44 @@ object Macro {
     current.kind match {
       case "Variable" =>
         val name = current.tag.name.split(":").lastOption.getOrElse("")
-        logger.log(s"[macro.try] Checking variable '$name' for macro lookup")
         macroRegistry.get(name) match {
           case Some((argNames, body)) if argNames.nonEmpty =>
-            logger.log(s"[macro.try]   Macro '$name' found in registry! Attempting to collect ${argNames.length} args...")
             val (args, tail) = collectNodes(rest, argNames.length)
             if (args.length == argNames.length) {
-              logger.log(s"[macro.try]   Args collected: ${args.map(_.kind)}. Substituting...")
               (substitute(body, argNames.zip(args).toMap), tail)
-            } else {
-              logger.log(s"[macro.try]   Insufficient args in stream (found ${args.length}, need ${argNames.length}). Keeping as variable.")
-              (current, rest)
-            }
-          case _ => 
-            logger.log(s"[macro.try]   No matching macro for '$name'")
-            (current, rest)
+            } else (current, rest)
+          case _ => (current, rest)
         }
       case "MacroCall" =>
         val name = current.attributes("name").asInstanceOf[String]
-        logger.log(s"[macro.try] Found direct MacroCall: $name. Children: ${current.children.length}")
-        macroRegistry.get(name) match {
-          case Some((argNames, body)) =>
-            logger.log(s"[macro.try]   Macro '$name' data found. Substituting children...")
-            val result = substitute(body, argNames.zip(current.children).toMap)
-            (result, rest)
-          case None => 
-            logger.log(s"[macro.try]   Warning: Macro $name NOT found in registry")
-            (current, rest)
-        }
+        macroRegistry.get(name).map { case (argNames, body) =>
+          (substitute(body, argNames.zip(current.children).toMap), rest)
+        }.getOrElse((current, rest))
       case "Unification" if current.children.length == 2 =>
-        // 右辺がマクロ呼び出しになっているケース: Y = square 5
-        val lhs = current.children(0)
-        val rhs = current.children(1)
+        val lhs = current.children(0); val rhs = current.children(1)
         if (rhs.kind == "Variable") {
           val name = rhs.tag.name.split(":").lastOption.getOrElse("")
-          macroRegistry.get(name) match {
-            case Some((argNames, body)) if argNames.nonEmpty =>
-              logger.log(s"[macro.try] Found macro '$name' on right side of Unification. Looking for args in rest...")
+          macroRegistry.get(name).collect { 
+            case (argNames, body) if argNames.nonEmpty =>
               val (args, tail) = collectNodes(rest, argNames.length)
               if (args.length == argNames.length) {
-                logger.log(s"[macro.try]   Args collected from sibling stream. Expanding...")
-                val expandedRhs = substitute(body, argNames.zip(args).toMap)
-                (current.copy(children = List(lhs, expandedRhs)), tail)
-              } else {
-                (current, rest)
-              }
-            case _ => (current, rest)
-          }
+                (current.copy(children = List(lhs, substitute(body, argNames.zip(args).toMap))), tail)
+              } else null
+          }.getOrElse((current, rest)) match { case null => (current, rest) case r => r }
         } else (current, rest)
-      case _ => 
-        (current, rest)
+      case _ => (current, rest)
     }
   }
 
+  // 最適化: 再帰による引数収集（リストの先頭から count 分だけ Node を奪う）
   private def collectNodes(list: List[Any], count: Int): (List[Node], List[Any]) = {
     if (count <= 0) (Nil, list)
     else list match {
       case (n: Node) :: rest => 
         val (collected, tail) = collectNodes(rest, count - 1)
         (n :: collected, tail)
-      case _ :: rest => 
-        logger.log("[macro.coll] Skipping non-node during arg collection")
-        collectNodes(rest, count) 
-      case Nil => 
-        (Nil, Nil)
+      case _ :: rest => collectNodes(rest, count) 
+      case Nil => (Nil, Nil)
     }
   }
 
@@ -129,44 +85,27 @@ object Macro {
     template.kind match {
       case "Variable" =>
         val name = template.tag.name.split(":").lastOption.getOrElse("")
-        env.get(name) match {
-          case Some(replacement) => 
-            logger.log(s"[macro.subst]   Substituting '$name' -> kind=${replacement.kind}")
-            replacement
-          case None => 
-            logger.log(s"[macro.subst]   Keeping original variable '$name'")
-            template
-        }
+        env.getOrElse(name, template)
       case _ =>
-        if (template.children.nonEmpty) {
-          template.copy(children = template.children.map(c => substitute(c, env)))
-        } else template
+        if (template.children.nonEmpty) template.copy(children = template.children.map(c => substitute(c, env)))
+        else template
     }
   }
 
   object ConstantFolding {
     private val evaluator = new Evaluator()
-    def apply(nodes: Array[Any]): Array[Any] = {
-      logger.log(s"[macro.fold] ConstantFolding starting on ${nodes.length} nodes")
-      val res = nodes.map {
-        case node: Node => fold(node)
-        case other => other
-      }
-      logger.log("[macro.fold] ConstantFolding finished")
-      res
-    }
-    private def fold(node: Node): Node = {
-      val foldedChildren = node.children.map(fold)
-      val foldedNode = node.copy(children = foldedChildren)
+    def apply(nodes: Array[Any]): Array[Any] = nodes.map { case n: Node => fold(n) case o => o }
+    private def fold(n: Node): Node = {
+      if (n.children.isEmpty) return n
+      val foldedChildren = n.children.map(fold)
+      val foldedNode = n.copy(children = foldedChildren)
       foldedNode.kind match {
         case "BinaryOp" if foldedChildren.length == 2 =>
           val left = foldedChildren(0); val right = foldedChildren(1)
           if (left.kind == "DecimalLiteral" && right.kind == "DecimalLiteral") {
             try {
               evaluator.eval(foldedNode) match {
-                case d: BigDecimal => 
-                  logger.log(s"[macro.fold] FOLDED node at kind=${node.kind} to literal $d")
-                  Node("DecimalLiteral", node.tag, Map("value" -> d))
+                case d: BigDecimal => Node("DecimalLiteral", n.tag, Map("value" -> d))
                 case _ => foldedNode
               }
             } catch { case _: Exception => foldedNode }
