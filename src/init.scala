@@ -170,6 +170,13 @@ object init {
     }
   }
 
+  object optimization {
+    def apply(results: Array[Any]): Array[Any] = {
+      logger.log("[optimization] Applying Constant Folding...")
+      Macro.ConstantFolding(results)
+    }
+  }
+
   object debug {
     def testEvaluator(results: Array[Any]): Unit = {
       val evaluator = new Evaluator()
