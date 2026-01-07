@@ -1,4 +1,2 @@
-X = 1 + 2 * 3
-Y = 10.5 / 2.1
-Z = 100 - 1
-A = X + Y + Z
+syntax square X = X * X
+Y = square 5
