@@ -36,6 +36,7 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
       case other: LatticeReader => offset == other.offset && tIdx == other.tIdx
       case _ => false
     }
+    override def toString = s"Reader(@$offset, tIdx=$tIdx, token='${if(first!=null) first.s else "EOF"}')"
   }
 
   def _S: Parser[List[lexer.Token]] = rep(acceptIf(t => t != null && lexer.isWhitespace(t))(_ => "whitespace expected"))
@@ -45,12 +46,12 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
   val database = new d(Hygenicmarker.bless("database", Some(this), true))
   class d(tag:HygenicTag) extends HygenicObj(tag){
     val rules = ArrayBuffer[(HygenicTag, PackratParser[Any])]()
-    var updated = false // ルールが追加されたらフラグを立てる
+    var updated = false 
 
     def set(t: HygenicTag, p: PackratParser[Any]): Unit = { 
       rules += ((t, p))
       updated = true
-      logger.log(s"[database] Rule added: ${t.mangledName}")
+      logger.log(s"[database] Rule registered: ${t.mangledName}")
     }
     def prepend(t: HygenicTag, p: PackratParser[Any]): Unit = { 
       ((t, p)) +=: rules 
@@ -64,16 +65,16 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
 
   private var nextContentOffset: Array[Int] = Array.empty
   var parseLattice: Array[Array[ParseEdge]] = Array.empty
+  
+  // ソースコードを保持（再トークナイズ用）
+  private var sourceCode: String = ""
 
-  // 特定の地点から格子を(再)構築する
   def buildLatticeFrom(offset: Int, lattice: Map[Int, Array[lexer.Token]]): Unit = {
     val maxOffset = if (lattice.isEmpty) 0 else lattice.keys.max
-    logger.log(s"[parse] Building/Updating lattice from offset $offset to $maxOffset")
+    logger.log(s"[parse] Building/Updating parse lattice from offset $offset")
     
-    // BFSを使って到達可能な範囲を探索・構築
     val queue = MutableQueue[Int]()
     val visited = MutableSet[Int]()
-    
     queue.enqueue(offset)
     visited.add(offset)
     
@@ -85,13 +86,12 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
         edges.foreach { edge =>
           val rawNext = edge.nextOffset
           val nextJump = if (rawNext < nextContentOffset.length) nextContentOffset(rawNext) else rawNext
-          if (nextJump < parseLattice.length && !visited.contains(nextJump)) {
-            visited.add(nextJump)
+          if (nextJump < parseLattice.length && visited.add(nextJump)) {
             queue.enqueue(nextJump)
           }
         }
       } else {
-        parseLattice(curr) = null // マッチなしを明示
+        parseLattice(curr) = null
       }
     }
   }
@@ -123,13 +123,11 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     builder.result()
   }
 
-  def apply(lattice: Map[Int, Array[lexer.Token]]): ParseResult[Array[Any]] = {
-    if (lattice.isEmpty) return Success(Array.empty, new LatticeReader(0, Map.empty))
-    val maxOffset = lattice.keys.max
-    
-    // 準備: ジャンプテーブルの構築
+  // 準備処理を共通化
+  private def prepareLattice(lattice: Map[Int, Array[lexer.Token]]): Unit = {
+    val maxOffset = if (lattice.isEmpty) 0 else lattice.keys.max
     val latticeArr = new Array[Array[lexer.Token]](maxOffset + 1)
-    lattice.foreach { case (off, tokens) => latticeArr(off) = tokens }
+    lattice.foreach { case (off, tokens) => if(off < latticeArr.length) latticeArr(off) = tokens }
     nextContentOffset = new Array[Int](maxOffset + 1)
     var lastContent = maxOffset + 1
     var i = maxOffset
@@ -139,31 +137,34 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
       nextContentOffset(i) = lastContent
       i -= 1
     }
+    if (parseLattice.length < maxOffset + 2) {
+      val newLattice = new Array[Array[ParseEdge]](maxOffset + 2)
+      Array.copy(parseLattice, 0, newLattice, 0, parseLattice.length)
+      parseLattice = newLattice
+    }
+  }
 
-    parseLattice = new Array[Array[ParseEdge]](maxOffset + 2)
-    
-    // --- メインループ: パスを復元しながら、必要に応じて格子を再構築する ---
+  def apply(lattice: Map[Int, Array[lexer.Token]], source: String = ""): ParseResult[Array[Any]] = {
+    if (lattice.isEmpty) return Success(Array.empty, new LatticeReader(0, Map.empty))
+    sourceCode = source
+    var currentLattice = lattice
+    prepareLattice(currentLattice)
+
     val results = ArrayBuffer[Any]()
     val startOff = if (0 < nextContentOffset.length) nextContentOffset(0) else 0
     var p = startOff
     
-    // 初回構築
-    buildLatticeFrom(p, lattice)
+    buildLatticeFrom(p, currentLattice)
     database.updated = false
+    lexer.database.updated = false
 
     while (p < parseLattice.length) {
-      // 1. 現在の位置にエッジがない場合、再構築を試みる
-      if (parseLattice(p) == null) {
-        buildLatticeFrom(p, lattice)
-      }
+      if (parseLattice(p) == null) buildLatticeFrom(p, currentLattice)
 
       val choices = parseLattice(p)
       if (choices == null || choices.isEmpty) {
-        // 本当にマッチするルールがない場合
-        if (lattice.keys.exists(_ >= p)) logger.log(s"[parse] No rule matched at $p")
-        p = Int.MaxValue // 終了
+        p = Int.MaxValue 
       } else {
-        // 2. 最良のエッジを選択
         var best = choices(0)
         var maxOff = best.nextOffset
         var ci = 1
@@ -172,26 +173,30 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
           if (c.nextOffset > maxOff) { maxOff = c.nextOffset; best = c }
           ci += 1
         }
-        
         results += best.result
         val rawNext = best.nextOffset
         val nextP = if (rawNext < nextContentOffset.length) nextContentOffset(rawNext) else rawNext
         
-        // 3. ルールが追加されていた場合、この地点以降の格子を無効化して再構築
-        if (database.updated) {
-          logger.log(s"[parse] Database updated by rule ${best.ruleTag.mangledName}. Re-scanning from $nextP")
-          // 以降の格子をクリア
+        // Lexer または Parser のルールが更新された場合、再構築
+        if (database.updated || lexer.database.updated) {
+          logger.log(s"[parse] Dynamic update detected. Re-scanning from offset $nextP")
+          if (lexer.database.updated && sourceCode.nonEmpty) {
+            // トークナイズのやり直し
+            currentLattice = lexer.tokenize(sourceCode)
+            prepareLattice(currentLattice)
+            lexer.database.updated = false
+          }
+          // 以降のパース格子をクリアして再構築
           for (j <- nextP until parseLattice.length) parseLattice(j) = null
-          buildLatticeFrom(nextP, lattice)
+          buildLatticeFrom(nextP, currentLattice)
           database.updated = false
         }
-        
         p = nextP
       }
     }
 
     result = results.toArray
-    Success(result, new LatticeReader(if (p == Int.MaxValue) maxOffset else p, lattice))
+    Success(result, new LatticeReader(if (p == Int.MaxValue) (if(currentLattice.isEmpty) 0 else currentLattice.keys.max) else p, currentLattice))
   }
 
   var result: Array[Any] = Array.empty

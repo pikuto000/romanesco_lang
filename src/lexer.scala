@@ -78,9 +78,11 @@ with HygenicObj(tag)
   val database = new d(Hygenicmarker.bless("database",Some(this),true))
   class d(tag:HygenicTag) extends HygenicObj(tag) {
     private val tokenizeRules = scala.collection.mutable.ArrayBuffer[(HygenicTag, Parser[Token])]()
-    
+    var updated = false // ルール追加フラグ
+
     def set(t:HygenicTag, p:Parser[Token]): Unit = {
       tokenizeRules += ((t, positioned(p)))
+      updated = true
       logger.log(s"[token] database added rule: ${t.mangledName}")
     }
     

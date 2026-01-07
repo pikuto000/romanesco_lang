@@ -22,10 +22,13 @@ object Main {
 
     val reader = source.bufferedReader()
     val start = Instant.now()
-    val lattice = lexer(reader)
+    
+    // ソースを読み込んでおく（再トークナイズ用）
+    val sourceStr = source.mkString
+    val lattice = lexer.tokenize(sourceStr)
     if (debugflag) lexer.printStream
     
-    val parseResult = parser(lattice.asInstanceOf[Map[Int, Array[parser.lexer.Token]]])
+    val parseResult = parser(lattice.asInstanceOf[Map[Int, Array[parser.lexer.Token]]], sourceStr)
     val parseEnd = Instant.now()
     println(s"parse took ${Duration.between(start, parseEnd).toMillis} ms")
     
