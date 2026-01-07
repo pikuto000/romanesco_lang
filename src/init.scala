@@ -169,4 +169,21 @@ object init {
       solver.check()
     }
   }
+
+  object debug {
+    def testEvaluator(results: Array[Any]): Unit = {
+      val evaluator = new Evaluator()
+      logger.log("[debug] Testing Evaluator with parsed nodes...")
+      results.foreach {
+        case node: Node if node.kind == "Unification" =>
+          try {
+            val rhsValue = evaluator.eval(node.children(1))
+            logger.log(s"[debug] Right-hand side of unification evaluates to: $rhsValue")
+          } catch {
+            case e: Exception => logger.log(s"[debug] Evaluation skipped: ${e.getMessage}")
+          }
+        case _ => 
+      }
+    }
+  }
 }

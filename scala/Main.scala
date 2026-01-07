@@ -29,32 +29,59 @@ object Main {
     val lattice = lexer(reader)
     if (true==debugflag)lexer.printStream
     
-    // パース実行
-    val parseResult = parser(lattice.asInstanceOf[Map[Int, Array[parser.lexer.Token]]])
-    val parseEnd = Instant.now()
-    val parseDuration = Duration.between(start, parseEnd)
-    println(s"parse took ${parseDuration.toMillis()} ms")
-    if (debugflag) parser.printStream
-    val solveStart = Instant.now()
+        // パース実行
     
-    // 制約解決の実行
-    val z3Ctx = new com.microsoft.z3.Context()
-    try {
-      val solver = new Solver(z3Ctx)
-      if (parseResult.successful) {
-        val res = parseResult.get
-        init.semantics.execute(res, solver)
-      } else {
-        println(s"Skipping execution due to parse failure: $parseResult")
-      }
-    } finally {
-      // z3Ctx.close() // Contextのcloseは慎重に行う必要がある（参照が残っているとクラッシュする）
-      // 今回はプロセス終了時にOSに任せるが、長寿命プロセスならcloseすべき
-    }
+        val parseResult = parser(lattice.asInstanceOf[Map[Int, Array[parser.lexer.Token]]])
     
-    val solveEnd = Instant.now()
-    val solveDuration = Duration.between(solveStart, solveEnd)
-    println(s"solve took ${solveDuration.toMillis()} ms")
+        val parseEnd = Instant.now()
+    
+        val parseDuration = Duration.between(start, parseEnd)
+    
+        println(s"parse took ${parseDuration.toMillis()} ms")
+    
+        if (debugflag) parser.printStream
+    
+        
+    
+        if (parseResult.successful) {
+    
+          val res = parseResult.get
+    
+          // Step 2.1 検証: 評価器のテスト
+    
+          init.debug.testEvaluator(res)
+    
+          
+    
+          val solveStart = Instant.now()
+    
+          // 制約解決の実行
+    
+          val z3Ctx = new com.microsoft.z3.Context()
+    
+          try {
+    
+            val solver = new Solver(z3Ctx)
+    
+            init.semantics.execute(res, solver)
+    
+          } finally {
+    
+            // z3Ctx.close()
+    
+          }
+    
+          val solveEnd = Instant.now()
+    
+          val solveDuration = Duration.between(solveStart, solveEnd)
+    
+          println(s"solve took ${solveDuration.toMillis()} ms")
+    
+        } else {
+    
+          println(s"Skipping execution due to parse failure: $parseResult")
+    
+        }
     //計測終了
     val end = Instant.now()
     val to = Duration.between(start, end)

@@ -39,9 +39,11 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
   }
 
   // --- 明示的な空白スキップ ---
-  def _S: Parser[List[lexer.Token]] = rep(acceptIf(t => lexer.isWhitespace(t))(_ => "whitespace expected"))
+  def _S: Parser[List[lexer.Token]] = rep(acceptIf(t => {
+    t != null && lexer.isWhitespace(t)
+  })(_ => "whitespace expected"))
 
-  def token(name: String): Parser[lexer.Token] = acceptIf(_.s == name)(t => s"Expected '$name' found '${t.s}'")
+  def token(name: String): Parser[lexer.Token] = acceptIf(t => t != null && t.s == name)(t => s"Expected '$name' found '${if(t!=null) t.s else "EOF"}'")
 
   val database = new d(Hygenicmarker.bless("database", Some(this), true))
   class d(tag:HygenicTag) extends HygenicObj(tag){
