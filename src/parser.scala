@@ -39,7 +39,11 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
   }
 
   // --- 明示的な空白スキップ ---
-  def _S: Parser[List[lexer.Token]] = rep(acceptIf(_.isWhiteSpace)(_ => "whitespace expected"))
+  def _S: Parser[List[lexer.Token]] = rep(acceptIf(t => {
+    val isWs = lexer.isWhitespace(t)
+    // logger.log(s"[trace] _S check: '${t.s}' (tag:${t.tag.mangledName}) -> $isWs")
+    isWs
+  })(_ => "whitespace expected"))
 
   def token(name: String): Parser[lexer.Token] = acceptIf(_.s == name)(t => s"Expected '$name' found '${t.s}'")
 
@@ -78,8 +82,10 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     var tIdx = 0
     while (tIdx < tokens.length) {
       val t = tokens(tIdx)
-      if (!t.tag.name.startsWith("whiteSpace")) {
-        // logger.log(s"[dispatchAll]   Token[$tIdx]: '${t.s}'")
+      val isWs = lexer.isWhitespace(t)
+      // logger.log(s"[dispatchAll] Token[$tIdx] at $offset: '${t.s}' (tag:${t.tag.mangledName}), isWhitespace: $isWs")
+      
+      if (!isWs) {
         val packratIn = new PackratReader(new LatticeReader(offset, lattice, tIdx))
         var rIdx = 0
         while (rIdx < currentRules.length) {
@@ -111,12 +117,22 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     var i = maxOffset
     while (i >= 0) {
       val tokens = latticeArr(i)
-      if (tokens != null && tokens.exists(!_.isWhiteSpace)) {
+      // ここで判定ミスがあると致命的
+      if (tokens != null && tokens.exists(t => !lexer.isWhitespace(t))) {
         lastContent = i
       }
       nextContentOffset(i) = lastContent
       i -= 1
     }
+    
+    // ジャンプテーブルのログ出力
+    /*
+    logger.log("[parse] Jump Table:")
+    for (i <- 0 to maxOffset) {
+      val t = if (latticeArr(i) != null) latticeArr(i).map(_.s).mkString(",") else "null"
+      logger.log(s"  $i [$t] -> ${nextContentOffset(i)}")
+    }
+    */
 
     // パース格子の初期化
     parseLattice = new Array[Array[ParseEdge]](maxOffset + 2)
@@ -132,7 +148,6 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     // BFSでパース可能なすべてのパスを埋める
     while (queue.nonEmpty) {
       val curr = queue.dequeue()
-      // logger.log(s"[bfs] Visiting $curr")
       
       val edges = dispatchAll(new LatticeReader(curr, lattice), lattice)
       if (edges.nonEmpty) {
@@ -141,20 +156,13 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
           val rawNext = edge.nextOffset
           val nextJump = if (rawNext < nextContentOffset.length) nextContentOffset(rawNext) else rawNext
           
-          // logger.log(s"[bfs]   Edge found: $curr -> $rawNext (jump to $nextJump)")
-          
           if (nextJump < parseLattice.length) {
             if (!visited.contains(nextJump)) {
               visited.add(nextJump)
               queue.enqueue(nextJump)
-              // logger.log(s"[bfs]     Enqueued $nextJump")
             }
-          } else {
-             logger.log(s"[bfs]     Next jump $nextJump is out of bounds (max ${parseLattice.length})")
           }
         }
-      } else {
-        // logger.log(s"[bfs]   No edges found at $curr")
       }
     }
 
@@ -166,15 +174,13 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     
     // 最初の空白スキップ確認
     if (p < nextContentOffset.length) p = nextContentOffset(p)
-    logger.log(s"[path] Start reconstruction at $p")
 
     while (p < parseLattice.length) {
       val choices = parseLattice(p)
       if (choices == null || choices.isEmpty) {
-        logger.log(s"[path] Dead end at $p. No edges found.")
         // EOFチェック
         if (lattice.keys.exists(_ >= p)) {
-           logger.log(s"[path] Unparsed tokens remain at $p")
+           logger.log(s"[path] Unparsed tokens remain at $p (choices is null/empty)")
         }
         p = Int.MaxValue // break
       } else {
@@ -182,18 +188,15 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
           logger.log(s"[path] Ambiguity at $p: ${choices.length} possibilities.")
         }
         val best = choices.maxBy(_.nextOffset) // 最長一致
-        logger.log(s"[path] Selected edge at $p: -> ${best.nextOffset}, result: ${best.result}")
         results += best.result
         
         val rawNext = best.nextOffset
+        var nextP = rawNext
         if (rawNext < nextContentOffset.length) {
-          val nextP = nextContentOffset(rawNext)
-          logger.log(s"[path] Jump: $rawNext -> $nextP")
-          p = nextP
-        } else {
-          logger.log(s"[path] Jump: $rawNext -> (end)")
-          p = rawNext
+          nextP = nextContentOffset(rawNext)
         }
+        logger.log(s"[path] Selected edge at $p -> $rawNext (jump to $nextP)")
+        p = nextP
       }
     }
 

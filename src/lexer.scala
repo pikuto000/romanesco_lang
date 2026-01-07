@@ -58,6 +58,10 @@ with HygenicObj(tag)
   // パース結果を保持する型をMap[Int, Array[Token]]に変更（位置 -> その位置から始まる全トークン）
   var latticeResult: scala.collection.immutable.Map[Int, Array[Token]] = scala.collection.immutable.Map.empty
 
+  private val whitespaceTags = scala.collection.mutable.Set[HygenicTag]()
+  def registerWhitespace(t: HygenicTag): Unit = whitespaceTags += t
+  def isWhitespace(t: Token): Boolean = whitespaceTags.contains(t.tag)
+
   def apply(reader: java.io.Reader): scala.collection.immutable.Map[Int, Array[Token]] = {
     // ReaderからStringへ変換して正規化（確実なオフセット追跡のため）
     val sb = new StringBuilder()

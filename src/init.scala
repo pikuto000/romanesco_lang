@@ -12,11 +12,17 @@ object init {
     // どの言語構成でも共通で使いそうな基本ルール
     def common(lexer: Lexer): Unit = {
       import lexer._
-      // 空白
+      // 空白タグを作成
+      val wsTag = Hygenicmarker.bless("whiteSpace", Some(lexer), true)
+      
+      // 空白として登録
+      lexer.registerWhitespace(wsTag)
+      
+      // ルール設定
       lexer.database.set(
-        Hygenicmarker.bless("whiteSpace", Some(lexer), true),
+        wsTag,
         lexer.positioned(lexer.regex("""\s+""".r) ^^ { ws => 
-          lexer.Token.otherwise(ws, Hygenicmarker.bless(s"ws", Some(lexer), true))
+          lexer.Token.otherwise(ws, wsTag)
         })
       )
     }
