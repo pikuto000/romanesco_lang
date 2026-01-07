@@ -29,7 +29,7 @@ object init {
     }
     def operators(lexer: Lexer): Unit = {
       import lexer._
-      List("=", "+", "-", "*", ">=", "<=", ">", "<", "(", ")", "{", "}", ";").foreach {
+      List("==", ">=", "<=", "=", "+", "-", "*", ">", "<", "(", ")", "{", "}", ";").foreach {
         opStr =>
           val tag = Hygenicmarker.bless(s"op_$opStr", Some(lexer), true)
           lexer.database.set(tag, lexer.positioned(lexer.regex(java.util.regex.Pattern.quote(opStr).r) ^^ { op => lexer.Token.Defined(op, tag) }))
@@ -50,50 +50,35 @@ object init {
       import parser._
       val syntax = getSyntaxDefParser(parser)
       val block = getBlockParser(parser)
-      val unification = getUnificationParser(parser)
       val expr = getExpressionParser(parser, true)
-      
+      val unification = ((expr <~ _S) ~ (token("=") <~ _S) ~ expr) ^^ { case lhs ~ _ ~ rhs => Node("Unification", Hygenicmarker.bless("unify", Some(parser), true), Map.empty, List(lhs, rhs)) }
       (syntax | block | unification | expr) <~ _S <~ opt(token(";"))
-    }
-
-    def getUnificationParser(parser: Parser): parser.PackratParser[Node] = {
-      import parser._
-      val expr = getExpressionParser(parser, true)
-      ((expr <~ _S) ~ (token("=") <~ _S) ~ expr) ^^ { 
-        case lhs ~ _ ~ rhs => 
-          Node("Unification", Hygenicmarker.bless("unify", Some(parser), true), Map.empty, List(lhs, rhs)) 
-      }
     }
 
     def getBlockParser(parser: Parser): parser.PackratParser[Node] = {
       import parser._
       lazy val stmt = getStatementParser(parser)
-      (token("{") ~> _S ~> rep(stmt <~ _S) <~ token("}")) ^^ { stmts => 
-        Node("Block", Hygenicmarker.bless("block", Some(parser), true), Map.empty, stmts) 
-      }
+      (token("{") ~> _S ~> rep(stmt <~ _S) <~ token("}")) ^^ { stmts => Node("Block", Hygenicmarker.bless("block", Some(parser), true), Map.empty, stmts) }
     }
 
     def getSyntaxDefParser(parser: Parser): parser.PackratParser[Node] = {
       import parser._
-      val exprNoMacro = getExpressionParser(parser, false)
       val exprWithMacro = getExpressionParser(parser, true)
       val block = getBlockParser(parser)
       lazy val syntaxKeyword = token("syntax")
       lazy val macroNameP = dataToken(_.tag.name.startsWith("id:"), "macro name") ^^ { t => t.s }
-      lazy val argP = dataToken(_.tag.name.startsWith("id:"), "arg") ^^ { t => t.s }
-
-      (syntaxKeyword ~ _S ~ macroNameP ~ _S ~ rep(argP <~ _S) ~ token("=") ~ _S ~ (block | exprNoMacro)) ^^ {
-        case (_ ~ _ ~ (name: String) ~ _ ~ (args: List[String]) ~ _ ~ _ ~ (body: Node)) =>
-          if (Macro.register(name, args, body)) {
+      
+      (syntaxKeyword ~ _S ~ macroNameP ~ _S ~ rep(exprWithMacro <~ _S) ~ token("=") ~ _S ~ (block | exprWithMacro)) ^^ {
+        case (_ ~ _ ~ (name: String) ~ _ ~ (patterns: List[Node]) ~ _ ~ _ ~ (body: Node)) =>
+          if (Macro.register(name, patterns, body)) {
             val mTag = Hygenicmarker.bless(s"macro_token_$name", Some(lexer), true)
             lexer.database.set(mTag, lexer.positioned(lexer.regex(java.util.regex.Pattern.quote(name).r) ^^ { s => lexer.Token.Defined(s, mTag) }))
-            val macroRule = (token(name) ~ repN(args.length, _S ~> exprWithMacro)) ^^ { 
-              case t ~ parsedArgs => 
-                Node("MacroCall", Hygenicmarker.bless(s"call_$name", Some(parser), true), Map("name" -> name), parsedArgs)
+            val macroRule = (token(name) ~ repN(patterns.length, _S ~> exprWithMacro)) ^^ { 
+              case t ~ parsedArgs => Node("MacroCall", Hygenicmarker.bless(s"call_$name", Some(parser), true), Map("name" -> name), parsedArgs)
             }
             parser.database.prepend(Hygenicmarker.bless(s"macro_$name", Some(parser), true), macroRule)
           }
-          Node("MacroDef", Hygenicmarker.bless("macro", Some(parser), true), Map("name" -> name, "args" -> args))
+          Node("MacroDef", Hygenicmarker.bless("macro", Some(parser), true), Map("name" -> name))
       }
     }
 
@@ -101,14 +86,10 @@ object init {
       import parser._
       lazy val varP = dataToken(_.tag.name.startsWith("id:"), "id") ^^ { t => Node("Variable", t.tag) }
       lazy val valP = dataToken(_.tag.name.startsWith("num:"), "num") ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s))) }
-      
-      lazy val factor: PackratParser[Node] = 
-        (token("(") ~> _S ~> getExpressionParser(parser, allowMacros) <~ _S <~ token(")")) |
-        (if (allowMacros) (anyRule | valP | varP) else (valP | varP))
-
+      lazy val factor: PackratParser[Node] = (token("(") ~> _S ~> getExpressionParser(parser, allowMacros) <~ _S <~ token(")")) | (if (allowMacros) (anyRule | valP | varP) else (valP | varP))
       lazy val term: PackratParser[Node] = (factor ~ rep(_S ~> token("*") ~> factor)) ^^ { case f ~ list => list.foldLeft(f)((x, y) => Node("BinaryOp", Hygenicmarker.bless("mul_op", Some(parser), true), Map("op" -> "*"), List(x, y))) }
-      lazy val arithmetic: PackratParser[Node] = (term ~ rep(_S ~> (token("+") | token("-")) ~ (_S ~> term))) ^^ { case t ~ list => list.foldLeft(t) { case (x, op ~ y) => Node("BinaryOp", Hygenicmarker.bless(s"bin_op_${op.s}", Some(parser), true), Map("op" -> op.s), List(x, y)) } }
-      lazy val comparison: PackratParser[Node] = (arithmetic ~ rep(_S ~> (token(">") | token("<") | token(">=") | token("<=")) ~ (_S ~> arithmetic))) ^^ { case t ~ list => list.foldLeft(t) { case (x, op ~ y) => Node("BinaryOp", Hygenicmarker.bless(s"cmp_op_${op.s}", Some(parser), true), Map("op" -> op.s), List(x, y)) } } 
+      lazy val arithmetic: PackratParser[Node] = (term ~ rep(_S ~> (token("+") | token("-")) ~ (_S ~> term))) ^^ { case t ~ list => list.foldLeft(t) { case (x, op ~ y) => Node("BinaryOp", Hygenicmarker.bless(s"bin_op_${op.s}", Some(parser), true), Map("op" -> op.s), List(x, y)) } } 
+      lazy val comparison: PackratParser[Node] = (arithmetic ~ rep(_S ~> (token("==") | token(">=") | token("<=") | token(">") | token("<")) ~ (_S ~> arithmetic))) ^^ { case t ~ list => list.foldLeft(t) { case (x, op ~ y) => Node("BinaryOp", Hygenicmarker.bless(s"cmp_op_${op.s}", Some(parser), true), Map("op" -> op.s), List(x, y)) } } 
       comparison
     }
 
@@ -126,7 +107,7 @@ object init {
 
   object semantics {
     def execute(results: Array[Any], solver: Solver): Unit = {
-      results.foreach { case node: Node => if (node.kind == "Program" || node.kind == "Block") execute(node.children.toArray, solver) else solver.solve(node); case _ => }
+      results.foreach { case node: Node => solver.solve(node); case _ => }
       solver.check()
     }
   }

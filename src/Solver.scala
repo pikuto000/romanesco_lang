@@ -6,7 +6,6 @@ class Solver(val ctx: Context) {
   def this() = this(new Context())
   private val solver = ctx.mkSolver()
   
-  // Z3オブジェクトのキャッシュ
   private val varMap = MutableMap[String, Expr[?]]()
   private val exprCache = MutableMap[Node, Expr[?]]()
 
@@ -14,39 +13,34 @@ class Solver(val ctx: Context) {
     varMap.getOrElseUpdate(tag.mangledName, ctx.mkRealConst(tag.mangledName)).asInstanceOf[ArithExpr[?]]
   }
 
-  def addEq(left: Expr[?], right: Expr[?]): Unit = {
-    solver.add(ctx.mkEq(left.asInstanceOf[Expr[Sort]], right.asInstanceOf[Expr[Sort]]))
-  }
-
   def solve(node: Node): Unit = {
     node.kind match {
       case "Unification" =>
         val lExpr = exprOf(node.children(0))
         val rExpr = exprOf(node.children(1))
-        addEq(lExpr, rExpr)
-        logger.log(s"[solver] Added constraint: $lExpr == $rExpr")
+        solver.add(ctx.mkEq(lExpr.asInstanceOf[Expr[Sort]], rExpr.asInstanceOf[Expr[Sort]]))
+        logger.log(s"[solver] Added Eq constraint: $lExpr == $rExpr")
       
       case "BinaryOp" =>
         val op = node.attributes("op").asInstanceOf[String]
-        if (List(">", "<", ">=", "<=").contains(op)) {
-          val l = exprOf(node.children(0)).asInstanceOf[ArithExpr[?]]
-          val r = exprOf(node.children(1)).asInstanceOf[ArithExpr[?]]
+        if (List(">", "<", ">=", "<=", "==").contains(op)) {
+          val l = exprOf(node.children(0))
+          val r = exprOf(node.children(1))
           val constr = op match {
-            case ">" => ctx.mkGt(l, r)
-            case "<" => ctx.mkLt(l, r)
-            case ">=" => ctx.mkGe(l, r)
-            case "<=" => ctx.mkLe(l, r)
+            case ">"  => ctx.mkGt(l.asInstanceOf[ArithExpr[?]], r.asInstanceOf[ArithExpr[?]])
+            case "<"  => ctx.mkLt(l.asInstanceOf[ArithExpr[?]], r.asInstanceOf[ArithExpr[?]])
+            case ">=" => ctx.mkGe(l.asInstanceOf[ArithExpr[?]], r.asInstanceOf[ArithExpr[?]])
+            case "<=" => ctx.mkLe(l.asInstanceOf[ArithExpr[?]], r.asInstanceOf[ArithExpr[?]])
+            case "==" => ctx.mkEq(l.asInstanceOf[Expr[Sort]], r.asInstanceOf[Expr[Sort]])
           }
           solver.add(constr)
-          logger.log(s"[solver] Added constraint: $l $op $r")
-        } else {
-          // トップレベルの算術式は制約にならないので無視（または警告）
+          logger.log(s"[solver] Added logical constraint: $l $op $r")
         }
 
-      case "Block" =>
+      case "Program" | "Block" =>
         node.children.foreach(solve)
       
-      case _ => // 無視
+      case _ => 
     }
   }
 
@@ -65,9 +59,9 @@ class Solver(val ctx: Context) {
             case "+" => ctx.mkAdd(l, r)
             case "-" => ctx.mkSub(l, r)
             case "*" => ctx.mkMul(l, r)
-            case _ => throw new Exception(s"Unsupported operator in expression: $op")
+            case _   => throw new Exception(s"Unsupported arithmetic/logical operator in expr: $op")
           }
-        case _ => throw new Exception(s"Unsupported AST node kind for solver: ${node.kind}")
+        case _ => throw new Exception(s"Unsupported node kind for symbolic expr: ${node.kind}")
       }
     })
   }
@@ -86,6 +80,8 @@ class Solver(val ctx: Context) {
       println("----------------------")
     } else if (status == Status.UNSATISFIABLE) {
       println("Error: Constraints are inconsistent (UNSAT).")
+    } else {
+      println(s"Solver returned: $status")
     }
   }
 }

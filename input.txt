@@ -1,2 +1,14 @@
-syntax square X = X * X
-Y = square 5
+# 1. 単純な足し算
+syntax simplify (0 + X) = X ;
+syntax simplify (X + 0) = X ;
+syntax simplify X = X ;
+
+# 2. スコープキャプチャ
+syntax set_global VAL = {
+  @global_res = VAL ;
+}
+
+A = simplify (0 + 100) ;
+set_global 500 ;
+# この時点で global_res という変数が外側に生えているはず
+B = @global_res ;
