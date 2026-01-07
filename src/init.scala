@@ -51,7 +51,12 @@ object init {
       val syntax = getSyntaxDefParser(parser)
       val block = getBlockParser(parser)
       val expr = getExpressionParser(parser, true)
-      val unification = ((expr <~ _S) ~ (token("=") <~ _S) ~ expr) ^^ { case lhs ~ _ ~ rhs => Node("Unification", Hygenicmarker.bless("unify", Some(parser), true), Map.empty, List(lhs, rhs)) }
+      
+      // Unificationを優先的にパース（= が含まれる場合）
+      val unification = (expr ~ (token("=") ~> _S ~> expr)) ^^ { 
+        case lhs ~ rhs => Node("Unification", Hygenicmarker.bless("unify", Some(parser), true), Map.empty, List(lhs, rhs)) 
+      }
+      
       (syntax | block | unification | expr) <~ _S <~ opt(token(";"))
     }
 
@@ -70,12 +75,9 @@ object init {
       lazy val syntaxKeyword = token("syntax")
       lazy val macroNameP = dataToken(_.tag.name.startsWith("id:"), "macro name") ^^ { t => t.s }
       
-      //ボディ側で「複数のノード」を返せるようにブロックまたは式を受理
       (syntaxKeyword ~ _S ~ macroNameP ~ _S ~ rep(exprWithMacro <~ _S) ~ token("=") ~ _S ~ (block | exprWithMacro)) ^^ {
         case (_ ~ _ ~ (name: String) ~ _ ~ (patterns: List[Node]) ~ _ ~ _ ~ (body: Node)) =>
-          // ボディがBlockならその子供たち（List[Node]）を、単一の式なら1要素のリストを登録
           val bodyList = if (body.kind == "Block") body.children else List(body)
-          
           if (Macro.register(name, patterns, bodyList)) {
             val mTag = Hygenicmarker.bless(s"macro_token_$name", Some(lexer), true)
             lexer.database.set(mTag, lexer.positioned(lexer.regex(java.util.regex.Pattern.quote(name).r) ^^ { s => lexer.Token.Defined(s, mTag) }))
@@ -91,8 +93,14 @@ object init {
     def getExpressionParser(parser: Parser, allowMacros: Boolean): parser.PackratParser[Node] = {
       import parser._
       lazy val varP = dataToken(_.tag.name.startsWith("id:"), "id") ^^ { t => Node("Variable", t.tag) }
-      lazy val valP = dataToken(_.tag.name.startsWith("num:"), "num") ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s))) }
-      lazy val factor: PackratParser[Node] = (token("(") ~> _S ~> getExpressionParser(parser, allowMacros) <~ _S <~ token(")")) | (if (allowMacros) (anyRule | valP | varP) else (valP | varP))
+      lazy val valP = dataToken(_.tag.name.startsWith("num:"), "num") ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s)))
+      }
+      
+      // 優先順位: 括弧 -> マクロ -> リテラル -> 変数
+      lazy val factor: PackratParser[Node] = 
+        (token("(") ~> _S ~> getExpressionParser(parser, allowMacros) <~ _S <~ token(")")) |
+        (if (allowMacros) (anyRule | valP | varP) else (valP | varP))
+
       lazy val term: PackratParser[Node] = (factor ~ rep(_S ~> token("*") ~> factor)) ^^ { case f ~ list => list.foldLeft(f)((x, y) => Node("BinaryOp", Hygenicmarker.bless("mul_op", Some(parser), true), Map("op" -> "*"), List(x, y))) }
       lazy val arithmetic: PackratParser[Node] = (term ~ rep(_S ~> (token("+") | token("-")) ~ (_S ~> term))) ^^ { case t ~ list => list.foldLeft(t) { case (x, op ~ y) => Node("BinaryOp", Hygenicmarker.bless(s"bin_op_${op.s}", Some(parser), true), Map("op" -> op.s), List(x, y)) } } 
       lazy val comparison: PackratParser[Node] = (arithmetic ~ rep(_S ~> (token("==") | token(">=") | token("<=") | token(">") | token("<")) ~ (_S ~> arithmetic))) ^^ { case t ~ list => list.foldLeft(t) { case (x, op ~ y) => Node("BinaryOp", Hygenicmarker.bless(s"cmp_op_${op.s}", Some(parser), true), Map("op" -> op.s), List(x, y)) } } 
@@ -101,7 +109,8 @@ object init {
 
     def literals(parser: Parser): Unit = {
       import parser._
-      parser.addSyntax(Hygenicmarker.bless("parseLiteral", Some(parser), true))(dataToken(_.tag.name.startsWith("num:"), "number") ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s))) })
+      parser.addSyntax(Hygenicmarker.bless("parseLiteral", Some(parser), true))(dataToken(_.tag.name.startsWith("num:"), "number") ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s)))
+      })
       parser.addSyntax(Hygenicmarker.bless("parseVariable", Some(parser), true))(dataToken(_.tag.name.startsWith("id:"), "identifier") ^^ { t => Node("Variable", t.tag) })
     }
 
