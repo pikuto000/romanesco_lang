@@ -7,7 +7,7 @@ object logger {
     Enable=enable
     println(s"logger is $Enable")
   }
-  def log(s:String):Unit={
+  def log(s: => String):Unit={
     if (Enable){
       println(s"[logger] $s".replace("\n", "\\n").replace("\r", "\\r"))
     }

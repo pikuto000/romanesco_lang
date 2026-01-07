@@ -39,11 +39,7 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
   }
 
   // --- 明示的な空白スキップ ---
-  def _S: Parser[List[lexer.Token]] = rep(acceptIf(t => {
-    val isWs = lexer.isWhitespace(t)
-    // logger.log(s"[trace] _S check: '${t.s}' (tag:${t.tag.mangledName}) -> $isWs")
-    isWs
-  })(_ => "whitespace expected"))
+  def _S: Parser[List[lexer.Token]] = rep(acceptIf(t => lexer.isWhitespace(t))(_ => "whitespace expected"))
 
   def token(name: String): Parser[lexer.Token] = acceptIf(_.s == name)(t => s"Expected '$name' found '${t.s}'")
 
@@ -70,39 +66,40 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
   // パース結果の格子: Offset -> Array[ParseEdge]
   var parseLattice: Array[Array[ParseEdge]] = Array.empty
 
-  // 指定された位置から始まるすべての可能性を探索する
+  // 指定された位置から始まるすべての可能性を探索する (最適化版: 配列ベース)
   def dispatchAll(in: Input, lattice: Map[Int, Array[lexer.Token]]): Array[ParseEdge] = {
     val offset = in.offset
     val tokens = lattice.getOrElse(offset, Array.empty[lexer.Token])
     val currentRules = database.getRules
-    val edges = ArrayBuffer[ParseEdge]()
-
-    // logger.log(s"[dispatchAll] At offset $offset, tokens: ${tokens.length}, rules: ${currentRules.length}")
+    
+    // 最大で (トークン数 * ルール数) のエッジが生まれる可能性があるが、
+    // 実際はほとんどマッチしないので、初期サイズを小さくして拡張するか、
+    // ArrayBuilder を使う。ArrayBuilder は内部で Array を拡張してくれる。
+    val builder = Array.newBuilder[ParseEdge]
+    // 頻繁なリサイズを避けるためのヒントがあれば良いが、とりあえずデフォルトで。
 
     var tIdx = 0
-    while (tIdx < tokens.length) {
+    val tokensLen = tokens.length
+    val rulesLen = currentRules.length
+
+    while (tIdx < tokensLen) {
       val t = tokens(tIdx)
-      val isWs = lexer.isWhitespace(t)
-      // logger.log(s"[dispatchAll] Token[$tIdx] at $offset: '${t.s}' (tag:${t.tag.mangledName}), isWhitespace: $isWs")
-      
-      if (!isWs) {
+      if (!lexer.isWhitespace(t)) {
         val packratIn = new PackratReader(new LatticeReader(offset, lattice, tIdx))
         var rIdx = 0
-        while (rIdx < currentRules.length) {
+        while (rIdx < rulesLen) {
           val (tag, rule) = currentRules(rIdx)
           rule(packratIn) match {
             case Success(res, next) => 
-              logger.log(s"[dispatchAll]     MATCH: ${tag.mangledName} -> next offset ${next.offset}")
-              edges += ParseEdge(res, next.offset)
-            case NoSuccess(msg, _) => 
-              // logger.log(s"[dispatchAll]     FAIL: ${tag.mangledName} ($msg)")
+              builder.addOne(ParseEdge(res, next.offset))
+            case _ => 
           }
           rIdx += 1
         }
       }
       tIdx += 1
     }
-    edges.toArray
+    builder.result()
   }
 
   def apply(lattice: Map[Int, Array[lexer.Token]]): ParseResult[Array[Any]] = {
@@ -117,22 +114,12 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     var i = maxOffset
     while (i >= 0) {
       val tokens = latticeArr(i)
-      // ここで判定ミスがあると致命的
       if (tokens != null && tokens.exists(t => !lexer.isWhitespace(t))) {
         lastContent = i
       }
       nextContentOffset(i) = lastContent
       i -= 1
     }
-    
-    // ジャンプテーブルのログ出力
-    /*
-    logger.log("[parse] Jump Table:")
-    for (i <- 0 to maxOffset) {
-      val t = if (latticeArr(i) != null) latticeArr(i).map(_.s).mkString(",") else "null"
-      logger.log(s"  $i [$t] -> ${nextContentOffset(i)}")
-    }
-    */
 
     // パース格子の初期化
     parseLattice = new Array[Array[ParseEdge]](maxOffset + 2)
@@ -145,23 +132,26 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
 
     logger.log(s"[parse] Building Parse Lattice via BFS starting at $startOff (maxOffset: $maxOffset)")
 
-    // BFSでパース可能なすべてのパスを埋める
+    // BFS
     while (queue.nonEmpty) {
       val curr = queue.dequeue()
       
+      // dispatchAll は Array[ParseEdge] を返すようになった
       val edges = dispatchAll(new LatticeReader(curr, lattice), lattice)
-      if (edges.nonEmpty) {
+      if (edges.nonEmpty) { // 配列の空チェックは length > 0
         parseLattice(curr) = edges
-        edges.foreach { edge =>
+        var eIdx = 0
+        while (eIdx < edges.length) {
+          val edge = edges(eIdx)
           val rawNext = edge.nextOffset
           val nextJump = if (rawNext < nextContentOffset.length) nextContentOffset(rawNext) else rawNext
           
           if (nextJump < parseLattice.length) {
-            if (!visited.contains(nextJump)) {
-              visited.add(nextJump)
+            if (visited.add(nextJump)) {
               queue.enqueue(nextJump)
             }
           }
+          eIdx += 1
         }
       }
     }
@@ -171,32 +161,40 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     // パス復元
     val results = ArrayBuffer[Any]()
     var p = startOff
-    
-    // 最初の空白スキップ確認
     if (p < nextContentOffset.length) p = nextContentOffset(p)
 
     while (p < parseLattice.length) {
       val choices = parseLattice(p)
       if (choices == null || choices.isEmpty) {
-        // EOFチェック
         if (lattice.keys.exists(_ >= p)) {
-           logger.log(s"[path] Unparsed tokens remain at $p (choices is null/empty)")
+           logger.log(s"[path] Unparsed tokens remain at $p")
         }
-        p = Int.MaxValue // break
+        p = Int.MaxValue 
       } else {
         if (choices.length > 1) {
           logger.log(s"[path] Ambiguity at $p: ${choices.length} possibilities.")
         }
-        val best = choices.maxBy(_.nextOffset) // 最長一致
+        // 最長一致探索
+        var best = choices(0)
+        var maxOff = best.nextOffset
+        var ci = 1
+        while (ci < choices.length) {
+          val c = choices(ci)
+          if (c.nextOffset > maxOff) {
+            maxOff = c.nextOffset
+            best = c
+          }
+          ci += 1
+        }
+        
         results += best.result
         
         val rawNext = best.nextOffset
-        var nextP = rawNext
         if (rawNext < nextContentOffset.length) {
-          nextP = nextContentOffset(rawNext)
+          p = nextContentOffset(rawNext)
+        } else {
+          p = rawNext
         }
-        logger.log(s"[path] Selected edge at $p -> $rawNext (jump to $nextP)")
-        p = nextP
       }
     }
 
