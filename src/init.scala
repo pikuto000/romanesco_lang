@@ -49,6 +49,24 @@ object init {
           lexer.Token.Defined(op, Hygenicmarker.bless(s"op:$op", Some(lexer), true))
         })
       )
+      lexer.database.set(
+        Hygenicmarker.bless("plus", Some(lexer), true),
+        lexer.positioned(lexer.regex("""\+""".r) ^^ { op => 
+          lexer.Token.Defined(op, Hygenicmarker.bless(s"op:$op", Some(lexer), true))
+        })
+      )
+      lexer.database.set(
+        Hygenicmarker.bless("minus", Some(lexer), true),
+        lexer.positioned(lexer.regex("""\-""".r) ^^ { op => 
+          lexer.Token.Defined(op, Hygenicmarker.bless(s"op:$op", Some(lexer), true))
+        })
+      )
+      lexer.database.set(
+        Hygenicmarker.bless("mul", Some(lexer), true),
+        lexer.positioned(lexer.regex("""\*""".r) ^^ { op => 
+          lexer.Token.Defined(op, Hygenicmarker.bless(s"op:$op", Some(lexer), true))
+        })
+      )
     }
   }
   
@@ -62,8 +80,8 @@ object init {
     // 基本的なリテラルをASTに変換するルール
     def literals(parser: Parser): Unit = {
       import parser._
-      lazy val identP = acceptIf(t => t.tag.name.startsWith("id:"))(_ => "id expected")
-      lazy val numP = acceptIf(t => t.tag.name.startsWith("num:"))(_ => "num expected")
+      val identP = acceptIf(t => t.tag.name.startsWith("id:"))(_ => "id expected")
+      val numP = acceptIf(t => t.tag.name.startsWith("num:"))(_ => "num expected")
 
       parser.addSyntax(Hygenicmarker.bless("parseVariable", Some(parser), true))(
         identP ^^ { t => AST.Variable(t.tag) }
@@ -73,16 +91,44 @@ object init {
       )
     }
 
-    // Oz風の論理制約ルール
+    // Oz風の論理制約ルール (算術演算を含む)
     def logic(parser: Parser): Unit = {
       import parser._
-      // literalsが先に呼ばれていることを前提とするか、内部で必要なパーサーを定義する
+      
+      // 基本要素
       lazy val varP = acceptIf(t => t.tag.name.startsWith("id:"))(_ => "id expected") ^^ { t => AST.Variable(t.tag) }
       lazy val valP = acceptIf(t => t.tag.name.startsWith("num:"))(_ => "num expected") ^^ { t => AST.IntLiteral(BigInt(t.s)) }
+      
+      // 演算子
+      lazy val plus = token("+")
+      lazy val minus = token("-")
+      lazy val mul = token("*")
 
-      val unificationParser = 
-        ((varP <~ _S) ~ (token("=") <~ _S) ~ (valP | varP)) ^^ {
-          case v ~ _ ~ rhs => AST.Unification(v, rhs)
+      // 数式パーサー (再帰的定義)
+      lazy val factor: PackratParser[AST] = 
+        valP | varP 
+
+      // term: factor * factor ...
+      lazy val term: PackratParser[AST] = 
+        (factor ~ rep(_S ~> mul ~ (_S ~> factor))) ^^ {
+          case f ~ list => list.foldLeft(f) {
+            case (x, _ ~ y) => AST.BinaryOp("*", x, y)
+          }
+        }
+
+      // expression: term + term ...
+      lazy val expression: PackratParser[AST] = 
+        (term ~ rep(_S ~> (plus | minus) ~ (_S ~> term))) ^^ {
+          case t ~ list => list.foldLeft(t) {
+            case (x, op ~ y) => AST.BinaryOp(op.s, x, y)
+          }
+        }
+
+      // 単一化: variable = expression (または expression = expression もあり得るが今回は単純化)
+      // 左辺は expression も許容するように変更
+      val unificationParser: PackratParser[AST.Unification] = 
+        ((expression <~ _S) ~ (token("=") <~ _S) ~ expression) ^^ {
+          case lhs ~ _ ~ rhs => AST.Unification(lhs, rhs)
         }
 
       parser.addSyntax(Hygenicmarker.bless("parseUnify", Some(parser), true))(unificationParser)

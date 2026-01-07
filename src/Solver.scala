@@ -4,8 +4,8 @@ import scala.collection.mutable.{Map => MutableMap}
 import romanesco.{AST => RAST}
 
 class Solver {
-  private lazy val ctx = new Context()
-  private lazy val solver = ctx.mkSolver()
+  private val ctx = new Context()
+  private val solver = ctx.mkSolver()
   
   // 変数名（Mangled Name）と Z3 定数のマッピング
   private val varMap = MutableMap[String, Expr[?]]()
@@ -39,6 +39,15 @@ class Solver {
   private def exprOf(node: RAST): Expr[?] = node match {
     case RAST.Variable(tag) => getOrCreateInt(tag)
     case RAST.IntLiteral(v) => ctx.mkInt(v.toString)
+    case RAST.BinaryOp(op, left, right) =>
+      val l = exprOf(left).asInstanceOf[ArithExpr[?]]
+      val r = exprOf(right).asInstanceOf[ArithExpr[?]]
+      op match {
+        case "+" => ctx.mkAdd(l, r)
+        case "-" => ctx.mkSub(l, r)
+        case "*" => ctx.mkMul(l, r)
+        case _ => throw new Exception(s"Unsupported operator: $op")
+      }
     case _ => throw new Exception(s"Unsupported AST node for solver: $node")
   }
 
@@ -51,7 +60,7 @@ class Solver {
       val model = solver.getModel
       println("--- Deduced Model ---")
       varMap.keys.toSeq.sorted.foreach { name =>
-        val res = model.evaluate(varMap(name), false)
+        val res = model.evaluate(varMap(name), true)
         println(s"$name = $res")
       }
       println("----------------------")

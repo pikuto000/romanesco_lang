@@ -38,11 +38,11 @@ object Main {
     val solveStart = Instant.now()
     // 制約解決の実行
     val solver = new Solver()
-    parseResult match {
-      case parser.Success(res, _) =>
-        init.semantics.execute(res, solver)
-      case _ =>
-        println("Skipping execution due to parse failure.")
+    if (parseResult.successful) {
+      val res = parseResult.get
+      init.semantics.execute(res, solver)
+    } else {
+      println(s"Skipping execution due to parse failure: $parseResult")
     }
     val solveEnd = Instant.now()
     val solveDuration = Duration.between(solveStart, solveEnd)

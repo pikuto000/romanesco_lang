@@ -19,6 +19,11 @@ object AST {
     override def toString: String = s"($left = $right)"
   }
 
+  // 算術演算: "X + Y", "10 * 2"
+  case class BinaryOp(op: String, left: AST, right: AST) extends AST {
+    override def toString: String = s"($left $op $right)"
+  }
+
   // 命令の並び
   case class Block(statements: Array[AST]) extends AST
 }
