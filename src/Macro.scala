@@ -4,10 +4,9 @@ import scala.util.boundary, boundary.break
 object Macro {
   
   private val macroRegistry = scala.collection.mutable.Map[String, scala.collection.mutable.ListBuffer[(List[Node], List[Node])]]()
-  private val tagCache = scala.collection.mutable.Map[String, HygenicTag]()
+  private val evaluator = new Evaluator()
 
   def register(name: String, pattern: List[Node], body: List[Node]): Boolean = synchronized {
-    // logger.log(s"[macro.reg] Registering sequential pattern for '$name' (${pattern.length} nodes)")
     val entries = macroRegistry.getOrElseUpdate(name, scala.collection.mutable.ListBuffer())
     if (entries.exists(_._1 == pattern)) false
     else {
@@ -17,7 +16,6 @@ object Macro {
   }
 
   def expand(nodes: Array[Any]): Array[Any] = {
-    logger.log(s"[macro.expand] Metamorphosis START (${nodes.length} nodes)")
     var current = nodes.toList
     var changed = true
     var pass = 0
@@ -27,7 +25,6 @@ object Macro {
       current = next
       changed = passChanged
     }
-    logger.log(s"[macro.expand] Metamorphosis FINISHED in $pass passes")
     current.toArray
   }
 
@@ -40,9 +37,9 @@ object Macro {
         case (node: Node) :: rest =>
           val (newChildren, childrenChanged) = expandList(node.children)
           if (childrenChanged) anyChanged = true
-          val internal = node.copy(children = newChildren.collect { case n: Node => n })
-          
-          tryMatchAny(internal, rest) match {
+          val internal = tryFold(node.copy(children = newChildren.collect { case n: Node => n }))
+
+          tryMatchMixfix(internal, rest) match {
             case Some((replacedNodes, remaining, matchedChanged)) =>
               if (matchedChanged) anyChanged = true
               replacedNodes ++ process(remaining)
@@ -58,40 +55,27 @@ object Macro {
     (result, anyChanged)
   }
 
-  private def tryMatchAny(firstNode: Node, rest: List[Any]): Option[(List[Any], List[Any], Boolean)] = synchronized {
-    val optName = firstNode.kind match {
-      case "MacroCall" => Some(firstNode.attributes("name").asInstanceOf[String])
-      case "Variable"  => Some(firstNode.tag.name.split(":").lastOption.getOrElse(""))
-      case _ => None
-    }
-
-    optName.flatMap { name =>
-      macroRegistry.get(name).flatMap { definitions =>
-        boundary {
-          for ((pattern, body) <- definitions) {
-            val (targets, tail) = if (firstNode.kind == "MacroCall") {
-              (firstNode.children, rest)
-            } else {
-              collectNodes(rest, pattern.length)
-            }
-
-            if (targets.length == pattern.length) {
-              val env = scala.collection.mutable.Map[String, Node]()
-              if (matchAll(pattern, targets, env)) {
-                // logger.log(s"[macro.match] SUCCESS: '$name' pattern matched")
-                val substitutedBody = body.map(b => substitute(b, env.toMap, freshLocals = true))
-                break(Some((substitutedBody, tail, true)))
-              }
-            }
-          }
-          None
+  private def tryMatchMixfix(firstNode: Node, rest: List[Any]): Option[(List[Any], List[Any], Boolean)] = synchronized {
+    for ((name, definitions) <- macroRegistry) {
+      for ((pattern, body) <- definitions) {
+        val env = scala.collection.mutable.Map[String, Node]()
+        val (targets, tail) = collectNodes(firstNode :: rest, pattern.length)
+        
+        if (targets.length == pattern.length && matchAll(pattern, targets, env)) {
+          // 呼び出し元（firstNode）のタグのハッシュを種にする
+          val seed = firstNode.tag.hash
+          
+          val substitutedBody = body.map(b => 
+            tryFold(substitute(b, env.toMap, freshLocals = true, seed))
+          )
+          return Some((substitutedBody, tail, true))
         }
       }
     }
+    None
   }
 
   private def matchAll(patterns: List[Node], targets: List[Node], env: scala.collection.mutable.Map[String, Node]): Boolean = {
-    if (patterns.length != targets.length) return false
     patterns.zip(targets).forall { case (p, t) => matchNode(p, t, env) }
   }
 
@@ -101,8 +85,11 @@ object Macro {
         val varName = p.tag.name.split(":").lastOption.getOrElse("")
         env(varName) = t
         true
+      case "LiteralWord" if t.kind == "Variable" =>
+        p.attributes("value") == t.tag.name.split(":").lastOption.getOrElse("")
       case _ if p.kind == t.kind =>
-        matchAll(p.children, t.children, env)
+        if (p.kind == "LiteralWord") p.attributes("value") == t.attributes("value")
+        else matchAll(p.children, t.children, env)
       case _ => false
     }
   }
@@ -113,16 +100,15 @@ object Macro {
       case (n: Node) :: rest => 
         val (collected, tail) = collectNodes(rest, count - 1)
         (n :: collected, tail)
-      case other :: rest => 
-        collectNodes(rest, count) 
+      case other :: rest => collectNodes(rest, count)
       case Nil => (Nil, Nil)
     }
   }
 
-  private def substitute(template: Node, env: Map[String, Node], freshLocals: Boolean): Node = {
+  private def substitute(template: Node, env: Map[String, Node], freshLocals: Boolean, seed: Int): Node = {
     val localRefreshMap = scala.collection.mutable.Map[Int, HygenicTag]()
     def process(n: Node): Node = {
-      n.kind match {
+      val res = n.kind match {
         case "Variable" =>
           val rawName = n.tag.name.split(":").lastOption.getOrElse("")
           if (env.contains(rawName)) env(rawName)
@@ -130,35 +116,32 @@ object Macro {
             val capturedName = rawName.substring(1)
             n.copy(tag = Hygenicmarker.bless(capturedName, None, false))
           } else if (freshLocals) {
-            val newTag = localRefreshMap.getOrElseUpdate(n.tag.hash, Hygenicmarker.freshen(n.tag))
+            // seed を使って一意化
+            val newTag = localRefreshMap.getOrElseUpdate(n.tag.hash, Hygenicmarker.freshen(n.tag, seed))
             n.copy(tag = newTag)
           } else n
         case _ =>
           n.copy(children = n.children.map(process))
       }
+      tryFold(res)
     }
     process(template)
   }
 
-  object ConstantFolding {
-    private val evaluator = new Evaluator()
-    def apply(nodes: Array[Any]): Array[Any] = nodes.map { case n: Node => fold(n) case o => o }
-    private def fold(n: Node): Node = {
-      val foldedChildren = n.children.map(fold)
-      val foldedNode = n.copy(children = foldedChildren)
-      foldedNode.kind match {
-        case "BinaryOp" if foldedChildren.length == 2 =>
-          val left = foldedChildren(0); val right = foldedChildren(1)
-          if (left.kind == "DecimalLiteral" && right.kind == "DecimalLiteral") {
-            try {
-              evaluator.eval(foldedNode) match {
-                case d: BigDecimal => Node("DecimalLiteral", n.tag, Map("value" -> d))
-                case _ => foldedNode
-              }
-            } catch { case _: Exception => foldedNode }
-          } else foldedNode
-        case _ => foldedNode
-      }
+  private def tryFold(n: Node): Node = {
+    n.kind match {
+      case "BinaryOp" if n.children.forall(_.kind == "DecimalLiteral") =>
+        try {
+          evaluator.eval(n) match {
+            case d: BigDecimal => Node("DecimalLiteral", n.tag, Map("value" -> d))
+            case _ => n
+          }
+        } catch { case _: Exception => n }
+      case _ => n
     }
+  }
+
+  object ConstantFolding {
+    def apply(nodes: Array[Any]): Array[Any] = nodes.map { case n: Node => tryFold(n) case o => o }
   }
 }

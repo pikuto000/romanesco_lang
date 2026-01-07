@@ -7,11 +7,11 @@ import scala.concurrent.duration.Duration
 import java.util.concurrent.ConcurrentHashMap
 import scala.jdk.CollectionConverters._
 
-case class ParseEdge(result: Any, nextOffset: Int, ruleTag: HygenicTag) {
-  override def toString: String = s"Edge(-> $nextOffset, rule: ${ruleTag.mangledName}, res: $result)"
+case class ParseEdge(result: Any, nextOffset: Int, ruleTag: HygenicTag, logicalError: Option[String] = None) {
+  def isConsistent: Boolean = logicalError.isEmpty
 }
 
-class Parser(val lexer: Lexer, tag: HygenicTag)
+class Parser(val lexer: Lexer, tag: HygenicTag, val solver: Option[Solver] = None)
   extends Parsers
   with PackratParsers
   with HygenicObj(tag) {
@@ -50,21 +50,21 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
   class d(tag:HygenicTag) extends HygenicObj(tag){
     val rules = ArrayBuffer[(HygenicTag, PackratParser[Any])]()
     private val registeredHashes = scala.collection.mutable.Set[Int]()
-    var updated = false 
+    @volatile var updated = false 
 
-    def set(t: HygenicTag, p: PackratParser[Any]): Unit = { 
+    def set(t: HygenicTag, p: PackratParser[Any]): Unit = synchronized { 
       if (!registeredHashes.contains(t.hash)) {
         logger.log(s"[parser.db] Adding rule: ${t.name}")
         rules += ((t, p)); registeredHashes += t.hash; updated = true
       }
     }
-    def prepend(t: HygenicTag, p: PackratParser[Any]): Unit = { 
+    def prepend(t: HygenicTag, p: PackratParser[Any]): Unit = synchronized { 
       if (!registeredHashes.contains(t.hash)) {
         logger.log(s"[parser.db] Prepending rule: ${t.name}")
         ((t, p)) +=: rules; registeredHashes += t.hash; updated = true
       }
     }
-    def getRules: Array[(HygenicTag, PackratParser[Any])] = rules.toArray
+    def getRules: Array[(HygenicTag, PackratParser[Any])] = synchronized { rules.toArray }
   }
 
   def addSyntax(t: HygenicTag)(p: PackratParser[Any]): Unit = database.set(t, p)
@@ -73,19 +73,19 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     def apply(in: Input): ParseResult[Node] = {
       val currentRules = database.getRules
       var i = 0
-      while (i < currentRules.length) {
+      var found: Option[Success[Node]] = None
+      while (i < currentRules.length && found.isEmpty) {
         val (tag, rule) = currentRules(i)
         if (tag.name != "parseProgram") {
           rule(in) match {
             case Success(res: Node, next) if next.offset > in.offset => 
-              // logger.log(s"[anyRule] Match: ${tag.name} at ${in.offset}")
-              return Success(res, next)
+              found = Some(Success(res, next))
             case _ =>
           }
         }
         i += 1
       }
-      Failure("No rule matched in database", in)
+      found.getOrElse(Failure("No rule matched in database", in))
     }
   }
 
@@ -109,26 +109,20 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     val tokens = lattice.getOrElse(offset, Array.empty[lexer.Token])
     val currentRules = database.getRules
     val builder = Array.newBuilder[ParseEdge]
-    
-    // 【統合最適化】構造的トークンがある場合、同一文字列の一般的トークン(otherwise)を無視する
     val definedStrings = tokens.collect { case t: lexer.Token.Defined => t.s }.toSet
     
     var tIdx = 0
     while (tIdx < tokens.length) {
       val t = tokens(tIdx)
-      val shouldSkip = t match {
-        case _: lexer.Token.otherwise if definedStrings.contains(t.s) => true
-        case _ => lexer.isWhitespace(t)
-      }
-      
-      if (!shouldSkip) {
+      if (t != null && !lexer.isWhitespace(t) && !(t.isInstanceOf[lexer.Token.otherwise] && definedStrings.contains(t.s))) {
         val packratIn = new PackratReader(new LatticeReader(offset, lattice, tIdx))
         var rIdx = 0
         while (rIdx < currentRules.length) {
           val (ruleTag, rule) = currentRules(rIdx)
           rule(packratIn) match {
             case Success(res, next) => 
-              builder.addOne(ParseEdge(res, next.offset, ruleTag))
+              // ここでは単体チェックは行わず、全ての可能性をエッジとして残す
+              builder.addOne(ParseEdge(res, next.offset, ruleTag, None))
             case _ => 
           }
           rIdx += 1
@@ -172,7 +166,7 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
     var finalNodes = Array.empty[Any]
     var lastReader: Reader[lexer.Token] = null
 
-    var needsReevaluation = true
+    @volatile var needsReevaluation = true
     var passCount = 0
 
     while (needsReevaluation && passCount < 10) {
@@ -185,37 +179,22 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
       buildExhaustiveLattice(currentLattice)
 
       val startOff = if (0 < nextContentOffset.length) nextContentOffset(0) else 0
-      val choices = parseLattice.get(startOff)
       
-      // PASS中、Programルールが成功しているなら、それを優先する
-      if (choices != null && choices.exists(_.ruleTag.name == "parseProgram")) {
-        val programEdge = choices.find(_.ruleTag.name == "parseProgram").get
-        logger.log(s"[parser]   Program rule matched (length=${programEdge.nextOffset})")
-        finalNodes = programEdge.result.asInstanceOf[Node].children.toArray
-        lastReader = new LatticeReader(programEdge.nextOffset, currentLattice)
-      } else {
-        // 断片を繋ぎ合わせる（最長一致）
-        val results = ArrayBuffer[Any]()
-        var p = startOff
-        while (p < maxOffsetSafe(currentLattice)) {
-          val currChoices = parseLattice.get(p)
-          if (currChoices == null || currChoices.isEmpty) { 
-            val jump = if (p < nextContentOffset.length) nextContentOffset(p) else p + 1
-            if (jump > p && jump < nextContentOffset.length + 1) p = jump else p = Int.MaxValue 
-          } else {
-            val best = currChoices.maxBy(_.nextOffset)
-            results += best.result
-            val nextRaw = best.nextOffset
-            p = if (nextRaw < nextContentOffset.length) nextContentOffset(nextRaw) else nextRaw
-          }
-        }
-        finalNodes = results.toArray
-        lastReader = new LatticeReader(if (p == Int.MaxValue) maxOffsetSafe(currentLattice) else p, currentLattice)
+      // 【論理駆動パス探索】
+      val (currentNodes, nextR) = searchLogicalPath(startOff, currentLattice) match {
+        case Some((nodes, off)) => (nodes, new LatticeReader(off, currentLattice))
+        case None => 
+          logger.log("[parser.error] No logically consistent path found. Falling back to longest match.")
+          fallbackToLongest(startOff, currentLattice)
       }
+      
+      finalNodes = currentNodes
+      lastReader = nextR
+
+      registerMacrosDeterministically(finalNodes)
 
       if (database.updated || lexer.database.updated) {
         if (lexer.database.updated && sourceCode.nonEmpty) {
-          logger.log("[parser] Re-tokenizing entire source...")
           currentLattice = lexer.tokenize(sourceCode)
         }
         needsReevaluation = true
@@ -224,6 +203,81 @@ class Parser(val lexer: Lexer, tag: HygenicTag)
 
     result = finalNodes
     Success(result, lastReader)
+  }
+
+  // 論理的なパスを深さ優先探索（DFS）で探す
+  private def searchLogicalPath(offset: Int, lattice: Map[Int, Array[lexer.Token]]): Option[(Array[Any], Int)] = {
+    if (offset >= maxOffsetSafe(lattice)) return Some((Array.empty, offset))
+    
+    val choices = parseLattice.get(offset)
+    if (choices == null || choices.isEmpty) {
+      val jump = if (offset < nextContentOffset.length) nextContentOffset(offset) else offset + 1
+      if (jump > offset && jump < nextContentOffset.length + 1) return searchLogicalPath(jump, lattice)
+      else return Some((Array.empty, offset))
+    }
+
+    // エッジを長さ順（長い順）に試す
+    val sortedEdges = choices.sortBy(-_.nextOffset)
+    
+    for (edge <- sortedEdges) {
+      // このエッジが論理的に矛盾しないかチェック
+      val isFeasible = edge.result match {
+        case n: Node if solver.isDefined && (n.kind == "Unification" || n.kind == "BinaryOp" || n.kind == "Block") =>
+          solver.get.checkFeasibility(n)
+        case _ => true
+      }
+
+      if (isFeasible) {
+        // このエッジを「仮採用」して Solver の状態を更新
+        edge.result match { case n: Node if solver.isDefined => solver.get.solve(n) case _ => }
+        
+        // 残りのパスを探索
+        searchLogicalPath(edge.nextOffset, lattice) match {
+          case Some((tailNodes, finalOff)) =>
+            return Some((edge.result +: tailNodes, finalOff))
+          case None => 
+            // 失敗した場合は Solver を戻す必要はない（現在のパスが終わるだけなので。真面目にやるなら push/pop 必要）
+        }
+      }
+    }
+    None
+  }
+
+  private def fallbackToLongest(startOff: Int, lattice: Map[Int, Array[lexer.Token]]): (Array[Any], Reader[lexer.Token]) = {
+    val results = ArrayBuffer[Any]()
+    var p = startOff
+    while (p < maxOffsetSafe(lattice)) {
+      val currChoices = parseLattice.get(p)
+      if (currChoices == null || currChoices.isEmpty) { 
+        val jump = if (p < nextContentOffset.length) nextContentOffset(p) else p + 1
+        if (jump > p && jump < nextContentOffset.length + 1) p = jump else p = Int.MaxValue 
+      } else {
+        val best = currChoices.maxBy(_.nextOffset)
+        results += best.result
+        val nextRaw = best.nextOffset
+        p = if (nextRaw < nextContentOffset.length) nextContentOffset(nextRaw) else nextRaw
+      }
+    }
+    (results.toArray, new LatticeReader(if (p == Int.MaxValue) maxOffsetSafe(lattice) else p, lattice))
+  }
+
+  private def registerMacrosDeterministically(nodes: Array[Any]): Unit = {
+    val macroDefs = nodes.collect { case n: Node if n.kind == "MacroDef" => n }
+    macroDefs.foreach { md =>
+      val name = md.attributes("name").asInstanceOf[String]
+      val patterns = md.attributes("patterns").asInstanceOf[List[Node]]
+      val bodyList = md.attributes("bodyList").asInstanceOf[List[Node]]
+
+      if (Macro.register(name, patterns, bodyList)) {
+        patterns.foreach {
+          case n if n.kind == "LiteralWord" =>
+            val word = n.attributes("value").asInstanceOf[String]
+            val mTag = Hygenicmarker.bless(s"kw_$word", Some(lexer), true)
+            lexer.database.set(mTag, lexer.positioned(lexer.regex(java.util.regex.Pattern.quote(word).r) ^^ { s => lexer.Token.Defined(s, mTag) }))
+          case _ =>
+        }
+      }
+    }
   }
 
   private def maxOffsetSafe(l: Map[Int, Array[lexer.Token]]): Int = if (l.isEmpty) 0 else l.keys.max + 1

@@ -1,23 +1,19 @@
 package romanesco
-import scala.collection.mutable.Map
 
 object InstanceRegistory {
-  private var instances:Map[String,Any]=Map.empty
-  
-  // Lexerを起動して登録する
-  def launch(replaceNewLine:Option[String]=None):Lexer={
-    val lex=init.lex.setup("firstLexer")
-    instances += (lex.tag.name -> lex)
-    lex
+  private val instanceMap = scala.collection.mutable.Map[String, Any]()
+
+  def register(name: String, instance: Any): Unit = {
+    instanceMap(name) = instance
   }
 
-  // Parserを起動して登録する
-  def launchParser(lexer: Lexer): Parser = {
-    val parser = init.parse.setup("firstParser", lexer)
-    instances += (parser.tag.name -> parser)
-    parser
-  }
+  def get(name: String): Option[Any] = instanceMap.get(name)
 
-  // 名前でインスタンスを取得する
-  def get(name: String): Option[Any] = instances.get(name)
+  // 便宜上、デフォルトのインスタンスを取得するためのヘルパー
+  def default: (Lexer, Parser, Solver) = {
+    val lexer = init.lex.setup("firstLexer")
+    val solver = new Solver()
+    val parser = init.parse.setup("firstParser", lexer, solver)
+    (lexer, parser, solver)
+  }
 }

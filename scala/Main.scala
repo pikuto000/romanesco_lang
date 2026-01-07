@@ -1,58 +1,51 @@
 package romanesco
-import java.time.Instant
-import java.time.Duration
+import java.nio.file.{Files, Paths}
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val filename = if (args.length >= 1) args(0) else scala.io.StdIn.readLine("input file:")
-    val debugflag = if (args.length == 2) args(1) == "debug" else false
-    if (debugflag) logger.Switch(true)
-    
-    val source = scala.io.Source.fromFile(filename)
-    val sourceStr = source.mkString
-    
-    val lexer = init.lex.setup("firstLexer")
-    init.lex.keywords(lexer)
-    init.lex.literals(lexer)
-    init.lex.operators(lexer)
+    if (args.length < 1) {
+      println("Usage: romanesco <input_file> [debug]")
+      return
+    }
 
-    val parser = init.parse.setup("firstParser", lexer)
+    val sourcePath = args(0)
+    val debug = args.length > 1 && args(1) == "debug"
+    
+    logger.Switch(debug)
+
+    val source = new String(Files.readAllBytes(Paths.get(sourcePath)))
+    val lexer = init.lex.setup("firstLexer")
+    val solver = new Solver() // 先に Solver を作る
+    val parser = init.parse.setup("firstParser", lexer, solver) // Parser に Solver を渡す
+
     init.parse.literals(parser)
     init.parse.logic(parser)
 
-    val start = Instant.now()
-    val lattice = lexer.tokenize(sourceStr)
-    if (debugflag) lexer.printStream
+    val startTime = System.currentTimeMillis()
+    val tokenLattice = lexer.tokenize(source).asInstanceOf[Map[Int, Array[parser.lexer.Token]]]
     
-    val parseResult = parser(lattice.asInstanceOf[Map[Int, Array[parser.lexer.Token]]], sourceStr)
-    val parseEnd = Instant.now()
-    println(s"parse took ${Duration.between(start, parseEnd).toMillis} ms")
-    
-    if (debugflag) parser.printStream
-    
-    if (parseResult.successful) {
-      val resRaw = parseResult.get
-      val res = init.optimization.apply(resRaw)
-      
-      if (debugflag) {
+    parser.apply(tokenLattice, source) match {
+      case parser.Success(results, _) =>
+        val parseEndTime = System.currentTimeMillis()
+        println(s"parse took ${parseEndTime - startTime} ms")
+
+        val optimizedNodes = init.optimization.apply(results)
+        
         println("--- Optimized AST ---")
-        res.zipWithIndex.foreach { case (r, i) => println(s"[$i] $r") }
+        optimizedNodes.zipWithIndex.foreach { case (node, idx) => println(s"[$idx] $node") }
         println("---------------------")
-      }
 
-      val solveStart = Instant.now()
-      val z3Ctx = new com.microsoft.z3.Context()
-      try {
-        val solver = new Solver(z3Ctx)
-        init.semantics.execute(res, solver)
-      } finally {
-        // z3Ctx.close()
-      }
-      println(s"solve took ${Duration.between(solveStart, Instant.now()).toMillis} ms")
-    } else {
-      println(s"Skipping execution due to parse failure: $parseResult")
+        val solveStartTime = System.currentTimeMillis()
+        init.semantics.execute(optimizedNodes, solver)
+        val solveEndTime = System.currentTimeMillis()
+        
+        println(s"solve took ${solveEndTime - solveStartTime} ms")
+        println(s"totally operation took ${System.currentTimeMillis() - startTime} ms")
+
+      case parser.Failure(msg, next) =>
+        println(s"Parse Failed: $msg at ${next.pos}")
+      case parser.Error(msg, next) =>
+        println(s"Parse Error: $msg at ${next.pos}")
     }
-
-    println(s"totally operation took ${Duration.between(start, Instant.now()).toMillis} ms")
   }
 }

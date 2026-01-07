@@ -29,7 +29,8 @@ object init {
     }
     def operators(lexer: Lexer): Unit = {
       import lexer._
-      List("==", ">=", "<=", "=", "+", "-", "*", ">", "<", "(", ")", "{", "}", ";").foreach {
+      // [ と ] を追加
+      List("==", ">=", "<= ", "=", "+", "-", "*", ">", "<", "(", ")", "{", "}", ";", "[", "]").foreach {
         opStr =>
           val tag = Hygenicmarker.bless(s"op_$opStr", Some(lexer), true)
           lexer.database.set(tag, lexer.positioned(lexer.regex(java.util.regex.Pattern.quote(opStr).r) ^^ { op => lexer.Token.Defined(op, tag) }))
@@ -38,7 +39,7 @@ object init {
   }
   
   object parse {
-    def setup(parseName: String, lexer: Lexer): Parser = new Parser(lexer, Hygenicmarker.bless(s"parser:${parseName}", None, true))
+    def setup(parseName: String, lexer: Lexer, solver: Solver): Parser = new Parser(lexer, Hygenicmarker.bless(s"parser:${parseName}", None, true), Some(solver))
 
     def getProgramParser(parser: Parser): parser.PackratParser[Node] = {
       import parser._
@@ -52,7 +53,6 @@ object init {
       val block = getBlockParser(parser)
       val expr = getExpressionParser(parser, true)
       
-      // Unificationを優先的にパース（= が含まれる場合）
       val unification = (expr ~ (token("=") ~> _S ~> expr)) ^^ { 
         case lhs ~ rhs => Node("Unification", Hygenicmarker.bless("unify", Some(parser), true), Map.empty, List(lhs, rhs)) 
       }
@@ -72,31 +72,26 @@ object init {
       import parser._
       val exprWithMacro = getExpressionParser(parser, true)
       val block = getBlockParser(parser)
-      lazy val syntaxKeyword = token("syntax")
-      lazy val macroNameP = dataToken(_.tag.name.startsWith("id:"), "macro name") ^^ { t => t.s }
       
-      (syntaxKeyword ~ _S ~ macroNameP ~ _S ~ rep(exprWithMacro <~ _S) ~ token("=") ~ _S ~ (block | exprWithMacro)) ^^ {
-        case (_ ~ _ ~ (name: String) ~ _ ~ (patterns: List[Node]) ~ _ ~ _ ~ (body: Node)) =>
+      // [X] の形式を最優先でマッチさせる
+      lazy val varPart: PackratParser[Node] = (token("[") ~> _S ~> dataToken(_.tag.name.startsWith("id:"), "variable") <~ _S <~ token("]")) ^^ { t => Node("Variable", t.tag) }
+      lazy val wordPart: PackratParser[Node] = dataToken(_.tag.name.startsWith("id:"), "word") ^^ { t => Node("LiteralWord", t.tag, Map("value" -> t.s)) }
+      lazy val partP = varPart | wordPart
+
+      (token("syntax") ~ _S ~ rep1(partP <~ _S) ~ token("=") ~ _S ~ (block | exprWithMacro)) ^^ {
+        case (_ ~ _ ~ (patterns: List[Node]) ~ _ ~ _ ~ (body: Node)) =>
           val bodyList = if (body.kind == "Block") body.children else List(body)
-          if (Macro.register(name, patterns, bodyList)) {
-            val mTag = Hygenicmarker.bless(s"macro_token_$name", Some(lexer), true)
-            lexer.database.set(mTag, lexer.positioned(lexer.regex(java.util.regex.Pattern.quote(name).r) ^^ { s => lexer.Token.Defined(s, mTag) }))
-            val macroRule = (token(name) ~ repN(patterns.length, _S ~> exprWithMacro)) ^^ { 
-              case t ~ parsedArgs => Node("MacroCall", Hygenicmarker.bless(s"call_$name", Some(parser), true), Map("name" -> name), parsedArgs)
-            }
-            parser.database.prepend(Hygenicmarker.bless(s"macro_$name", Some(parser), true), macroRule)
-          }
-          Node("MacroDef", Hygenicmarker.bless("macro", Some(parser), true), Map("name" -> name))
+          val macroName = patterns.collectFirst { case n if n.kind == "LiteralWord" => n.attributes("value").toString }.getOrElse("mixfix_" + patterns.hashCode())
+          Node("MacroDef", Hygenicmarker.bless("macro", Some(parser), true), 
+            Map("name" -> macroName, "patterns" -> patterns, "bodyList" -> bodyList))
       }
     }
 
     def getExpressionParser(parser: Parser, allowMacros: Boolean): parser.PackratParser[Node] = {
       import parser._
-      lazy val varP = dataToken(_.tag.name.startsWith("id:"), "id") ^^ { t => Node("Variable", t.tag) }
-      lazy val valP = dataToken(_.tag.name.startsWith("num:"), "num") ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s)))
-      }
+      lazy val varP: PackratParser[Node] = dataToken(_.tag.name.startsWith("id:"), "id") ^^ { t => Node("Variable", t.tag) }
+      lazy val valP: PackratParser[Node] = dataToken(_.tag.name.startsWith("num:"), "num") ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s)))} 
       
-      // 優先順位: 括弧 -> マクロ -> リテラル -> 変数
       lazy val factor: PackratParser[Node] = 
         (token("(") ~> _S ~> getExpressionParser(parser, allowMacros) <~ _S <~ token(")")) |
         (if (allowMacros) (anyRule | valP | varP) else (valP | varP))
@@ -109,8 +104,7 @@ object init {
 
     def literals(parser: Parser): Unit = {
       import parser._
-      parser.addSyntax(Hygenicmarker.bless("parseLiteral", Some(parser), true))(dataToken(_.tag.name.startsWith("num:"), "number") ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s)))
-      })
+      parser.addSyntax(Hygenicmarker.bless("parseLiteral", Some(parser), true))(dataToken(_.tag.name.startsWith("num:"), "number") ^^ { t => Node("DecimalLiteral", Hygenicmarker.bless("literal", Some(parser), true), Map("value" -> BigDecimal(t.s))) })
       parser.addSyntax(Hygenicmarker.bless("parseVariable", Some(parser), true))(dataToken(_.tag.name.startsWith("id:"), "identifier") ^^ { t => Node("Variable", t.tag) })
     }
 
@@ -122,12 +116,26 @@ object init {
 
   object semantics {
     def execute(results: Array[Any], solver: Solver): Unit = {
-      results.foreach { case node: Node => solver.solve(node); case _ => }
+      val errors = scala.collection.mutable.ListBuffer[String]()
+      results.foreach {
+        case node: Node =>
+          if (!solver.checkFeasibility(node)) {
+            errors += s"CONTRADICTION in node: $node"
+          }
+          solver.solve(node)
+        case _ =>
+      }
+      
       solver.check()
+      if (errors.nonEmpty) {
+        println("--- Semantic Errors Encountered ---")
+        errors.foreach(e => println(s"[Error] $e"))
+        println("-----------------------------------")
+      }
     }
   }
 
   object optimization {
-    def apply(results: Array[Any]): Array[Any] = Macro.ConstantFolding(Macro.expand(results))
+    def apply(results: Array[Any]): Array[Any] = Macro.expand(results)
   }
 }

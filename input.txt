@@ -1,14 +1,11 @@
-# 1. 単純な足し算
-syntax simplify (0 + X) = X ;
-syntax simplify (X + 0) = X ;
-syntax simplify X = X ;
+# 同じ記法に2つの意味を与える
+syntax process [X] = { X > 0 }
+syntax process [X] = { X < 0 }
 
-# 2. スコープキャプチャ
-syntax set_global VAL = {
-  @global_res = VAL ;
-}
+# 1. 文脈が X > 0 の場合
+Value = 100
+process Value
 
-A = simplify (0 + 100) ;
-set_global 500 ;
-# この時点で global_res という変数が外側に生えているはず
-B = @global_res ;
+# 2. 文脈が X < 0 の場合
+Other = -50
+process Other
