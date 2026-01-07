@@ -1,99 +1,95 @@
 package romanesco
-
-import scala.util.boundary
+import scala.util.boundary, boundary.break
 
 object Macro {
   
-  // マクロ定義: 名前 -> リスト[(パターン(Node), ボディ(Node))]
-  // 引数名のリストではなく、パターンそのものを保持するように変更
-  private val macroRegistry = scala.collection.mutable.Map[String, scala.collection.mutable.ListBuffer[(List[Node], Node)]]()
+  private val macroRegistry = scala.collection.mutable.Map[String, scala.collection.mutable.ListBuffer[(List[Node], List[Node])]]()
   private val tagCache = scala.collection.mutable.Map[String, HygenicTag]()
 
-  def register(name: String, patternArgs: List[Node], body: Node): Boolean = {
-    logger.log(s"[macro.reg] Registering pattern for '$name' with ${patternArgs.length} args")
+  def register(name: String, pattern: List[Node], body: List[Node]): Boolean = synchronized {
+    // logger.log(s"[macro.reg] Registering sequential pattern for '$name' (${pattern.length} nodes)")
     val entries = macroRegistry.getOrElseUpdate(name, scala.collection.mutable.ListBuffer())
-    // 同一パターンの重複登録を防止
-    if (entries.exists(_._1 == patternArgs)) {
-      logger.log(s"[macro.reg]   Pattern already exists for '$name'.")
-      false
-    } else {
-      // 複雑なパターンを先に試すため、先頭に追加（Overloading）
-      (patternArgs, body) +=: entries
+    if (entries.exists(_._1 == pattern)) false
+    else {
+      (pattern, body) +=: entries
       true
     }
   }
 
   def expand(nodes: Array[Any]): Array[Any] = {
-    logger.log(s"[macro.expand] Metamorphosis starting on ${nodes.length} nodes")
+    logger.log(s"[macro.expand] Metamorphosis START (${nodes.length} nodes)")
     var current = nodes.toList
     var changed = true
     var pass = 0
     while (changed && pass < 10) {
       pass += 1
-      val (next, passChanged) = expandStep(current)
+      val (next, passChanged) = expandList(current)
       current = next
       changed = passChanged
     }
+    logger.log(s"[macro.expand] Metamorphosis FINISHED in $pass passes")
     current.toArray
   }
 
-  private def expandStep(nodes: List[Any]): (List[Any], Boolean) = {
+  private def expandList(nodes: List[Any]): (List[Any], Boolean) = {
     var anyChanged = false
-    def processList(list: List[Any]): List[Any] = {
+    
+    def process(list: List[Any]): List[Any] = {
       list match {
         case Nil => Nil
         case (node: Node) :: rest =>
-          val (newChildren, childrenChanged) = expandStep(node.children)
+          val (newChildren, childrenChanged) = expandList(node.children)
           if (childrenChanged) anyChanged = true
-          val nodeWithExpandedChildren = node.copy(children = newChildren.collect { case n: Node => n })
-          val (finalNode, remaining, nodeChanged) = tryExpand(nodeWithExpandedChildren, rest)
-          if (nodeChanged) anyChanged = true
-          finalNode :: processList(remaining)
-        case other :: rest => other :: processList(rest)
+          val internal = node.copy(children = newChildren.collect { case n: Node => n })
+          
+          tryMatchAny(internal, rest) match {
+            case Some((replacedNodes, remaining, matchedChanged)) =>
+              if (matchedChanged) anyChanged = true
+              replacedNodes ++ process(remaining)
+            case None =>
+              internal :: process(rest)
+          }
+        case other :: rest => 
+          other :: process(rest)
       }
     }
-    (processList(nodes), anyChanged)
+    
+    val result = process(nodes)
+    (result, anyChanged)
   }
 
-  private def tryExpand(current: Node, rest: List[Any]): (Node, List[Any], Boolean) = {
-    // マクロ名（MacroCallまたはVariable）を取得
-    val optName = current.kind match {
-      case "MacroCall" => Some(current.attributes("name").asInstanceOf[String])
-      case "Variable"  => Some(current.tag.name.split(":").lastOption.getOrElse(""))
+  private def tryMatchAny(firstNode: Node, rest: List[Any]): Option[(List[Any], List[Any], Boolean)] = synchronized {
+    val optName = firstNode.kind match {
+      case "MacroCall" => Some(firstNode.attributes("name").asInstanceOf[String])
+      case "Variable"  => Some(firstNode.tag.name.split(":").lastOption.getOrElse(""))
       case _ => None
     }
 
-    optName match {
-      case Some(name) =>
-        macroRegistry.get(name) match {
-          case Some(definitions) =>
-            // 登録されているパターンを順に試行
-            for ((patternArgs, body) <- definitions) {
-              val (runtimeArgs, tail) = if (current.kind == "MacroCall") {
-                (current.children, rest)
-              } else {
-                collectNodes(rest, patternArgs.length)
-              }
+    optName.flatMap { name =>
+      macroRegistry.get(name).flatMap { definitions =>
+        boundary {
+          for ((pattern, body) <- definitions) {
+            val (targets, tail) = if (firstNode.kind == "MacroCall") {
+              (firstNode.children, rest)
+            } else {
+              collectNodes(rest, pattern.length)
+            }
 
-              if (runtimeArgs.length == patternArgs.length) {
-                // パターンマッチング開始
-                val env = scala.collection.mutable.Map[String, Node]()
-                if (matchAll(patternArgs, runtimeArgs, env)) {
-                  logger.log(s"[macro.match] SUCCESS: '$name' matched pattern. Transforming...")
-                  // マッチした環境でボディを置換（@による非衛生制御を含む）
-                  val transformed = substitute(body, env.toMap, freshLocals = true)
-                  boundary (transformed, tail, true)
-                }
+            if (targets.length == pattern.length) {
+              val env = scala.collection.mutable.Map[String, Node]()
+              if (matchAll(pattern, targets, env)) {
+                // logger.log(s"[macro.match] SUCCESS: '$name' pattern matched")
+                val substitutedBody = body.map(b => substitute(b, env.toMap, freshLocals = true))
+                break(Some((substitutedBody, tail, true)))
               }
             }
-            (current, rest, false)
-          case None => (current, rest, false)
+          }
+          None
         }
-      case None => (current, rest, false)
+      }
     }
   }
 
-  // 構造的なパターンマッチング
   private def matchAll(patterns: List[Node], targets: List[Node], env: scala.collection.mutable.Map[String, Node]): Boolean = {
     if (patterns.length != targets.length) return false
     patterns.zip(targets).forall { case (p, t) => matchNode(p, t, env) }
@@ -102,12 +98,10 @@ object Macro {
   private def matchNode(p: Node, t: Node, env: scala.collection.mutable.Map[String, Node]): Boolean = {
     p.kind match {
       case "Variable" =>
-        // パターン側の変数は「ワイルドカード」として機能し、ターゲットをキャプチャする
         val varName = p.tag.name.split(":").lastOption.getOrElse("")
         env(varName) = t
         true
       case _ if p.kind == t.kind =>
-        // kindが一致する場合、子供も再帰的にマッチング
         matchAll(p.children, t.children, env)
       case _ => false
     }
@@ -119,32 +113,23 @@ object Macro {
       case (n: Node) :: rest => 
         val (collected, tail) = collectNodes(rest, count - 1)
         (n :: collected, tail)
-      case _ :: rest => collectNodes(rest, count) 
+      case other :: rest => 
+        collectNodes(rest, count) 
       case Nil => (Nil, Nil)
     }
   }
 
-  // 置換ロジック: Hygieneの明示的制御
   private def substitute(template: Node, env: Map[String, Node], freshLocals: Boolean): Node = {
     val localRefreshMap = scala.collection.mutable.Map[Int, HygenicTag]()
     def process(n: Node): Node = {
       n.kind match {
         case "Variable" =>
           val rawName = n.tag.name.split(":").lastOption.getOrElse("")
-          
-          // 1. 引数置換
-          if (env.contains(rawName)) {
-            env(rawName)
-          } 
-          // 2. 非衛生的なキャプチャ（@prefix）
+          if (env.contains(rawName)) env(rawName)
           else if (rawName.startsWith("@")) {
-            // freshenせず、名前から '@' を除いた状態で元のタグを維持
-            // これにより親スコープの変数と意図的に衝突させる
             val capturedName = rawName.substring(1)
             n.copy(tag = Hygenicmarker.bless(capturedName, None, false))
-          }
-          // 3. 衛生的なローカル変数（デフォルト）
-          else if (freshLocals) {
+          } else if (freshLocals) {
             val newTag = localRefreshMap.getOrElseUpdate(n.tag.hash, Hygenicmarker.freshen(n.tag))
             n.copy(tag = newTag)
           } else n

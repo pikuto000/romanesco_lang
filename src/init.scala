@@ -58,7 +58,9 @@ object init {
     def getBlockParser(parser: Parser): parser.PackratParser[Node] = {
       import parser._
       lazy val stmt = getStatementParser(parser)
-      (token("{") ~> _S ~> rep(stmt <~ _S) <~ token("}")) ^^ { stmts => Node("Block", Hygenicmarker.bless("block", Some(parser), true), Map.empty, stmts) }
+      (token("{") ~> _S ~> rep(stmt <~ _S) <~ token("}")) ^^ { stmts => 
+        Node("Block", Hygenicmarker.bless("block", Some(parser), true), Map.empty, stmts) 
+      }
     }
 
     def getSyntaxDefParser(parser: Parser): parser.PackratParser[Node] = {
@@ -68,9 +70,13 @@ object init {
       lazy val syntaxKeyword = token("syntax")
       lazy val macroNameP = dataToken(_.tag.name.startsWith("id:"), "macro name") ^^ { t => t.s }
       
+      //ボディ側で「複数のノード」を返せるようにブロックまたは式を受理
       (syntaxKeyword ~ _S ~ macroNameP ~ _S ~ rep(exprWithMacro <~ _S) ~ token("=") ~ _S ~ (block | exprWithMacro)) ^^ {
         case (_ ~ _ ~ (name: String) ~ _ ~ (patterns: List[Node]) ~ _ ~ _ ~ (body: Node)) =>
-          if (Macro.register(name, patterns, body)) {
+          // ボディがBlockならその子供たち（List[Node]）を、単一の式なら1要素のリストを登録
+          val bodyList = if (body.kind == "Block") body.children else List(body)
+          
+          if (Macro.register(name, patterns, bodyList)) {
             val mTag = Hygenicmarker.bless(s"macro_token_$name", Some(lexer), true)
             lexer.database.set(mTag, lexer.positioned(lexer.regex(java.util.regex.Pattern.quote(name).r) ^^ { s => lexer.Token.Defined(s, mTag) }))
             val macroRule = (token(name) ~ repN(patterns.length, _S ~> exprWithMacro)) ^^ { 
