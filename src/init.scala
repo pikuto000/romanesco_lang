@@ -24,10 +24,10 @@ object init {
     // 識別子や数値などのリテラル
     def literals(lexer: Lexer): Unit = {
       import lexer._
-      // 数字
+      // 数字 (小数対応)
       lexer.database.set(
         Hygenicmarker.bless("number", Some(lexer), true),
-        lexer.positioned(lexer.regex("""\d+""".r) ^^ { n => 
+        lexer.positioned(lexer.regex("""\d+(\.\d+)?""".r) ^^ { n => 
           lexer.Token.otherwise(n, Hygenicmarker.bless(s"num:$n", Some(lexer), true))
         })
       )
@@ -87,7 +87,7 @@ object init {
         identP ^^ { t => AST.Variable(t.tag) }
       )
       parser.addSyntax(Hygenicmarker.bless("parseLiteral", Some(parser), true))(
-        numP ^^ { t => AST.IntLiteral(BigInt(t.s)) }
+        numP ^^ { t => AST.DecimalLiteral(BigDecimal(t.s)) }
       )
     }
 
@@ -97,7 +97,7 @@ object init {
       
       // 基本要素
       lazy val varP = acceptIf(t => t.tag.name.startsWith("id:"))(_ => "id expected") ^^ { t => AST.Variable(t.tag) }
-      lazy val valP = acceptIf(t => t.tag.name.startsWith("num:"))(_ => "num expected") ^^ { t => AST.IntLiteral(BigInt(t.s)) }
+      lazy val valP = acceptIf(t => t.tag.name.startsWith("num:"))(_ => "num expected") ^^ { t => AST.DecimalLiteral(BigDecimal(t.s)) }
       
       // 演算子
       lazy val plus = token("+")

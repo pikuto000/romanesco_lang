@@ -10,9 +10,9 @@ class Solver {
   // 変数名（Mangled Name）と Z3 定数のマッピング
   private val varMap = MutableMap[String, Expr[?]]()
 
-  // 整数変数の取得または作成
-  def getOrCreateInt(tag: HygenicTag): IntExpr = {
-    varMap.getOrElseUpdate(tag.mangledName, ctx.mkIntConst(tag.mangledName)).asInstanceOf[IntExpr]
+  // 実数変数の取得または作成
+  def getOrCreateReal(tag: HygenicTag): ArithExpr[?] = {
+    varMap.getOrElseUpdate(tag.mangledName, ctx.mkRealConst(tag.mangledName)).asInstanceOf[ArithExpr[?]]
   }
 
   // 制約の追加 (等式)
@@ -37,8 +37,8 @@ class Solver {
   }
 
   private def exprOf(node: RAST): Expr[?] = node match {
-    case RAST.Variable(tag) => getOrCreateInt(tag)
-    case RAST.IntLiteral(v) => ctx.mkInt(v.toString)
+    case RAST.Variable(tag) => getOrCreateReal(tag)
+    case RAST.DecimalLiteral(v) => ctx.mkReal(v.toString)
     case RAST.BinaryOp(op, left, right) =>
       val l = exprOf(left).asInstanceOf[ArithExpr[?]]
       val r = exprOf(right).asInstanceOf[ArithExpr[?]]

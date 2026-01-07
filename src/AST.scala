@@ -11,7 +11,7 @@ object AST {
   }
 
   // リテラル（定数）
-  case class IntLiteral(value: BigInt) extends AST
+  case class DecimalLiteral(value: BigDecimal) extends AST
   case class BoolLiteral(value: Boolean) extends AST
 
   // 単一化 / 制約追加: "X = 5" や "X = Y"
