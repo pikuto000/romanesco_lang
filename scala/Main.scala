@@ -36,14 +36,22 @@ object Main {
     println(s"parse took ${parseDuration.toMillis()} ms")
     if (debugflag) parser.printStream
     val solveStart = Instant.now()
+    
     // 制約解決の実行
-    val solver = new Solver()
-    if (parseResult.successful) {
-      val res = parseResult.get
-      init.semantics.execute(res, solver)
-    } else {
-      println(s"Skipping execution due to parse failure: $parseResult")
+    val z3Ctx = new com.microsoft.z3.Context()
+    try {
+      val solver = new Solver(z3Ctx)
+      if (parseResult.successful) {
+        val res = parseResult.get
+        init.semantics.execute(res, solver)
+      } else {
+        println(s"Skipping execution due to parse failure: $parseResult")
+      }
+    } finally {
+      // z3Ctx.close() // Contextのcloseは慎重に行う必要がある（参照が残っているとクラッシュする）
+      // 今回はプロセス終了時にOSに任せるが、長寿命プロセスならcloseすべき
     }
+    
     val solveEnd = Instant.now()
     val solveDuration = Duration.between(solveStart, solveEnd)
     println(s"solve took ${solveDuration.toMillis()} ms")

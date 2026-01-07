@@ -1,57 +1,53 @@
 package romanesco
 import com.microsoft.z3._
 import scala.collection.mutable.{Map => MutableMap}
-import romanesco.{AST => RAST}
 
-class Solver {
-  private val ctx = new Context()
+class Solver(val ctx: Context) {
+  def this() = this(new Context())
   private val solver = ctx.mkSolver()
-  
-  // 変数名（Mangled Name）と Z3 定数のマッピング
   private val varMap = MutableMap[String, Expr[?]]()
 
-  // 実数変数の取得または作成
   def getOrCreateReal(tag: HygenicTag): ArithExpr[?] = {
     varMap.getOrElseUpdate(tag.mangledName, ctx.mkRealConst(tag.mangledName)).asInstanceOf[ArithExpr[?]]
   }
 
-  // 制約の追加 (等式)
   def addEq(left: Expr[?], right: Expr[?]): Unit = {
     solver.add(ctx.mkEq(left.asInstanceOf[Expr[Sort]], right.asInstanceOf[Expr[Sort]]))
   }
 
-  // AST を Z3 の式に変換して制約を追加
-  def solve(ast: RAST): Unit = {
-    ast match {
-      case RAST.Unification(left, right) =>
-        val lExpr = exprOf(left)
-        val rExpr = exprOf(right)
+  def solve(node: Node): Unit = {
+    node.kind match {
+      case "Unification" =>
+        val lExpr = exprOf(node.children(0))
+        val rExpr = exprOf(node.children(1))
         addEq(lExpr, rExpr)
         logger.log(s"[solver] Added constraint: $lExpr == $rExpr")
       
-      case RAST.Block(stmts) =>
-        stmts.foreach(solve)
+      case "Block" =>
+        node.children.foreach(solve)
       
-      case _ => // その他は現状無視
+      case _ => // 無視
     }
   }
 
-  private def exprOf(node: RAST): Expr[?] = node match {
-    case RAST.Variable(tag) => getOrCreateReal(tag)
-    case RAST.DecimalLiteral(v) => ctx.mkReal(v.toString)
-    case RAST.BinaryOp(op, left, right) =>
-      val l = exprOf(left).asInstanceOf[ArithExpr[?]]
-      val r = exprOf(right).asInstanceOf[ArithExpr[?]]
+  private def exprOf(node: Node): Expr[?] = node.kind match {
+    case "Variable" => getOrCreateReal(node.tag)
+    case "DecimalLiteral" => 
+      val v = node.attributes("value").asInstanceOf[BigDecimal]
+      ctx.mkReal(v.toString)
+    case "BinaryOp" =>
+      val op = node.attributes("op").asInstanceOf[String]
+      val l = exprOf(node.children(0)).asInstanceOf[ArithExpr[?]]
+      val r = exprOf(node.children(1)).asInstanceOf[ArithExpr[?]]
       op match {
         case "+" => ctx.mkAdd(l, r)
         case "-" => ctx.mkSub(l, r)
         case "*" => ctx.mkMul(l, r)
         case _ => throw new Exception(s"Unsupported operator: $op")
       }
-    case _ => throw new Exception(s"Unsupported AST node for solver: $node")
+    case _ => throw new Exception(s"Unsupported AST node kind for solver: ${node.kind}")
   }
 
-  // 解決と結果の表示
   def check(): Unit = {
     logger.log("[solver] Checking satisfiability...")
     val status = solver.check()
