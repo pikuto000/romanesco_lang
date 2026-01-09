@@ -1,94 +1,76 @@
 package romanesco
+
 import scala.util.parsing.combinator._
-import scala.util.parsing.input._
-import scala.concurrent.{Future, Await, ExecutionContext}
-import scala.concurrent.duration.Duration
-import java.util.concurrent.ConcurrentHashMap
+import scala.util.parsing.input.CharSequenceReader
+import java.util.regex.Pattern
 
-class Lexer(tag: HygenicTag) extends RegexParsers with HygenicObj(tag) {
+object Lexer extends RegexParsers {
+  import Token._
+
   override def skipWhitespace = false
-  implicit val ec: ExecutionContext = ExecutionContext.global
 
-  sealed trait Token extends Positional { def s: String; def tag: HygenicTag }
-  object Token {
-    case class Defined(s: String, tag: HygenicTag) extends Token
-    case class otherwise(s: String, tag: HygenicTag) extends Token
-  }
-
-  val database = new d(Hygenicmarker.bless("database", Some(this), true))
-  class d(tag:HygenicTag) extends HygenicObj(tag) {
-    val rules = new ConcurrentHashMap[Int, Parser[Token]]()
-    @volatile var updated = false 
-    def set(t: HygenicTag, p: Parser[Token]): Unit = {
-      if (!rules.containsKey(t.hash)) {
-        logger.debug(s"[lexer.db] New rule: ${t.name}")
-        rules.put(t.hash, p)
-        updated = true
-      }
-    }
-  }
-
-  private var whitespaceTag: Option[HygenicTag] = None
-  def registerWhitespace(t: HygenicTag): Unit = { whitespaceTag = Some(t) }
-  def isWhitespace(t: Token): Boolean = whitespaceTag.exists(_.hash == t.tag.hash)
-
-  private var latticeResult: Map[Int, Array[Token]] = Map.empty
-
-  def tokenize(source: String): Map[Int, Array[Token]] = {
-    val lattice = new ConcurrentHashMap[Int, Array[Token]]()
-    val offsets = 0 until source.length
-    
-    val futures = offsets.map { offset =>
-      Future {
-        val tokens = whoAreYou(new CharSequenceReader(source.drop(offset)))
-        if (tokens.nonEmpty) {
-          lattice.put(offset, tokens.toArray)
-        }
-      }
-    }
-    Await.result(Future.sequence(futures), Duration.Inf)
-    
-    import scala.jdk.CollectionConverters._
-    val result = lattice.asScala.toMap
-    latticeResult = result
-    result
+  private def trim(code: String): String = {
+    code.replaceAll("^(\\s|#.*)+", "")
   }
   
-  def printStream: Unit = {
-    logger.debug("[lexer] printStream begin")
-    latticeResult.keys.toSeq.sorted.foreach { offset =>
-      val tokens = latticeResult(offset)
-      println(s"Position $offset:")
-      tokens.foreach { t =>
-        val kind = t match {
-          case Token.Defined(_, _) => "Defined"
-          case Token.otherwise(_, _) => "otherwise"
-        }
-        println(s"  - [$kind] Token: '${t.s}', Tag: ${t.tag.mangledName}".replace("\n", "\\n").replace("\r", "\\r"))
-      }
-    }
-    logger.debug("[lexer] printStream end")
+  private def matchPattern(p: String, in: Input): Option[String] = {
+    val matcher = Pattern.compile(p).matcher(in.source.subSequence(in.offset, in.source.length))
+    if (matcher.lookingAt()) Some(matcher.group()) else None
   }
 
-  private def whoAreYou(in: Input): List[Token] = {
-    val results = scala.collection.mutable.ListBuffer[Token]()
-    
-    val commentRegex = "#[^\n]*".r
-    commentRegex.findPrefixOf(in.source.subSequence(in.offset, in.source.length())) match {
-      case Some(c) if whitespaceTag.isDefined => {
-        results += Token.otherwise(c, whitespaceTag.get)
-      }
-      case _ =>
+  def whitespace: Parser[Token] = new Parser[Token] {
+    def apply(in: Input) = matchPattern("\\s+", in) match {
+      case Some(s) => Success(WS(s), in.drop(s.length))
+      case _ => Failure("not whitespace", in)
     }
+  }
 
-    import scala.jdk.CollectionConverters._
-    val rules = database.rules.values().asScala
-    rules.foreach { rule =>
-      rule(in) match {
-        case Success(t, _) => results += t
-        case _ =>
+  def comment: Parser[Token] = new Parser[Token] {
+    def apply(in: Input) = matchPattern("#.*", in) match {
+      case Some(s) => Success(Comment(s), in.drop(s.length))
+      case _ => Failure("not a comment", in)
+    }
+  }
+
+  def num: Parser[Token] = new Parser[Token] {
+    def apply(in: Input) = matchPattern("\\d+(\\.\\d+)?", in) match {
+      case Some(s) => Success(Num(BigDecimal(s)), in.drop(s.length))
+      case _ => Failure("not a number", in)
+    }
+  }
+
+  def kw: Parser[Token] = ("macro" | "syntax") ^^ { s => Keyword(s) }
+
+  def id: Parser[Token] = new Parser[Token] {
+    def apply(in: Input) = matchPattern("[a-zA-Z_$][a-zA-Z0-9_$]*", in) match {
+      case Some(s) => Success(Var(s), in.drop(s.length))
+      case _ => Failure("not an identifier", in)
+    }
+  }
+  
+  def sym: Parser[Token] = ("(" | ")" | "{" | "}" | "," | ";" | "`") ^^ { s => Sym(s) }
+  def opLong: Parser[Token] = ("<<" | ">>") ^^ { s => Op(s) }
+  def opShort: Parser[Token] = ("+" | "-" | "*" | "/" | "=" | "<" | ">" | ":") ^^ { s => Op(s) }
+
+  private val allParsers = List(comment, whitespace, num, kw, id, opLong, opShort, sym)
+
+  def lex(code: String): Either[String, List[List[Token]]] = {
+    def solve(currentCode: String): List[List[Token]] = {
+      if (currentCode.isEmpty) List(Nil)
+      else {
+        val reader = new CharSequenceReader(currentCode)
+        val candidates = allParsers.flatMap { p =>
+          p(reader) match {
+            case Success(t, next) => Some((t, currentCode.substring(next.offset)))
+            case _ => None
+          }
+        }
+        if (candidates.isEmpty) Nil
+        else candidates.flatMap { case (t, rest) => solve(rest).map(t :: _) }
       }
     }
-    results.toList
+    val results = solve(code)
+    if (results.isEmpty) Left("Lexer Error: Could not tokenize any path")
+    else Right(results.distinct)
   }
 }

@@ -1,163 +1,88 @@
 package romanesco
+
 import com.microsoft.z3._
-import scala.collection.mutable.{Map => MutableMap}
+import scala.collection.mutable
 
-class Solver(val ctx: Context) extends AutoCloseable {
-  def this() = this(new Context())
-  
+class Solver extends AutoCloseable {
+  import AstExpr._
+  import Stmt._
+
+  private val ctx = new Context()
   private val solver = ctx.mkSolver()
-  private val varMap = MutableMap[String, Expr[?]]()
-  private val exprCache = MutableMap[Node, Expr[?]]()
+  private val vars = mutable.Map[String, com.microsoft.z3.Expr[RealSort]]()
 
-  def getOrCreateReal(tag: HygenicTag): ArithExpr[?] = {
-    varMap.getOrElseUpdate(
-      tag.mangledName, 
-      ctx.mkRealConst(tag.mangledName)
-    ).asInstanceOf[ArithExpr[?]]
-  }
-  
-  // パーサーで使用するメソッドを追加
-  def push(): Unit = solver.push()
-  def pop(): Unit = solver.pop()
-  
-  def checkFeasibility(node: Node): Boolean = {
-    push()
-    try {
-      solve(node)
-      val status = solver.check()
-      status == Status.SATISFIABLE || status == Status.UNKNOWN
-    } finally {
-      pop()
-    }
+  private def getVar(name: String): com.microsoft.z3.Expr[RealSort] = {
+    vars.getOrElseUpdate(name, ctx.mkRealConst(name))
   }
 
-  def solve(node: Node): Unit = {
-    node.kind match {
-      case "Unification" => {
-        val lExpr = exprOf(node.children(0))
-        val rExpr = exprOf(node.children(1))
-        solver.add(ctx.mkEq(
-          lExpr.asInstanceOf[Expr[Sort]], 
-          rExpr.asInstanceOf[Expr[Sort]]
-        ))
-        logger.debug(s"Added Eq constraint: $lExpr == $rExpr")
-      }
-      
-      case "BinaryOp" => {
-        val op = node.requireOp("op")
-        if (List(">", "<", ">=", "<=", "==").contains(op)) {
-          val l = exprOf(node.children(0))
-          val r = exprOf(node.children(1))
-          val constr = op match {
-            case ">" => ctx.mkGt(
-              l.asInstanceOf[ArithExpr[?]], 
-              r.asInstanceOf[ArithExpr[?]]
-            )
-            case "<" => ctx.mkLt(
-              l.asInstanceOf[ArithExpr[?]], 
-              r.asInstanceOf[ArithExpr[?]]
-            )
-            case ">=" => ctx.mkGe(
-              l.asInstanceOf[ArithExpr[?]], 
-              r.asInstanceOf[ArithExpr[?]]
-            )
-            case "<=" => ctx.mkLe(
-              l.asInstanceOf[ArithExpr[?]], 
-              r.asInstanceOf[ArithExpr[?]]
-            )
-            case "==" => ctx.mkEq(
-              l.asInstanceOf[Expr[Sort]], 
-              r.asInstanceOf[Expr[Sort]]
-            )
-          }
-          solver.add(constr)
-          logger.debug(s"Added logical constraint: $l $op $r")
-        }
-      }
-
-      case "Program" | "Block" => {
-        node.children.foreach(solve)
-      }
-      
-      case _ => {
-        // 他のノードは無視
-      }
-    }
-  }
-
-  private def exprOf(node: Node): Expr[?] = {
-    exprCache.getOrElseUpdate(node, {
-      node.kind match {
-        case "Variable" => getOrCreateReal(node.tag)
-        
-        case "DecimalLiteral" => {
-          val v = node.requireNum("value")
-          ctx.mkReal(v.toString)
-        }
-        
-        case "BinaryOp" => {
-          val op = node.requireOp("op")
-          val l = exprOf(node.children(0)).asInstanceOf[ArithExpr[?]]
-          val r = exprOf(node.children(1)).asInstanceOf[ArithExpr[?]]
+  private def toZ3(expr: AstExpr): ArithExpr[RealSort] = expr match {
+    case Num(v) => ctx.mkReal(v.toString).asInstanceOf[ArithExpr[RealSort]]
+    case Var(n) => getVar(n).asInstanceOf[ArithExpr[RealSort]]
+    case BinOp(op, l, r) =>
+      op match {
+        case "=" =>
+          val left = toZ3(l); val right = toZ3(r)
+          solver.add(ctx.mkEq(left, right))
+          right
+        case "<<" => ctx.mkMul(toZ3(l), ctx.mkPower(ctx.mkReal(2), toZ3(r)))
+        case ">>" => ctx.mkDiv(toZ3(l), ctx.mkPower(ctx.mkReal(2), toZ3(r)))
+        case _ =>
+          val left = toZ3(l); val right = toZ3(r)
           op match {
-            case "+" => ctx.mkAdd(l, r)
-            case "-" => ctx.mkSub(l, r)
-            case "*" => ctx.mkMul(l, r)
-            case _ => throw new Exception(
-              s"Unsupported arithmetic/logical operator in expr: $op"
-            )
+            case "+" => ctx.mkAdd(left, right)
+            case "-" => ctx.mkSub(left, right)
+            case "*" => ctx.mkMul(left, right)
+            case "/" => 
+              solver.add(ctx.mkNot(ctx.mkEq(right, ctx.mkReal(0))))
+              ctx.mkDiv(left, right)
+            case _ => 
+              val domain = Array[Sort](ctx.getRealSort, ctx.getRealSort)
+              val func = ctx.mkFuncDecl(op, domain, ctx.getRealSort)
+              func.apply(left, right).asInstanceOf[ArithExpr[RealSort]]
           }
-        }
-        
-        case _ => throw new Exception(
-          s"Unsupported node kind for symbolic expr: ${node.kind}"
-        )
       }
-    })
+    case Templated(name, _) =>
+      ctx.mkReal(Math.abs(name.hashCode % 1000)).asInstanceOf[ArithExpr[RealSort]]
+    case Ambiguous(options) =>
+      val tmp = ctx.mkFreshConst("ambig", ctx.getRealSort).asInstanceOf[ArithExpr[RealSort]]
+      val constraints = options.map(opt => ctx.mkEq(tmp, toZ3(opt)))
+      solver.add(ctx.mkOr(constraints*))
+      tmp
+    case Raw(_) =>
+      ctx.mkReal(0).asInstanceOf[ArithExpr[RealSort]]
+    case MacroCall(name, _) =>
+      throw new RuntimeException(s"Unexpanded macro call in solver: $name")
   }
 
-  def check(): Unit = {
-    logger.info("Checking satisfiability...")
+  def add(stmt: Stmt): Unit = stmt match {
+    case Constraint(l, r) => solver.add(ctx.mkEq(toZ3(l), toZ3(r)))
+    case Block(stmts) => stmts.foreach(add)
+    case Branch(options) => solver.add(ctx.mkOr(options.map(convertStmtToBoolExpr)*))
+    case MacroDef(_, _, _) => 
+  }
+
+  private def convertStmtToBoolExpr(stmt: Stmt): BoolExpr = stmt match {
+    case Constraint(l, r) => ctx.mkEq(toZ3(l), toZ3(r))
+    case Block(stmts) => ctx.mkAnd(stmts.map(convertStmtToBoolExpr)*)
+    case Branch(options) => ctx.mkOr(options.map(convertStmtToBoolExpr)*)
+    case _ => ctx.mkTrue()
+  }
+
+  def solveAndPrint(): Unit = {
+    println(s"Constraints added: ${solver.getNumAssertions}")
     val status = solver.check()
-    println(s"Solver Status: $status")
-    
-    status match {
-      case Status.SATISFIABLE => {
-        val model = solver.getModel
-        println("--- Deduced Model ---")
-        
-        // Z3変数の値を表示
-        varMap.keys.toSeq.sorted.foreach { name =>
-          val res = model.evaluate(varMap(name), true)
-          println(s"$name = $res")
-        }
-        
-        // 定数値も表示（exprCacheから取得）
-        val constants = exprCache.collect {
-          case (node, expr) if node.kind == "DecimalLiteral" =>
-            (node.tag.mangledName, node.requireNum("value"))
-        }.toSeq.sortBy(_._1)
-        
-        constants.foreach { case (name, value) =>
-          println(s"$name = $value (constant)")
-        }
-        
-        println("----------------------")
+    println(s"Status: $status")
+    if (status == Status.SATISFIABLE) {
+      val model = solver.getModel
+      println("--- Model ---")
+      vars.keys.toSeq.sorted.foreach { name =>
+        val v = vars(name)
+        println(s"$name = ${model.evaluate(v, true)}")
       }
-      
-      case Status.UNSATISFIABLE => {
-        println("Error: Constraints are inconsistent (UNSAT).")
-      }
-      
-      case _ => {
-        println(s"Solver returned: $status")
-      }
+    } else {
+      println("Unsatisfiable!")
     }
   }
-  
-  def close(): Unit = {
-    exprCache.clear()
-    varMap.clear()
-    ctx.close()
-  }
+
+  override def close(): Unit = ctx.close()
 }

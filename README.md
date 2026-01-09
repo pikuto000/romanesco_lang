@@ -1,8 +1,42 @@
-# [開発中] Romanesco プログラミング言語
+# Romanesco (Reduced)
 
-型無しコンパイル型言語です。
+A minimal, typeless compiled language backed by the Z3 SMT solver.
 
-Z3 SMTソルバーを用いて、制約を使うことで静的型付け言語以上に強力な安全性と高速性、ポータビリティを実現する予定です。
+This project was originally an ambitious attempt at a universal, self-modifying language. It has been drastically reduced to its core value proposition: using an SMT solver for execution and safety verification.
 
-また、複数のマクロで、もはや別言語への変容を可能にします。
+## Features
 
+- **Z3 Solver Integration:** Variables and expressions are directly mapped to Z3 constraints.
+- **Safety:** The solver verifies the feasibility of your code.
+- **Simplicity:** No macros, no complex optimizations. Just parsing and solving.
+
+## Requirements
+
+- Scala 3.7.4 (or compatible)
+- sbt 1.12.0 (or compatible)
+- Z3 installed and accessible (via `z3-turnkey` dependency)
+
+## Usage
+
+Run the compiler with a source file:
+
+```bash
+sbt "run <file>"
+```
+
+## Example
+
+```
+x = 10;
+y = 20;
+z = 30;
+x + y == z
+```
+
+Output:
+```
+Solver Status: SATISFIABLE
+x = 10
+y = 20
+z = 30
+```
