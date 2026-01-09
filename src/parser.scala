@@ -31,16 +31,22 @@ object SimpleParser extends Parsers {
   def stmt: Parser[Stmt] = (
       k("syntax") ~> rep1(not(o("=") ~ s("{")) ~> anyT) ~ (o("=") ~> s("{") ~> rep(not(s("}")) ~> anyT) <~ s("}")) ^^ { case p ~ t => SyntaxDef(p, t) }
     | expr ~ o("=") ~ expr ^^ { case l ~ _ ~ r => Constraint(l, r) }
+    | expr ^^ Verify.apply
     | s("{") ~> rep(stmt) <~ s("}") ^^ Block.apply
   ) <~ opt(s(";"))
 
   def expr: Parser[AstExpr] = (
       k("if") ~> expr ~ (k("then") ~> expr) ~ (k("else") ~> expr) ^^ { case c ~ t ~ e => If(c, t, e) }
     | s("\u005c") ~> id ~ (o("->") ~> expr) ^^ { case p ~ b => Lambda(p, b) }
-    | term ~ rep((o("+") | o("-") | o("<<") | o(">>") | o("==") | o("<") | o(">")) ~ term) ^^ { case t ~ l => l.foldLeft(t) { case (x, op ~ y) => BinOp(op, x, y) } }
+    | logicOr
   )
-  def term: Parser[AstExpr] = fact ~ rep((o("*") | o("/")) ~ fact) ^^ { case f ~ l => l.foldLeft(f) { case (x, op ~ y) => BinOp(op, x, y) } }
+  def logicOr: Parser[AstExpr] = logicAnd ~ rep(o("||") ~ logicAnd) ^^ { case t ~ l => l.foldLeft(t) { case (x, o ~ y) => BinOp(o, x, y) } }
+  def logicAnd: Parser[AstExpr] = compare ~ rep(o("&&") ~ compare) ^^ { case t ~ l => l.foldLeft(t) { case (x, o ~ y) => BinOp(o, x, y) } }
+  def compare: Parser[AstExpr] = arith ~ rep((o("==") | o("<") | o(">")) ~ arith) ^^ { case t ~ l => l.foldLeft(t) { case (x, o ~ y) => BinOp(o, x, y) } }
+  def arith: Parser[AstExpr] = term ~ rep((o("+") | o("-") | o("<<") | o(">>")) ~ term) ^^ { case t ~ l => l.foldLeft(t) { case (x, o ~ y) => BinOp(o, x, y) } }
+  def term: Parser[AstExpr] = fact ~ rep((o("*") | o("/")) ~ fact) ^^ { case f ~ l => l.foldLeft(f) { case (x, o ~ y) => BinOp(o, x, y) } }
   def fact: Parser[AstExpr] = anyOf(
+    o("!") ~> fact ^^ { e => UnOp("!", e) },
     (id ~ o("<") ~ expr <~ o(">")) ^^ { case n ~ _ ~ i => Templated(n, i) },
     (id ~ (s("(") ~> repsep(expr, s(",")) <~ s(")"))) ^^ { case n ~ a => Apply(Var(n), a) },
     (id ~ (s("(") ~> repsep(expr, s(",")) <~ s(")"))) ^^ { case n ~ a => BinOp("=", Var(n), a.head) },

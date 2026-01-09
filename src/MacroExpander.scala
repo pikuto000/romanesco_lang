@@ -8,17 +8,15 @@ object MacroExpander {
 
   def registerAll(ss: List[Stmt]): Unit = ss.foreach {
     case SyntaxDef(p, t) => syntax = ((p, t) :: syntax).sortBy(-_._1.size)
-    case Block(s) => registerAll(s)
-    case Branch(o) => o.foreach(st => registerAll(List(st)))
+    case Block(s) => registerAll(s); case Branch(o) => o.foreach(st => registerAll(List(st)))
     case _ =>
   }
 
   def transform(ts: List[Token]): List[Token] = if ts.isEmpty then Nil else {
-    val headWord = ts.head match { case Token.Kw(w) => w; case Token.Var(n) => n; case _ => "" }
+    val headWord = ts.head.raw
     if (headWord == "syntax") {
-      val rest = ts.dropWhile(t => !t.isInstanceOf[Token.Sym] || t.asInstanceOf[Token.Sym].s != "}").drop(1)
-      val finalRest = if (rest.nonEmpty && rest.head.isInstanceOf[Token.Sym] && rest.head.asInstanceOf[Token.Sym].s == ";") rest.tail else rest
-      transform(finalRest)
+      val rest = ts.dropWhile(t => t.raw != "}").drop(1)
+      transform(if (rest.nonEmpty && rest.head.raw == ";") rest.tail else rest)
     } else {
       syntax.collectFirst { case (p, t) if matchT(p, ts).isDefined => (t, matchT(p, ts).get) } match {
         case Some((tpl, (env, cons))) => substituteT(tpl, env) ++ transform(ts.drop(cons))
@@ -30,12 +28,12 @@ object MacroExpander {
   private def matchT(p: List[Token], t: List[Token]): Option[(Map[String, List[Token]], Int)] = {
     var (env, pi, ti, cons) = (Map[String, List[Token]](), p, t, 0)
     while (pi.nonEmpty) {
-      while (ti.nonEmpty && (ti.head.isInstanceOf[WS] || ti.head.isInstanceOf[Comment])) { ti = ti.tail; cons += 1 }
-      if (pi.head.isInstanceOf[WS] || pi.head.isInstanceOf[Comment]) pi = pi.tail
+      while (ti.nonEmpty && (ti.head.isInstanceOf[Token.WS] || ti.head.isInstanceOf[Token.Comment])) { ti = ti.tail; cons += 1 }
+      if (pi.head.isInstanceOf[Token.WS] || pi.head.isInstanceOf[Token.Comment]) pi = pi.tail
       else if (ti.isEmpty) return None
       else pi.head match {
         case Token.Var(n) if n.startsWith("$") => env += (n -> List(ti.head)); pi = pi.tail; ti = ti.tail; cons += 1
-        case h if h == ti.head => pi = pi.tail; ti = ti.tail; cons += 1
+        case h if h.raw == ti.head.raw => pi = pi.tail; ti = ti.tail; cons += 1
         case _ => return None
       }
     }

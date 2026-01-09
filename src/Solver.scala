@@ -12,6 +12,9 @@ class Solver extends AutoCloseable {
     case BinOp("==", l, r) => ctx.mkEq(toZ(l, env), toZ(r, env))
     case BinOp("<", l, r) => ctx.mkLt(toZ(l, env).asInstanceOf[ArithExpr[?]], toZ(r, env).asInstanceOf[ArithExpr[?]])
     case BinOp(">", l, r) => ctx.mkGt(toZ(l, env).asInstanceOf[ArithExpr[?]], toZ(r, env).asInstanceOf[ArithExpr[?]])
+    case BinOp("&&", l, r) => ctx.mkAnd(b(l, env), b(r, env))
+    case BinOp("||", l, r) => ctx.mkOr(b(l, env), b(r, env))
+    case UnOp("!", ex) => ctx.mkNot(b(ex, env))
     case _ => ctx.mkNot(ctx.mkEq(toZ(e, env), ctx.mkReal(0)))
   }
 
@@ -44,13 +47,14 @@ class Solver extends AutoCloseable {
       s.add(ctx.mkForall(Array[Sort](ctx.getRealSort), Array(ctx.mkSymbol(p)), ctx.mkEq(f.apply(x), toZ(bd, Map(p -> x))), 0, null, null, null, null))
       fs += (n -> f)
     case Constraint(l, r) => s.add(ctx.mkEq(toZ(l), toZ(r)))
+    case Verify(e) => s.add(b(e, Map.empty))
     case Block(ss) => ss.foreach(add)
     case Branch(o) => s.add(ctx.mkOr(o.map(convert)*))
     case _ =>
   }
 
   private def convert(st: Stmt): BoolExpr = st match {
-    case Constraint(l, r) => ctx.mkEq(toZ(l), toZ(r))
+    case Constraint(l, r) => ctx.mkEq(toZ(l), toZ(r)); case Verify(e) => b(e, Map.empty)
     case Block(ss) => ctx.mkAnd(ss.map(convert)*); case Branch(o) => ctx.mkOr(o.map(convert)*); case _ => ctx.mkTrue()
   }
 
