@@ -1,51 +1,110 @@
 package romanesco
-import java.nio.file.{Files, Paths}
+import java.time.{Instant, Duration}
+import scala.util.{Using, Try}
 
 object Main {
   def main(args: Array[String]): Unit = {
-    if (args.length < 1) {
-      println("Usage: romanesco <input_file> [debug]")
-      return
-    }
-
-    val sourcePath = args(0)
-    val debug = args.length > 1 && args(1) == "debug"
+    val result = for {
+      config <- parseArgs(args)
+      _ = logger.switch(config.debug, if (config.debug) { LogLevel.Debug } else { LogLevel.Info })
+      source <- readSource(config.filename)
+      _ <- compile(source, config.debug)
+    } yield ()
     
-    logger.Switch(debug)
-
-    val source = new String(Files.readAllBytes(Paths.get(sourcePath)))
+    result match {
+      case Right(_) => {
+        logger.info("Compilation successful")
+        sys.exit(0)
+      }
+      case Left(errors) => {
+        errors.foreach(e => println(e.format))
+        sys.exit(1)
+      }
+    }
+  }
+  
+  case class Config(filename: String, debug: Boolean)
+  
+  private def parseArgs(args: Array[String]): CompilerResult[Config] = {
+    val filename = if (args.length >= 1) {
+      args(0)
+    } else {
+      scala.io.StdIn.readLine("input file: ")
+    }
+    val debug = args.length == 2 && args(1) == "debug"
+    Right(Config(filename, debug))
+  }
+  
+  private def readSource(filename: String): CompilerResult[String] = {
+    Try {
+      val source = scala.io.Source.fromFile(filename)
+      try {
+        source.mkString
+      } finally {
+        source.close()
+      }
+    }.toEither.left.map { e =>
+      List(CompilerError.BackendError(
+        s"Cannot read file: ${e.getMessage}", 
+        "io"
+      ))
+    }
+  }
+  
+  private def compile(sourceStr: String, debugFlag: Boolean): CompilerResult[Unit] = {
+    val start = Instant.now()
+    
     val lexer = init.lex.setup("firstLexer")
-    val solver = new Solver() // 先に Solver を作る
-    val parser = init.parse.setup("firstParser", lexer, solver) // Parser に Solver を渡す
-
+    val parser = init.parse.setup("firstParser", lexer)
+    
+    // パーサーの初期化
     init.parse.literals(parser)
     init.parse.logic(parser)
-
-    val startTime = System.currentTimeMillis()
-    val tokenLattice = lexer.tokenize(source).asInstanceOf[Map[Int, Array[parser.lexer.Token]]]
     
-    parser.apply(tokenLattice, source) match {
-      case parser.Success(results, _) =>
-        val parseEndTime = System.currentTimeMillis()
-        println(s"parse took ${parseEndTime - startTime} ms")
+    val lattice = lexer.tokenize(sourceStr)
+    if (debugFlag) {
+      lexer.printStream
+    }
+    
+    val parseResult = parser(lattice.asInstanceOf[Map[Int, Array[parser.lexer.Token]]], sourceStr)
+    val parseEnd = Instant.now()
+    println(s"parse took ${Duration.between(start, parseEnd).toMillis} ms")
+    
+    if (debugFlag) {
+      parser.printStream
+    }
+    
+    if (!parseResult.successful) {
+      return Left(List(CompilerError.ParseError(
+        s"Parse failed: $parseResult", 
+        None
+      )))
+    }
+    
+    val resRaw = parseResult.get
+    val res = init.optimization.apply(resRaw)
+    
+    if (debugFlag) {
+      println("--- Optimized AST ---")
+      res.zipWithIndex.foreach { case (r, i) => 
+        println(s"[$i] $r") 
+      }
+      println("---------------------")
+    }
 
-        val optimizedNodes = init.optimization.apply(results)
-        
-        println("--- Optimized AST ---")
-        optimizedNodes.zipWithIndex.foreach { case (node, idx) => println(s"[$idx] $node") }
-        println("---------------------")
-
-        val solveStartTime = System.currentTimeMillis()
-        init.semantics.execute(optimizedNodes, solver)
-        val solveEndTime = System.currentTimeMillis()
-        
-        println(s"solve took ${solveEndTime - solveStartTime} ms")
-        println(s"totally operation took ${System.currentTimeMillis() - startTime} ms")
-
-      case parser.Failure(msg, next) =>
-        println(s"Parse Failed: $msg at ${next.pos}")
-      case parser.Error(msg, next) =>
-        println(s"Parse Error: $msg at ${next.pos}")
+    val solveStart = Instant.now()
+    Try {
+      Using.resource(new Solver()) { solver =>
+        init.semantics.execute(res, solver)
+      }
+    }.toEither.left.map { e =>
+      List(CompilerError.ConstraintError(
+        s"Solver error: ${e.getMessage}",
+        None
+      ))
+    }.map { _ =>
+      println(s"solve took ${Duration.between(solveStart, Instant.now()).toMillis} ms")
+      println(s"totally operation took ${Duration.between(start, Instant.now()).toMillis} ms")
     }
   }
 }

@@ -1,0 +1,489 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by scala.runtime.LazyVals$ (file:/C:/Users/Cocoa/scoop/apps/sbt/1.12.0/bin/sbt-launch.jar)
+WARNING: Please consider reporting this to the maintainers of class scala.runtime.LazyVals$
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[info] welcome to sbt 1.11.7 (Oracle Corporation Java 25.0.1)
+[info] loading settings for project romanesco-build-build-build from metals.sbt...
+[info] loading project definition from C:\Users\Cocoa\romanesco\project\project\project
+[info] loading settings for project romanesco-build-build from metals.sbt...
+[info] loading project definition from C:\Users\Cocoa\romanesco\project\project
+[success] Generated .bloop\romanesco-build-build.json
+[success] Total time: 4 s, completed 2026/01/09 16:21:41
+[info] loading settings for project romanesco-build from metals.sbt, plugins.sbt...
+[info] loading project definition from C:\Users\Cocoa\romanesco\project
+[info] loading settings for project romanesco from build.sbt...
+[info] set current project to romanesco (in build file:/C:/Users/Cocoa/romanesco/)
+[info] compiling 1 Scala source to C:\Users\Cocoa\romanesco\scala\target\scala-3.7.4\classes ...
+[info] done compiling
+[info] running romanesco.Main input.txt debug
+Logger enabled (level: Debug)
+[DEBUG] Blessed lexer:firstLexer (Hash: -1090799695)
+[DEBUG] Blessed database (Hash: 688203216)
+[DEBUG] Blessed whiteSpace (Hash: -1100384665)
+[DEBUG] [lexer.db] New rule: whiteSpace
+[DEBUG] Blessed comment (Hash: 933637113)
+[DEBUG] [lexer.db] New rule: comment
+[DEBUG] Blessed kw_syntax (Hash: -851729454)
+[DEBUG] [lexer.db] New rule: kw_syntax
+[DEBUG] Blessed number (Hash: -1589246638)
+[DEBUG] [lexer.db] New rule: number
+[DEBUG] Blessed ident (Hash: -425514811)
+[DEBUG] [lexer.db] New rule: ident
+[DEBUG] Blessed op_== (Hash: -1436007201)
+[DEBUG] [lexer.db] New rule: op_==
+[DEBUG] Blessed op_>= (Hash: -754917561)
+[DEBUG] [lexer.db] New rule: op_>=
+[DEBUG] Blessed op_<= (Hash: 1815367929)
+[DEBUG] [lexer.db] New rule: op_<=
+[DEBUG] Blessed op_= (Hash: 1762350956)
+[DEBUG] [lexer.db] New rule: op_=
+[DEBUG] Blessed op_+ (Hash: 249979278)
+[DEBUG] [lexer.db] New rule: op_+
+[DEBUG] Blessed op_- (Hash: 1721049769)
+[DEBUG] [lexer.db] New rule: op_-
+[DEBUG] Blessed op_* (Hash: 412535767)
+[DEBUG] [lexer.db] New rule: op_*
+[DEBUG] Blessed op_> (Hash: 974598738)
+[DEBUG] [lexer.db] New rule: op_>
+[DEBUG] Blessed op_< (Hash: 527915022)
+[DEBUG] [lexer.db] New rule: op_<
+[DEBUG] Blessed op_( (Hash: -724233850)
+[DEBUG] [lexer.db] New rule: op_(
+[DEBUG] Blessed op_) (Hash: -1531981119)
+[DEBUG] [lexer.db] New rule: op_)
+[DEBUG] Blessed op_{ (Hash: 2044273798)
+[DEBUG] [lexer.db] New rule: op_{
+[DEBUG] Blessed op_} (Hash: -564668181)
+[DEBUG] [lexer.db] New rule: op_}
+[DEBUG] Blessed op_; (Hash: 1477618655)
+[DEBUG] [lexer.db] New rule: op_;
+[DEBUG] Blessed op_[ (Hash: -2006066214)
+[DEBUG] [lexer.db] New rule: op_[
+[DEBUG] Blessed op_] (Hash: -44860981)
+[DEBUG] [lexer.db] New rule: op_]
+[DEBUG] Blessed parser:firstParser (Hash: 1622190051)
+[DEBUG] Blessed database (Hash: -1711928872)
+[DEBUG] Blessed parseLiteral (Hash: -56929198)
+[DEBUG] Blessed parseVariable (Hash: 787551242)
+[DEBUG] Blessed parseSyntaxDef (Hash: -691396015)
+[DEBUG] [getSyntaxDefParser] Creating parser
+[DEBUG] Blessed parseProgram (Hash: 454852561)
+[DEBUG] Blessed id:ntax (Hash: 679707014)
+[DEBUG] Blessed id:tax (Hash: 1093663019)
+[DEBUG] Blessed id:x (Hash: 1972343759)
+[DEBUG] Blessed id:test (Hash: 1752863002)
+[DEBUG] Blessed id:yntax (Hash: 983065753)
+[DEBUG] Blessed id:syntax (Hash: -1873962594)
+[DEBUG] Blessed id:ax (Hash: 1427692826)
+[DEBUG] Blessed id:est (Hash: 1509800476)
+[DEBUG] Blessed id:X (Hash: 1725492106)
+[DEBUG] Blessed id:st (Hash: -571797602)
+[DEBUG] Blessed id:t (Hash: 964928908)
+[DEBUG] Blessed id:X (Hash: 1725492106)
+[DEBUG] Blessed id:test (Hash: 1752863002)
+[DEBUG] Blessed id:st (Hash: -571797602)
+[DEBUG] Blessed id:t (Hash: 964928908)
+[DEBUG] Blessed id:est (Hash: 1509800476)
+[DEBUG] Blessed num:100 (Hash: -1087853238)
+[DEBUG] Blessed num:00 (Hash: -1985667802)
+[DEBUG] Blessed num:0 (Hash: 957942912)
+[DEBUG] [lexer] printStream begin
+Position 0:
+  - [otherwise] Token: 'syntax', Tag: id:syntax_#-1873962594
+  - [Defined] Token: 'syntax', Tag: kw_syntax_#-851729454
+Position 1:
+  - [otherwise] Token: 'yntax', Tag: id:yntax_#983065753
+Position 2:
+  - [otherwise] Token: 'ntax', Tag: id:ntax_#679707014
+Position 3:
+  - [otherwise] Token: 'tax', Tag: id:tax_#1093663019
+Position 4:
+  - [otherwise] Token: 'ax', Tag: id:ax_#1427692826
+Position 5:
+  - [otherwise] Token: 'x', Tag: id:x_#1972343759
+Position 6:
+  - [otherwise] Token: ' ', Tag: whiteSpace_#-1100384665
+Position 7:
+  - [otherwise] Token: 'test', Tag: id:test_#1752863002
+Position 8:
+  - [otherwise] Token: 'est', Tag: id:est_#1509800476
+Position 9:
+  - [otherwise] Token: 'st', Tag: id:st_#-571797602
+Position 10:
+  - [otherwise] Token: 't', Tag: id:t_#964928908
+Position 11:
+  - [otherwise] Token: ' ', Tag: whiteSpace_#-1100384665
+Position 12:
+  - [Defined] Token: '[', Tag: op_[_#-2006066214
+Position 13:
+  - [otherwise] Token: 'X', Tag: id:X_#1725492106
+Position 14:
+  - [Defined] Token: ']', Tag: op_]_#-44860981
+Position 15:
+  - [otherwise] Token: ' ', Tag: whiteSpace_#-1100384665
+Position 16:
+  - [Defined] Token: '=', Tag: op_=_#1762350956
+Position 17:
+  - [otherwise] Token: ' ', Tag: whiteSpace_#-1100384665
+Position 18:
+  - [Defined] Token: '{', Tag: op_{_#2044273798
+Position 19:
+  - [otherwise] Token: ' ', Tag: whiteSpace_#-1100384665
+Position 20:
+  - [otherwise] Token: 'X', Tag: id:X_#1725492106
+Position 21:
+  - [otherwise] Token: ' ', Tag: whiteSpace_#-1100384665
+Position 22:
+  - [Defined] Token: '}', Tag: op_}_#-564668181
+Position 23:
+  - [otherwise] Token: '\n', Tag: whiteSpace_#-1100384665
+Position 24:
+  - [otherwise] Token: 'test', Tag: id:test_#1752863002
+Position 25:
+  - [otherwise] Token: 'est', Tag: id:est_#1509800476
+Position 26:
+  - [otherwise] Token: 'st', Tag: id:st_#-571797602
+Position 27:
+  - [otherwise] Token: 't', Tag: id:t_#964928908
+Position 28:
+  - [otherwise] Token: ' ', Tag: whiteSpace_#-1100384665
+Position 29:
+  - [otherwise] Token: '100', Tag: num:100_#-1087853238
+Position 30:
+  - [otherwise] Token: '00', Tag: num:00_#-1985667802
+Position 31:
+  - [otherwise] Token: '0', Tag: num:0_#957942912
+Position 32:
+  - [otherwise] Token: '\n', Tag: whiteSpace_#-1100384665
+[DEBUG] [lexer] printStream end
+[DEBUG] [parser] === PASS #1 START ===
+[DEBUG] [parser] Registered rules: parseSyntaxDef, parseLiteral, parseVariable, parseProgram
+[DEBUG] [buildLattice] Building for 33 offsets
+[DEBUG] [parser.dispatch] Offset 0: 2 tokens, 4 rules
+[DEBUG] [parser.dispatch] Token #0 at offset 0: s='syntax', shouldSkip=true
+[DEBUG] [parser.dispatch] Token #1 at offset 0: s='syntax', shouldSkip=false
+[DEBUG] [token] Matched Defined token: s='syntax', expected='syntax'
+[DEBUG] [parser.dispatch] Match at offset 5: rule=parseVariable, nextOffset=7
+[DEBUG] [parser.dispatch] Match at offset 8: rule=parseVariable, nextOffset=12
+[DEBUG] [parser.dispatch] Match at offset 7: rule=parseVariable, nextOffset=12
+[DEBUG] [parser.dispatch] Match at offset 4: rule=parseVariable, nextOffset=7
+[DEBUG] [parser.dispatch] Match at offset 3: rule=parseVariable, nextOffset=7
+[DEBUG] [parser.dispatch] Match at offset 2: rule=parseVariable, nextOffset=7
+[DEBUG] [parser.dispatch] Match at offset 1: rule=parseVariable, nextOffset=7
+[DEBUG] [getSyntaxDefParser] Matched macro name: test
+[DEBUG] [getSyntaxDefParser] Creating parser
+[DEBUG] [getSyntaxDefParser] Successfully parsed syntax definition for: test
+[DEBUG] Blessed macro (Hash: -1507336271)
+[DEBUG] [parser.dispatch] Match at offset 0: rule=parseSyntaxDef, nextOffset=12
+[DEBUG] [token] Matched Defined token: s='syntax', expected='syntax'
+[DEBUG] [getSyntaxDefParser] Matched macro name: test
+[DEBUG] [getSyntaxDefParser] Successfully parsed syntax definition for: test
+[DEBUG] Blessed macro (Hash: -1507336271)
+[DEBUG] [token] Failed Defined token: s='[', expected=';'
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='*'
+[DEBUG] [token] Failed Defined token: s='[', expected='*'
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 0: rule=parseProgram, nextOffset=12
+[DEBUG] [buildLattice] Offset 0: registered 2 edges
+[DEBUG] [parser.dispatch] Match at offset 9: rule=parseVariable, nextOffset=12
+[DEBUG] [token] Failed Defined token: s='[', expected='+'
+[DEBUG] [token] Failed Defined token: s='[', expected='-'
+[DEBUG] [token] Failed Defined token: s='[', expected='+'
+[DEBUG] [token] Failed Defined token: s='[', expected='-'
+[DEBUG] [token] Failed Defined token: s='[', expected='*'
+[DEBUG] [token] Failed Defined token: s='[', expected='+'
+[DEBUG] [token] Failed Defined token: s='[', expected='-'
+[DEBUG] [token] Failed Defined token: s='[', expected='=='
+[DEBUG] [token] Failed Defined token: s='[', expected='>='
+[DEBUG] [token] Failed Defined token: s='[', expected='<='
+[DEBUG] [token] Failed Defined token: s='[', expected='=='
+[DEBUG] [token] Failed Defined token: s='[', expected='>='
+[DEBUG] [token] Failed Defined token: s='[', expected='<='
+[DEBUG] [token] Failed Defined token: s='[', expected='>'
+[DEBUG] [token] Failed Defined token: s='[', expected='=='
+[DEBUG] [token] Failed Defined token: s='[', expected='>='
+[DEBUG] [token] Failed Defined token: s='[', expected='>'
+[DEBUG] [token] Failed Defined token: s='[', expected='<'
+[DEBUG] [token] Failed Defined token: s='[', expected='<='
+[DEBUG] [token] Failed Defined token: s='[', expected='<'
+[DEBUG] [token] Failed Defined token: s='[', expected='>'
+[DEBUG] [token] Failed Defined token: s='[', expected='<'
+[DEBUG] [token] Failed Defined token: s='[', expected='='
+[DEBUG] [token] Failed Defined token: s='[', expected=';'
+[DEBUG] [token] Failed Defined token: s='[', expected='='
+[DEBUG] [token] Failed Defined token: s='[', expected='='
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected=';'
+[DEBUG] [token] Failed Defined token: s='[', expected=';'
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] [token] Failed Defined token: s='[', expected='*'
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [token] Failed Defined token: s='[', expected='+'
+[DEBUG] [token] Failed Defined token: s='[', expected='-'
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='*'
+[DEBUG] [token] Failed Defined token: s='[', expected='=='
+[DEBUG] [token] Failed Defined token: s='[', expected='>='
+[DEBUG] [token] Failed Defined token: s='[', expected='<='
+[DEBUG] [token] Failed Defined token: s='[', expected='*'
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] [token] Failed Defined token: s='[', expected='*'
+[DEBUG] [token] Failed Defined token: s='[', expected='+'
+[DEBUG] [token] Failed Defined token: s='[', expected='-'
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [token] Failed Defined token: s='[', expected='*'
+[DEBUG] [token] Failed Defined token: s='[', expected='=='
+[DEBUG] [token] Failed Defined token: s='[', expected='>='
+[DEBUG] [token] Failed Defined token: s='[', expected='<='
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] [token] Failed Defined token: s='[', expected='>'
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [token] Failed Defined token: s='[', expected='+'
+[DEBUG] [token] Failed Defined token: s='[', expected='+'
+[DEBUG] [parser.dispatch] Match at offset 9: rule=parseProgram, nextOffset=12
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='>'
+[DEBUG] [token] Failed Defined token: s='[', expected='+'
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [token] Failed Defined token: s='[', expected='<'
+[DEBUG] [token] Failed Defined token: s='[', expected='-'
+[DEBUG] [token] Failed Defined token: s='[', expected='='
+[DEBUG] [token] Failed Defined token: s='[', expected='-'
+[DEBUG] [buildLattice] Offset 9: registered 2 edges
+[DEBUG] [token] Failed Defined token: s='[', expected='<'
+[DEBUG] [token] Failed Defined token: s='[', expected='=='
+[DEBUG] [token] Failed Defined token: s='[', expected='>='
+[DEBUG] [token] Failed Defined token: s='[', expected='<='
+[DEBUG] [token] Failed Defined token: s='[', expected='>'
+[DEBUG] [parser.dispatch] Offset 10: 1 tokens, 4 rules
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='-'
+[DEBUG] [parser.dispatch] Match at offset 10: rule=parseVariable, nextOffset=12
+[DEBUG] [token] Failed Defined token: s='[', expected=';'
+[DEBUG] [token] Failed Defined token: s='[', expected='=='
+[DEBUG] [token] Failed Defined token: s='[', expected='=='
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [token] Failed Defined token: s='[', expected='*'
+[DEBUG] [parser.dispatch] Match at offset 7: rule=parseProgram, nextOffset=12
+[DEBUG] [token] Failed Defined token: s='[', expected='<'
+[DEBUG] [token] Failed Defined token: s='[', expected='='
+[DEBUG] [token] Failed Defined token: s='[', expected='>='
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='>='
+[DEBUG] [buildLattice] Offset 7: registered 2 edges
+[DEBUG] [token] Failed Defined token: s='[', expected='<='
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] [token] Failed Defined token: s='[', expected='+'
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [token] Failed Defined token: s='[', expected='='
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected=';'
+[DEBUG] [token] Failed Defined token: s='[', expected=';'
+[DEBUG] [token] Failed Defined token: s='[', expected='<='
+[DEBUG] [token] Failed Defined token: s='[', expected='>'
+[DEBUG] [token] Failed Defined token: s='[', expected='<'
+[DEBUG] [parser.dispatch] Match at offset 8: rule=parseProgram, nextOffset=12
+[DEBUG] [token] Failed Defined token: s='[', expected='>'
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='-'
+[DEBUG] [buildLattice] Offset 8: registered 2 edges
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [parser.dispatch] Match at offset 1: rule=parseProgram, nextOffset=12
+[DEBUG] [token] Failed Defined token: s='[', expected='='
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] [buildLattice] Offset 1: registered 2 edges
+[DEBUG] [token] Failed Defined token: s='[', expected='<'
+[DEBUG] [token] Failed Defined token: s='[', expected=';'
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] [token] Failed Defined token: s='[', expected='=='
+[DEBUG] [parser.dispatch] Match at offset 13: rule=parseVariable, nextOffset=14
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [token] Failed Defined token: s=']', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='='
+[DEBUG] [token] Failed Defined token: s='[', expected='>='
+[DEBUG] [token] Failed Defined token: s='[', expected='<='
+[DEBUG] [token] Failed Defined token: s=']', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [token] Failed Defined token: s=']', expected='*'
+[DEBUG] [token] Failed Defined token: s='[', expected=';'
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 4: rule=parseProgram, nextOffset=12
+[DEBUG] [buildLattice] Offset 4: registered 2 edges
+[DEBUG] [token] Failed Defined token: s=']', expected='+'
+[DEBUG] [token] Failed Defined token: s='[', expected='>'
+[DEBUG] [token] Failed Defined token: s=']', expected='{'
+[DEBUG] [token] Failed Defined token: s=']', expected='('
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='=', expected='syntax'
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='=', expected='syntax'
+[DEBUG] [token] Failed Defined token: s=']', expected='-'
+[DEBUG] [token] Failed Defined token: s='=', expected='{'
+[DEBUG] [token] Failed Defined token: s='[', expected='<'
+[DEBUG] [token] Failed Defined token: s='[', expected='='
+[DEBUG] [token] Failed Defined token: s='[', expected=';'
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='=', expected='('
+[DEBUG] [token] Failed Defined token: s='{', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='{', expected='syntax'
+[DEBUG] [token] Matched Defined token: s='{', expected='{'
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 2: rule=parseProgram, nextOffset=12
+[DEBUG] [parser.dispatch] Match at offset 3: rule=parseProgram, nextOffset=12
+[DEBUG] [buildLattice] Offset 3: registered 2 edges
+[DEBUG] [parser.dispatch] Offset 20: 1 tokens, 4 rules
+[DEBUG] [token] Failed Defined token: s=']', expected='=='
+[DEBUG] [token] Failed Defined token: s='[', expected='{'
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 10: rule=parseProgram, nextOffset=12
+[DEBUG] [token] Failed Defined token: s='[', expected='('
+[DEBUG] [buildLattice] Offset 10: registered 2 edges
+[DEBUG] [buildLattice] Offset 2: registered 2 edges
+[DEBUG] [token] Failed Defined token: s='}', expected='syntax'
+[DEBUG] [parser.dispatch] Match at offset 24: rule=parseVariable, nextOffset=29
+[DEBUG] [token] Failed Defined token: s='}', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='}', expected='{'
+[DEBUG] [token] Failed Defined token: s='}', expected='('
+[DEBUG] [getSyntaxDefParser] Creating parser
+[DEBUG] [token] Failed Defined token: s=']', expected='>='
+[DEBUG] [parser.dispatch] Match at offset 20: rule=parseVariable, nextOffset=22
+[DEBUG] [parser.dispatch] Match at offset 27: rule=parseVariable, nextOffset=29
+[DEBUG] [token] Failed Defined token: s='[', expected='syntax'
+[DEBUG] [parser.dispatch] Match at offset 25: rule=parseVariable, nextOffset=29
+[DEBUG] [parser.dispatch] Match at offset 26: rule=parseVariable, nextOffset=29
+[DEBUG] [token] Failed Defined token: s='}', expected='*'
+[DEBUG] [token] Failed Defined token: s='}', expected='+'
+[DEBUG] [token] Failed Defined token: s='}', expected='-'
+[DEBUG] [token] Failed Defined token: s='}', expected='*'
+[DEBUG] [token] Failed Defined token: s=']', expected='<='
+[DEBUG] [token] Failed Defined token: s='}', expected='=='
+[DEBUG] [token] Failed Defined token: s='}', expected='>='
+[DEBUG] [token] Failed Defined token: s='}', expected='<='
+[DEBUG] [token] Failed Defined token: s='}', expected='>'
+[DEBUG] Blessed literal (Hash: 1858592738)
+[DEBUG] Blessed literal (Hash: 1858592738)
+[DEBUG] Blessed literal (Hash: 1858592738)
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 5: rule=parseProgram, nextOffset=12
+[DEBUG] [buildLattice] Offset 5: registered 2 edges
+[DEBUG] Blessed literal (Hash: 1858592738)
+[DEBUG] [token] Failed Defined token: s='}', expected='+'
+[DEBUG] [token] Failed Defined token: s=']', expected='>'
+[DEBUG] [token] Failed Defined token: s='}', expected='<'
+[DEBUG] [token] Failed Defined token: s='}', expected='-'
+[DEBUG] [token] Failed Defined token: s='}', expected='=='
+[DEBUG] [token] Failed Defined token: s='}', expected='>='
+[DEBUG] [token] Failed Defined token: s='}', expected='<='
+[DEBUG] [token] Failed Defined token: s='}', expected='>'
+[DEBUG] [token] Failed Defined token: s='}', expected='<'
+[DEBUG] [token] Failed Defined token: s='}', expected='='
+[DEBUG] [token] Failed Defined token: s=']', expected='<'
+[DEBUG] [token] Failed Defined token: s='}', expected=';'
+[DEBUG] Blessed literal (Hash: 1858592738)
+[DEBUG] [token] Failed Defined token: s='}', expected='='
+[DEBUG] [token] Failed Defined token: s=']', expected='='
+[DEBUG] [token] Failed Defined token: s='}', expected='syntax'
+[DEBUG] [token] Failed Defined token: s=']', expected=';'
+[DEBUG] [token] Failed Defined token: s='}', expected='{'
+[DEBUG] [token] Failed Defined token: s='}', expected=';'
+[DEBUG] [token] Failed Defined token: s='}', expected='('
+[DEBUG] [token] Failed Defined token: s=']', expected='syntax'
+[DEBUG] [token] Failed Defined token: s=']', expected='{'
+[DEBUG] [token] Failed Defined token: s=']', expected='('
+[DEBUG] [token] Failed Defined token: s='}', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='}', expected='syntax'
+[DEBUG] [token] Failed Defined token: s=']', expected='syntax'
+[DEBUG] [token] Failed Defined token: s='}', expected='{'
+[DEBUG] [token] Failed Defined token: s='}', expected='('
+[DEBUG] [token] Failed Defined token: s='}', expected='syntax'
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [token] Matched Defined token: s='}', expected='}'
+[DEBUG] [parser.dispatch] Match at offset 13: rule=parseProgram, nextOffset=14
+[DEBUG] [buildLattice] Offset 13: registered 2 edges
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] Blessed block (Hash: 1734998692)
+[DEBUG] [parser.dispatch] Match at offset 20: rule=parseProgram, nextOffset=22
+[DEBUG] [buildLattice] Offset 20: registered 2 edges
+[DEBUG] [parser.dispatch] Offset 30: 1 tokens, 4 rules
+[DEBUG] Blessed literal (Hash: 1858592738)
+[DEBUG] Blessed literal (Hash: 1858592738)
+[DEBUG] Blessed literal (Hash: 1858592738)
+[DEBUG] [parser.dispatch] Match at offset 30: rule=parseLiteral, nextOffset=33
+[DEBUG] [parser.dispatch] Match at offset 29: rule=parseLiteral, nextOffset=33
+[DEBUG] [parser.dispatch] Match at offset 31: rule=parseLiteral, nextOffset=33
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 24: rule=parseProgram, nextOffset=33
+[DEBUG] [buildLattice] Offset 24: registered 2 edges
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 18: rule=parseProgram, nextOffset=33
+[DEBUG] [buildLattice] Offset 18: registered 1 edges
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 26: rule=parseProgram, nextOffset=33
+[DEBUG] [buildLattice] Offset 26: registered 2 edges
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 29: rule=parseProgram, nextOffset=33
+[DEBUG] [buildLattice] Offset 29: registered 2 edges
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 25: rule=parseProgram, nextOffset=33
+[DEBUG] [buildLattice] Offset 25: registered 2 edges
+[DEBUG] [parser.dispatch] Match at offset 31: rule=parseProgram, nextOffset=33
+[DEBUG] [parser.dispatch] Match at offset 30: rule=parseProgram, nextOffset=33
+[DEBUG] [buildLattice] Offset 30: registered 2 edges
+[DEBUG] Blessed program (Hash: -395995764)
+[DEBUG] [parser.dispatch] Match at offset 27: rule=parseProgram, nextOffset=33
+[DEBUG] [buildLattice] Offset 31: registered 2 edges
+[DEBUG] [buildLattice] Offset 27: registered 2 edges
+[DEBUG] [buildLattice] Complete. ParseLattice size: 20
+[DEBUG] [parser] ParseLattice has 20 offsets with edges
+[DEBUG] [parser] Starting offset: 0
+[DEBUG] [searchPath] Entering at offset 0
+[DEBUG] [searchPath] Offset 0 has 2 choices
+[DEBUG] [searchPath] Trying 2 edges at offset 0
+[DEBUG] [searchPath] Trying edge: rule=parseSyntaxDef, nextOffset=12
+[DEBUG] [searchPath] Entering at offset 12
+[DEBUG] [searchPath] Offset 12 has 0 choices
+[DEBUG] [searchPath] No choices, jumping to 12
+[DEBUG] [parser] searchLogicalPath found 1 nodes
+[DEBUG] [parser] Pass result: 1 nodes
+[error] java.lang.ClassCastException: class romanesco.AttributeValue$Str cannot be cast to class java.lang.String (romanesco.AttributeValue$Str is in unnamed module of loader sbt.internal.LayeredClassLoader @2c43d52d; java.lang.String is in module java.base of loader 'bootstrap')
+[error] 	at romanesco.Parser.registerMacrosDeterministically$$anonfun$1(parser.scala:320)
+[error] 	at scala.runtime.function.JProcedure1.apply(JProcedure1.java:15)
+[error] 	at scala.runtime.function.JProcedure1.apply(JProcedure1.java:10)
+[error] 	at scala.collection.ArrayOps$.foreach$extension(ArrayOps.scala:1324)
+[error] 	at romanesco.Parser.registerMacrosDeterministically(parser.scala:319)
+[error] 	at romanesco.Parser.apply(parser.scala:211)
+[error] 	at romanesco.Main$.compile(Main.scala:69)
+[error] 	at romanesco.Main$.$anonfun$2$$anonfun$1(Main.scala:11)
+[error] 	at scala.util.Either.flatMap(Either.scala:360)
+[error] 	at romanesco.Main$.$anonfun$2(Main.scala:10)
+[error] 	at scala.util.Either.flatMap(Either.scala:360)
+[error] 	at romanesco.Main$.main(Main.scala:8)
+[error] 	at romanesco.Main.main(Main.scala)
+[error] 	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104)
+[error] 	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+[error] stack trace is suppressed; run 'last jvm / Compile / runMain' for the full output
+[error] (jvm / Compile / runMain) java.lang.ClassCastException: class romanesco.AttributeValue$Str cannot be cast to class java.lang.String (romanesco.AttributeValue$Str is in unnamed module of loader sbt.internal.LayeredClassLoader @2c43d52d; java.lang.String is in module java.base of loader 'bootstrap')
+[error] Total time: 11 s, completed 2026/01/09 16:21:54

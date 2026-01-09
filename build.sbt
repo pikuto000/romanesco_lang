@@ -1,4 +1,5 @@
 ThisBuild / scalaVersion := "3.7.4"
+ThisBuild / sbtVersion := "1.12.0"
 
 lazy val jvm= project
   .in(file("scala"))

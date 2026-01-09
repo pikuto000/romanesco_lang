@@ -13,7 +13,7 @@ object InstanceRegistory {
   def default: (Lexer, Parser, Solver) = {
     val lexer = init.lex.setup("firstLexer")
     val solver = new Solver()
-    val parser = init.parse.setup("firstParser", lexer, solver)
+    val parser = init.parse.setup("firstParser", lexer)
     (lexer, parser, solver)
   }
 }

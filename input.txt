@@ -1,11 +1,2 @@
-# 同じ記法に2つの意味を与える
-syntax process [X] = { X > 0 }
-syntax process [X] = { X < 0 }
-
-# 1. 文脈が X > 0 の場合
-Value = 100
-process Value
-
-# 2. 文脈が X < 0 の場合
-Other = -50
-process Other
+syntax test [X] = { X }
+test 100
