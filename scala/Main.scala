@@ -3,49 +3,26 @@ import scala.util.Using
 
 object Main {
   def main(args: Array[String]): Unit = {
-    if (args.isEmpty) {
-      println("Usage: sbt \"run <file>\"")
-      sys.exit(1)
-    }
-
+    if (args.isEmpty) return println("Usage: run <file>")
     MacroExpander.reset()
-    val source = scala.io.Source.fromFile(args(0)).mkString
-    println(s"Source:\n$source\n")
-
-    Lexer.lex(source) match {
-      case Left(msg) => println(msg); sys.exit(1)
-      case Right(allTokenPaths) =>
-        val initialTokens = allTokenPaths.head
-
-        // 1. Discovery Pass
-        SimpleParser.parse(initialTokens) match {
-          case SimpleParser.Success(rawStmts, _) =>
-            println("Pass 1: Discovery Successful.")
-            MacroExpander.expandAll(rawStmts) 
-
-            // 2. Metamorphosis
-            val transformedTokens = MacroExpander.transformTokens(initialTokens)
-            println(s"Metamorphosis Complete. Tokens: ${transformedTokens.size}")
-            println(s"--- Transformed Tokens ---\n${transformedTokens.mkString(", ")}\n--------------------------\n")
-
-            // 3. Execution Pass
-            SimpleParser.parse(transformedTokens) match {
-              case SimpleParser.Success(finalRawStmts, _) =>
-                println("Pass 2: Execution Parse Successful.")
-                
-                val finalStmts = MacroExpander.expandAll(finalRawStmts)
-                Using.resource(new Solver()) { solver =>
-                  finalStmts.foreach(solver.add)
-                  solver.solveAndPrint()
-                }
-
-              case f: SimpleParser.NoSuccess =>
-                println(s"Pass 2 Failed: ${f.msg}")
+    val src = scala.io.Source.fromFile(args(0)).mkString
+    Lexer.lex(src) match {
+      case Right(allPaths) =>
+        val ts = allPaths.head // デモ用
+        SimpleParser.parse(ts) match {
+          case SimpleParser.Success(ss, _) =>
+            MacroExpander.registerAll(ss)
+            val ts2 = MacroExpander.transform(ts)
+            println(s"Transformed Tokens: ${ts2.mkString(", ")}")
+            SimpleParser.parse(ts2) match {
+              case SimpleParser.Success(ss2, _) =>
+                println(s"Pass 2 SUCCESS. AST: $ss2")
+                Using.resource(new Solver) { s => ss2.foreach(s.add); s.solve() }
+              case f => println(s"Pass 2 Fail: $f")
             }
-
-          case f: SimpleParser.NoSuccess =>
-            println(s"Pass 1 Failed: ${f.msg}")
+          case f => println(s"Pass 1 Fail: $f")
         }
+      case Left(e) => println(e)
     }
   }
 }
