@@ -4,115 +4,65 @@ object MacroExpander {
   import AstExpr._
   import Stmt._
 
-  private var registry = Map[String, (List[String], AstExpr)]()
-  private var syntaxRules = List[(List[Token], List[Token])]()
+  private var macros = Map[String, (List[String], AstExpr)]()
+  private var syntax = List[(List[Token], List[Token])]()
 
-  def reset(): Unit = {
-    registry = Map.empty
-    syntaxRules = Nil
+  def reset(): Unit = { macros = Map.empty; syntax = Nil }
+
+  def expandAll(stmts: List[Stmt]): List[Stmt] = stmts.flatMap {
+    case m: MacroDef => macros += (m.name -> (m.params, m.body)); None
+    case s: SyntaxDef => syntax = ((s.pattern, s.template) :: syntax).sortBy(-_._1.size); None
+    case Constraint(l, r) => Some(Constraint(expand(l), expand(r)))
+    case Block(s) => Some(Block(expandAll(s)))
+    case Branch(o) => Some(Branch(expandAll(o)))
   }
 
-  def register(df: MacroDef): Unit = {
-    registry += (df.name -> (df.params, df.body))
-  }
-
-  def registerSyntax(sd: SyntaxDef): Unit = {
-    println(s"DEBUG: Registering Syntax: ${sd.pattern.mkString(", ")} -> ${sd.template.mkString(", ")}")
-    syntaxRules = (sd.pattern, sd.template) :: syntaxRules
-    syntaxRules = syntaxRules.sortBy(-_._1.size)
-  }
-
-  def transformTokens(tokens: List[Token]): List[Token] = {
-    if (tokens.isEmpty) Nil
+  def transformTokens(ts: List[Token]): List[Token] = {
+    if (ts.isEmpty) Nil
     else {
-      val matchOpt = syntaxRules.collectFirst { 
-        case (pattern, template) if matchTokensDetailed(pattern, tokens).isDefined => 
-          val (env, consumed) = matchTokensDetailed(pattern, tokens).get
-          (template, env, consumed)
-      }
-
-      matchOpt match {
-        case Some((template, env, consumed)) =>
-          println(s"DEBUG: Match Found! Consumed: $consumed")
-          val substituted = substituteTokens(template, env)
-          substituted ++ transformTokens(tokens.drop(consumed))
-        case None =>
-          tokens.head :: transformTokens(tokens.tail)
+      val found = syntax.collectFirst { case (p, t) if matchT(p, ts).isDefined => (t, matchT(p, ts).get) }
+      found match {
+        case Some((tpl, (env, cons))) => substituteT(tpl, env) ++ transformTokens(ts.drop(cons))
+        case None => ts.head :: transformTokens(ts.tail)
       }
     }
   }
 
-  private def matchTokensDetailed(pattern: List[Token], targets: List[Token]): Option[(Map[String, List[Token]], Int)] = {
-    var env = Map[String, List[Token]]()
-    var p = pattern
-    var t = targets
-    var consumed = 0
-
-    while (p.nonEmpty) {
-      // パターン側の空白・コメントをスキップ
-      if (p.head.isInstanceOf[Token.WS] || p.head.isInstanceOf[Token.Comment]) {
-        p = p.tail
-      } else if (t.isEmpty) {
-        return None
-      } else if (t.head.isInstanceOf[Token.WS] || t.head.isInstanceOf[Token.Comment]) {
-        // ターゲット側の空白・コメントをスキップ
-        t = t.tail
-        consumed += 1
-      } else {
-        // 実質的なトークンの比較
-        (p.head, t.head) match {
-          case (Token.Var(name), target) if name.startsWith("$") =>
-            env += (name -> List(target))
-            p = p.tail; t = t.tail; consumed += 1
-          case (ph, th) if ph.getClass == th.getClass && ph == th =>
-            p = p.tail; t = t.tail; consumed += 1
-          case _ => 
-            return None
-        }
+  private def matchT(p: List[Token], t: List[Token]): Option[(Map[String, List[Token]], Int)] = {
+    var (env, pi, ti, cons) = (Map[String, List[Token]](), p, t, 0)
+    while (pi.nonEmpty) {
+      if (pi.head.isInstanceOf[Token.WS]) pi = pi.tail
+      else if (ti.nonEmpty && ti.head.isInstanceOf[Token.WS]) { ti = ti.tail; cons += 1 }
+      else if (ti.isEmpty) return None
+      else pi.head match {
+        case Token.Var(n) if n.startsWith("$") => env += (n -> List(ti.head)); pi = pi.tail; ti = ti.tail; cons += 1
+        case h if h == ti.head => pi = pi.tail; ti = ti.tail; cons += 1
+        case _ => return None
       }
     }
-    Some((env, consumed))
+    Some((env, cons))
   }
 
-  private def substituteTokens(template: List[Token], env: Map[String, List[Token]]): List[Token] = {
-    template.flatMap {
-      case Token.Var(name) if env.contains(name) => env(name)
-      case t => List(t)
-    }
+  private def substituteT(tpl: List[Token], env: Map[String, List[Token]]) = tpl.flatMap {
+    case Token.Var(n) if env.contains(n) => env(n)
+    case t => List(t)
   }
 
-  def expandAll(stmts: List[Stmt]): List[Stmt] = {
-    stmts.flatMap {
-      case m: MacroDef => register(m); None
-      case s: SyntaxDef => registerSyntax(s); None
-      case Constraint(l, r) => Some(Constraint(expand(l), expand(r)))
-      case Block(s) => Some(Block(expandAll(s)))
-      case Branch(options) => Some(Branch(expandAll(options)))
-      case s: SyntaxDef => None // 二重登録防止
-    }
+  private def expand(e: AstExpr): AstExpr = e match {
+    case MacroCall(n, a) if macros.contains(n) =>
+      val (p, b) = macros(n); expand(substitute(b, p.zip(a.map(expand)).toMap))
+    case BinOp(o, l, r) => BinOp(o, expand(l), expand(r))
+    case Ambiguous(o) =>
+      val ex = o.map(expand); val sp = ex.filterNot(_.isInstanceOf[MacroCall])
+      if (sp.nonEmpty) sp.head else Ambiguous(ex)
+    case _ => e
   }
 
-  private def expand(expr: AstExpr): AstExpr = expr match {
-    case MacroCall(name, args) =>
-      if (registry.contains(name)) {
-        val (params, body) = registry(name)
-        val expandedArgs = args.map(expand)
-        val env = params.zip(expandedArgs).toMap
-        expand(substitute(body, env))
-      } else expr
-    case BinOp(op, l, r) => BinOp(op, expand(l), expand(r))
-    case Ambiguous(options) =>
-      val expandedOptions = options.map(expand)
-      val specialized = expandedOptions.filter { case _: MacroCall => false; case _ => true }
-      if (specialized.nonEmpty) specialized.head else Ambiguous(expandedOptions)
-    case _ => expr
-  }
-
-  private def substitute(expr: AstExpr, env: Map[String, AstExpr]): AstExpr = expr match {
+  private def substitute(e: AstExpr, env: Map[String, AstExpr]): AstExpr = e match {
     case Var(n) if env.contains(n) => env(n)
-    case BinOp(op, l, r) => BinOp(op, substitute(l, env), substitute(r, env))
-    case MacroCall(n, args) => MacroCall(n, args.map(a => substitute(a, env)))
-    case Ambiguous(options) => Ambiguous(options.map(o => substitute(o, env)))
-    case _ => expr
+    case BinOp(o, l, r) => BinOp(o, substitute(l, env), substitute(r, env))
+    case MacroCall(n, a) => MacroCall(n, a.map(substitute(_, env)))
+    case Ambiguous(o) => Ambiguous(o.map(substitute(_, env)))
+    case _ => e
   }
 }
