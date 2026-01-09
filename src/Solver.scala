@@ -5,7 +5,7 @@ import scala.collection.mutable
 class Solver extends AutoCloseable {
   import AstExpr._, Stmt._
   private val ctx = new Context; private val s = ctx.mkSolver()
-  private val vs = mutable.Map[String, Expr[RealSort]](); private val fs = mutable.Map[String, FuncDecl[RealSort]]()
+  val vs = mutable.Map[String, Expr[RealSort]](); val fs = mutable.Map[String, FuncDecl[RealSort]]()
 
   private def v(n: String) = vs.getOrElseUpdate(n, ctx.mkRealConst(n))
   private def b(e: AstExpr, env: Map[String, Expr[RealSort]]): BoolExpr = e match {
@@ -23,10 +23,12 @@ class Solver extends AutoCloseable {
     case Var(n) => env.getOrElse(n, v(n))
     case BinOp("=", l, r) => val eq = ctx.mkEq(toZ(l, env), toZ(r, env)); s.add(eq); toZ(r, env)
     case BinOp(o, l, r) => 
-      val (lx, rx) = (toZ(l, env).asInstanceOf[ArithExpr[RealSort]], toZ(r, env).asInstanceOf[ArithExpr[RealSort]])
+      val lx = toZ(l, env).asInstanceOf[ArithExpr[?]]; val rx = toZ(r, env).asInstanceOf[ArithExpr[?]]
       o match {
-        case "+" => ctx.mkAdd(lx, rx); case "-" => ctx.mkSub(lx, rx); case "*" => ctx.mkMul(lx, rx)
-        case "/" => s.add(ctx.mkNot(ctx.mkEq(rx, ctx.mkReal(0)))); ctx.mkDiv(lx, rx)
+        case "+" => ctx.mkAdd(lx.asInstanceOf[ArithExpr[RealSort]], rx.asInstanceOf[ArithExpr[RealSort]]); 
+        case "-" => ctx.mkSub(lx.asInstanceOf[ArithExpr[RealSort]], rx.asInstanceOf[ArithExpr[RealSort]]); 
+        case "*" => ctx.mkMul(lx.asInstanceOf[ArithExpr[RealSort]], rx.asInstanceOf[ArithExpr[RealSort]])
+        case "/" => s.add(ctx.mkNot(ctx.mkEq(rx, ctx.mkReal(0)))); ctx.mkDiv(lx.asInstanceOf[ArithExpr[RealSort]], rx.asInstanceOf[ArithExpr[RealSort]])
         case _ => ctx.mkFuncDecl(o, Array[Sort](ctx.getRealSort, ctx.getRealSort), ctx.getRealSort).apply(lx, rx).asInstanceOf[Expr[RealSort]]
       }
     case If(c, t, el) => ctx.mkITE(b(c, env), toZ(t, env), toZ(el, env)).asInstanceOf[Expr[RealSort]]
@@ -58,9 +60,7 @@ class Solver extends AutoCloseable {
     case Block(ss) => ctx.mkAnd(ss.map(convert)*); case Branch(o) => ctx.mkOr(o.map(convert)*); case _ => ctx.mkTrue()
   }
 
-  def solve(): Unit = if (s.check() == Status.SATISFIABLE) {
-    val m = s.getModel; vs.keys.toSeq.sorted.foreach(n => println(s"$n = ${m.evaluate(vs(n), true)}"))
-    fs.keys.toSeq.sorted.foreach(n => { val i = m.getFuncInterp(fs(n)); if (i != null) println(s"fn $n = $i") })
-  }
+  def check() = s.check()
+  def model = s.getModel
   def close() = ctx.close()
 }
