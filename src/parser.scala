@@ -29,14 +29,14 @@ object SimpleParser extends Parsers {
   private def anyT = Parser(in => if (in.atEnd) Failure("", in) else Success(in.first, in.rest))//これはTokenの略
 
 
-  def program: Parser[List[Stmt]] = rep(stmt) <~ opt(s(";"))
+  def program: Parser[List[Stmt]] = rep(stmt)
   def stmt: Parser[Stmt] = (
       k("syntax") ~> rep1(not(o("=") ~ s("{")) ~> anyT) ~ (o("=") ~> s("{") ~> rep(not(s("}")) ~> anyT) <~ s("}")) ^^ { case p ~ t => SyntaxDef(p, t) }
     | id ~ (o("=") ~> expr) ^^ { case n ~ e => Constraint(Var(n), e) }
     | expr ~ o("=") ~ expr ^^ { case l ~ _ ~ r => Constraint(l, r) }
     | expr ^^ Verify.apply
     | s("{") ~> rep(stmt) <~ s("}") ^^ Block.apply
-  ) <~ opt(s(";") | o(";"))
+  )
 
   def expr: Parser[AstExpr] = (
       k("if") ~> expr ~ (k("then") ~> expr) ~ (k("else") ~> expr) ^^ { case c ~ t ~ e => If(c, t, e) }

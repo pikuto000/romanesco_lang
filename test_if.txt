@@ -1,9 +1,9 @@
 # 絶対値を計算する関数
-abs = \x -> if x > 0 then x else 0 - x;
+abs = \x -> if x > 0 then x else 0 - x
 
-res1 = abs(10);
-res2 = abs(0 - 5);
+res1 = abs(10)
+res2 = abs(0 - 5)
 
 # 逆算: 結果が 100 になる入力は？
-input_test = abs(input);
-input_test = 100;
+input_test = abs(input)
+input_test = 100
