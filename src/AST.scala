@@ -7,10 +7,8 @@ enum Token extends Positional:
 
 enum AstExpr:
   case Num(v: BigDecimal); case Var(n: String)
-  case BinOp(o: String, l: AstExpr, r: AstExpr)
-  case UnOp(o: String, e: AstExpr)
-  case If(c: AstExpr, t: AstExpr, e: AstExpr)
-  case Lambda(p: String, b: AstExpr); case Apply(f: AstExpr, a: List[AstExpr])
+  case BinOp(o: String, l: AstExpr, r: AstExpr); case UnOp(o: String, e: AstExpr)
+  case If(c: AstExpr, t: AstExpr, e: AstExpr); case Lambda(p: String, b: AstExpr); case Apply(f: AstExpr, a: List[AstExpr])
   case Ambiguous(o: List[AstExpr]); case Templated(n: String, i: AstExpr)
 
 enum Stmt:
