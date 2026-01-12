@@ -1,7 +1,0 @@
-macro double(x) = x + x
-
-# res = double(10) は 20 (マクロ) か 10 (代入) の曖昧な状態
-res = double(10)
-
-# 論理で正解を決定する
-res = 20

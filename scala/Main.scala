@@ -1,31 +1,143 @@
-package romanesco
-import scala.util.Using
+import java.nio.file.{Files, Paths}
+import java.nio.charset.StandardCharsets
+import scala.util.boundary
+@main def run(args: String*): Unit =
+  import Lexing._
+  if args.length < 3 then
+    usageAndExit()
+    return
+  lazy val inputPath = args(0)
+  lazy val modeArg   = args(1)
+  //Unlexするためのファイルパスを指定する
+  lazy val unlexStringPath = args(2)
 
-object Main {
-  def main(args: Array[String]): Unit = {
-    if (args.isEmpty) return Reporter.error("Usage: run <file>")
-    MacroExpander.reset()
-    val src = scala.io.Source.fromFile(args(0)).mkString
-    Lexer.lex(src) match {
-      case Right(allPaths) =>
-        allPaths.foreach { ts =>
-          SimpleParser.parse(ts) match {
-            case SimpleParser.Success(ss, _) => MacroExpander.registerAll(ss); case _ =>
-          }
-        }
-        val results = allPaths.flatMap { ts =>
-          val ts2 = MacroExpander.transform(ts)
-          SimpleParser.parse(ts2) match {
-            case SimpleParser.Success(ss, next) if next.atEnd => Some(ss); case _ => None
-          }
-        }.distinct
-        if (results.isEmpty) return Reporter.error("All interpretations failed.")
-        Using.resource(new romanesco.Solver) { s =>
-          if (results.size == 1) results.head.foreach(s.add)
-          else s.add(Stmt.Branch(results.map(Stmt.Block.apply)))
-          Reporter.reportSolver(s.check(), s)
-        }
-      case Left(e) => Reporter.error(e)
+
+  lazy val input =
+    try Files.readString(Paths.get(inputPath), StandardCharsets.UTF_8)
+    catch
+      case e: Exception =>
+        System.err.println(s"Failed to read file: $inputPath")
+        boundary("")
+
+  lazy val unlexString =
+    try Files.readString(Paths.get(unlexStringPath), StandardCharsets.UTF_8)
+    catch
+      case e: Exception =>
+        System.err.println(s"Failed to read file: $unlexStringPath")
+        boundary("")
+
+  lazy val mode =
+    parseMode(modeArg).getOrElse {
+      System.err.println(s"Invalid mode: $modeArg")
+      usageAndExit()
+      LexMode.All
     }
+
+  lazy val rules =
+    Map(
+      ">>"  -> Token.Op(">>"),
+      ">"   -> Token.Op(">"),
+      "<<"  -> Token.Op("<<"),
+      "<"   -> Token.Op("<"),
+      "+"   -> Token.Op("+"),
+      "-"   -> Token.Op("-"),
+      "*"   -> Token.Op("*"),
+      "/"   -> Token.Op("/"),
+      "->"  -> Token.Op("->"),
+      "="   -> Token.Op("="),
+      "=="  -> Token.Op("=="),
+      "!="  -> Token.Op("!="),
+      "=<"  -> Token.Op("=<"),
+      ">="  -> Token.Op(">="),
+      "&&"  -> Token.Op("&&"),
+      "||"  -> Token.Op("||"),
+      "!"   -> Token.Op("!")
+    )
+
+  lazy val delimRules =
+    Map(
+      "(" -> Token.Delim("("),
+      ")" -> Token.Delim(")"),
+      "{" -> Token.Delim("{"),
+      "}" -> Token.Delim("}"),
+      "[" -> Token.Delim("["),
+      "]" -> Token.Delim("]"),
+      "<" -> Token.Delim("<"),
+      ">" -> Token.Delim(">"),
+      "," -> Token.Delim(","),
+      ";" -> Token.Delim(";"),
+      ":" -> Token.Delim(":")
+    )
+
+  // Helper to create regex from map keys
+  def keysToRegex(keys: Iterable[String]): scala.util.matching.Regex =
+    keys.map(java.util.regex.Pattern.quote).mkString("|").r
+
+  lazy val opRegex = keysToRegex(rules.keys)
+  lazy val opTokenizer = lexRegex(opRegex, s => rules(s))
+
+  lazy val delimTokenizer = lexDelim(delimRules.keys.toSet)
+  
+  // Use regex for identifiers
+  lazy val identRegex = "[a-zA-Z_][a-zA-Z_0-9]*".r
+  lazy val identTokenizer = lexRegexLongest(identRegex, Token.Ident(_))
+
+  lazy val wsRegex = "[ \t\n\r]+".r
+  lazy val wsTokenizer = lexRegexLongest(wsRegex, Token.WS(_))
+
+  lazy val numberRegex = "[0-9]+".r
+  lazy val numberTokenizer = lexRegexLongest(numberRegex, Token.Number(_))
+
+  lazy val tokenizers = List(
+    opTokenizer,
+    identTokenizer,
+    wsTokenizer,
+    numberTokenizer,
+    delimTokenizer
+  )
+
+  println(s"== Mode: $mode ==")
+  println(s"== Input: $inputPath ==")
+  println()
+
+  lazy val results = lexAll(input, tokenizers, mode)
+  lazy val unlexTargetStr = lexAll(unlexString, tokenizers, mode)
+
+  results.zipWithIndex.foreach { (tokens, i) =>
+    println(s"[$i] $tokens")
   }
-}
+
+  println()
+  println("== UnLex (round-trip check) ==")
+  //UnlexStrResultの出力でresultsを逆引きして、UnlexStrResultのトークナイズ結果と一致するものを出力する
+  unlexTargetStr.foreach{tokens=>
+    //逆引きのキーを使ってマッチする
+    val unlexed = UnLexer.unlex(tokens)
+    if unlexed.contains(unlexString) then
+      println(s"Unlexed: $tokens")
+      println(s"Original: $unlexString")
+      println()
+  }
+  
+
+
+def parseMode(arg: String): Option[Lexing.LexMode] =
+  arg match
+    case "best" => Some(Lexing.LexMode.BestOnly)
+    case "all"  => Some(Lexing.LexMode.All)
+    case s if s.startsWith("topN:") =>
+      s.drop(5).toIntOption.map(Lexing.LexMode.TopN.apply)
+    case _ => None
+
+
+def usageAndExit(): Unit =
+  System.err.println(
+    """Usage:
+      |  run <input-file> <mode>
+      |
+      |Modes:
+      |  best
+      |  all
+      |  topN:<n>
+      |""".stripMargin
+  )

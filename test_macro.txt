@@ -1,5 +1,0 @@
-macro double(x) = x + x
-macro square(x) = x * x
-
-val = 10
-res = square(double(val))
