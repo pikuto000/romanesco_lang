@@ -40,13 +40,13 @@ def lexRegex(
   converter: String => Token
 ): Tokenizer =
   (input, _, pos) =>
-    val s = input.substring(pos)
-    val matcher = pattern.pattern.matcher(s)
-    val builder = List.newBuilder[(Token, Int)]
+    lazy val s = input.substring(pos)
+    lazy val matcher = pattern.pattern.matcher(s)
+    lazy val builder = List.newBuilder[(Token, Int)]
     var len = 1
-    val maxLen = s.length
+    lazy val maxLen = s.length
     while len <= maxLen do
-      val sub = s.substring(0, len)
+      lazy val sub = s.substring(0, len)
       if matcher.reset(sub).matches() then
         builder += ((converter(sub), pos + len))
       len += 1
@@ -57,10 +57,10 @@ def lexRegexLongest(
   converter: String => Token
 ): Tokenizer =
   (input, _, pos) =>
-    val matcher = pattern.pattern.matcher(input)
+    lazy val matcher = pattern.pattern.matcher(input)
     matcher.region(pos, input.length)
     if matcher.lookingAt() then
-      val sub = matcher.group()
+      lazy val sub = matcher.group()
       List((converter(sub), pos + sub.length))
     else
       Nil
@@ -85,8 +85,8 @@ def lexAll(
   tokenizers: List[Tokenizer],
   mode: LexMode
 ): List[List[Token]] =
-  val chars = input.toCharArray
-  val len = chars.length
+  lazy val chars = input.toCharArray
+  lazy val len = chars.length
 
   var frontier: List[LexState] =
     List(LexState(0, 0, Nil))
@@ -94,7 +94,7 @@ def lexAll(
   var completed = List.empty[LexState]
 
   while frontier.nonEmpty do
-    val nextStates =
+    lazy val nextStates =
       frontier.flatMap {
         state =>
           if state.pos >= len then Nil
@@ -107,7 +107,7 @@ def lexAll(
             }
       }
 
-    val (done, cont) = nextStates.partition(_.pos == len)
+    lazy val (done, cont) = nextStates.partition(_.pos == len)
 
     mode match
       case LexMode.BestOnly if done.nonEmpty =>
@@ -116,7 +116,7 @@ def lexAll(
         completed ++= done
         frontier = cont
 
-  val sorted = completed.sortBy(_.cost)
+  lazy val sorted = completed.sortBy(_.cost)
 
   mode match
     case LexMode.TopN(n) => sorted.take(n).map(_.freeze)
@@ -127,7 +127,7 @@ def lexAll(
 // ====================================== 
 def lexDelim(delimiters: Set[String]): Tokenizer =
   (input, chars, pos) =>
-    val builder = List.newBuilder[(Token, Int)]
+    lazy val builder = List.newBuilder[(Token, Int)]
     for d <- delimiters do
       if input.startsWith(d, pos) then
         builder += ((Token.Delim(d), pos + d.length))

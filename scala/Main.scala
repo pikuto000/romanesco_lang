@@ -9,7 +9,7 @@ import scala.util.boundary
   lazy val inputPath = args(0)
   lazy val modeArg   = args(1)
   //Unlexするためのファイルパスを指定する
-  lazy val unlexStringPath = args(2)
+  lazy val targetStringPath = args(2)
 
 
   lazy val input =
@@ -20,10 +20,10 @@ import scala.util.boundary
         boundary("")
 
   lazy val unlexString =
-    try Files.readString(Paths.get(unlexStringPath), StandardCharsets.UTF_8)
+    try Files.readString(Paths.get(targetStringPath), StandardCharsets.UTF_8)
     catch
       case e: Exception =>
-        System.err.println(s"Failed to read file: $unlexStringPath")
+        System.err.println(s"Failed to read file: $targetStringPath")
         boundary("")
 
   lazy val mode =
@@ -101,23 +101,23 @@ import scala.util.boundary
   println()
 
   lazy val results = lexAll(input, tokenizers, mode)
-  lazy val unlexTargetStr = lexAll(unlexString, tokenizers, mode)
+  lazy val TargetTokenResult = lexAll(unlexString, tokenizers, mode)
 
   results.zipWithIndex.foreach { (tokens, i) =>
     println(s"[$i] $tokens")
   }
 
   println()
-  println("== UnLex (round-trip check) ==")
-  //UnlexStrResultの出力でresultsを逆引きして、UnlexStrResultのトークナイズ結果と一致するものを出力する
-  unlexTargetStr.foreach{tokens=>
-    //逆引きのキーを使ってマッチする
-    val unlexed = UnLexer.unlex(tokens)
-    if unlexed.contains(unlexString) then
-      println(s"Unlexed: $tokens")
-      println(s"Original: $unlexString")
-      println()
+  println("== targetTokenResultMatching (round-trip check) ==")
+  //targetTokenResultのトークナイズ結果を使い、resultsの中から逆引きできるか確認する
+  TargetTokenResult.zipWithIndex.foreach { (tokens, i) =>
+    println(s"[$i] $tokens")
   }
+  println()
+  
+    
+  
+    
   
 
 
