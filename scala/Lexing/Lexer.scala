@@ -85,16 +85,16 @@ def lexToTree(
   input: String,
   tokenizers: List[Tokenizer]
 ): tree[Token] =
-  val chars = input.toCharArray
-  val len = chars.length
-  val memo = scala.collection.mutable.Map.empty[Int, tree[Token]]
+  lazy val chars = input.toCharArray
+  lazy val len = chars.length
+  lazy val memo = scala.collection.mutable.Map.empty[Int, tree[Token]]
 
   def build(pos: Int): tree[Token] =
     memo.getOrElseUpdate(pos, {
       if pos == len then
         tree.Node(Vector.empty, LazyList.empty)
       else
-        val branches = tokenizers.to(LazyList).flatMap { tokenizer =>
+        lazy val branches = tokenizers.to(LazyList).flatMap { tokenizer =>
           tokenizer(input, chars, pos).to(LazyList).flatMap { (tok, nextPos) =>
             build(nextPos) match
               case tree.DeadEnd => None

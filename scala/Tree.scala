@@ -7,18 +7,18 @@ enum tree[+A]:
   def flattenPaths: LazyList[LazyList[A]] = this match
     case DeadEnd => LazyList.empty[LazyList[A]]
     case Node(vals, LazyList()) => LazyList(LazyList.from(vals))
-    case Node(vals, brs) if brs.nonEmpty => val prefix =LazyList.from(vals)
+    case Node(vals, brs) if brs.nonEmpty => lazy val prefix =LazyList.from(vals)
       brs.flatMap(b => b.flattenPaths).map(prefix #::: _)
     case _ => LazyList.empty[LazyList[A]]
 
   def drawTree: String =
-    val visited = scala.collection.mutable.Set.empty[Int]
+    lazy val visited = scala.collection.mutable.Set.empty[Int]
     def loop(t: tree[A], indent: String, isLast: Boolean): String =
-      val id = System.identityHashCode(t)
-      val marker = if isLast then "└── " else "├── "
-      val nextIndent = indent + (if isLast then "    " else "│   ")
+      lazy val id = System.identityHashCode(t)
+      lazy val marker = if isLast then "└── " else "├── "
+      lazy val nextIndent = indent + (if isLast then "    " else "│   ")
       
-      val head = indent + marker + (t match
+      lazy val head = indent + marker + (t match
         case DeadEnd => "DeadEnd"
         case Node(vals, _) => s"Node@${Integer.toHexString(id)}(vals: [${vals.mkString(", ")}])"
       )
@@ -30,7 +30,7 @@ enum tree[+A]:
           case DeadEnd => head + "\n"
           case Node(_, brs) if brs.isEmpty => head + "\n"
           case Node(_, brs) =>
-            val body = brs.zipWithIndex.map { (b, i) =>
+            lazy val body = brs.zipWithIndex.map { (b, i) =>
               loop(b, nextIndent, i == brs.length - 1)
             }.mkString
             head + "\n" + body

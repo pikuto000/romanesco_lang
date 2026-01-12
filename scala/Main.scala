@@ -105,17 +105,10 @@ import scala.util.boundary
 
   println("== Result Tree ==")
   println(resultTree.drawTree)
-
-  println("== Paths ==")
-  val paths = resultTree.flattenPaths.map(_.toList)
-  paths.zipWithIndex.foreach { (tokens, i) =>
-    println(s"[$i] $tokens")
-  }
-
   println()
   println("== targetTokenResultMatching (round-trip check) ==")
   println(targetTree.drawTree)
-  val targetPaths = targetTree.flattenPaths.map(_.toList)
+  lazy val targetPaths = targetTree.flattenPaths.map(_.toList)
   targetPaths.zipWithIndex.foreach { (tokens, i) =>
     println(s"[$i] $tokens")
   }
