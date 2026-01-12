@@ -100,17 +100,23 @@ import scala.util.boundary
   println(s"== Input: $inputPath ==")
   println()
 
-  lazy val results = lexAll(input, tokenizers, mode)
-  lazy val TargetTokenResult = lexAll(unlexString, tokenizers, mode)
+  lazy val resultTree = lexAll(input, tokenizers, mode)
+  lazy val targetTree = lexAll(unlexString, tokenizers, mode)
 
-  results.zipWithIndex.foreach { (tokens, i) =>
+  println("== Result Tree ==")
+  println(resultTree.drawTree)
+
+  println("== Paths ==")
+  val paths = resultTree.flattenPaths.map(_.toList)
+  paths.zipWithIndex.foreach { (tokens, i) =>
     println(s"[$i] $tokens")
   }
 
   println()
   println("== targetTokenResultMatching (round-trip check) ==")
-  //targetTokenResultのトークナイズ結果を使い、resultsの中から逆引きできるか確認する
-  TargetTokenResult.zipWithIndex.foreach { (tokens, i) =>
+  println(targetTree.drawTree)
+  val targetPaths = targetTree.flattenPaths.map(_.toList)
+  targetPaths.zipWithIndex.foreach { (tokens, i) =>
     println(s"[$i] $tokens")
   }
   println()

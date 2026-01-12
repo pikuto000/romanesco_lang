@@ -1,8 +1,9 @@
 package Lexing
 import scala.util.matching.Regex
+import Undeterminable.*
 
 // ====================================== 
-// Token 定義
+// Token 定定義
 // ====================================== 
 
 enum Token:
@@ -80,47 +81,38 @@ enum LexMode:
 // Lexer 本体
 // ====================================== 
 
+def lexToTree(
+  input: String,
+  tokenizers: List[Tokenizer]
+): tree[Token] =
+  val chars = input.toCharArray
+  val len = chars.length
+  val memo = scala.collection.mutable.Map.empty[Int, tree[Token]]
+
+  def build(pos: Int): tree[Token] =
+    memo.getOrElseUpdate(pos, {
+      if pos == len then
+        tree.Node(Vector.empty, LazyList.empty)
+      else
+        val branches = tokenizers.to(LazyList).flatMap { tokenizer =>
+          tokenizer(input, chars, pos).to(LazyList).flatMap { (tok, nextPos) =>
+            build(nextPos) match
+              case tree.DeadEnd => None
+              case nextTree => Some(tree.Node(Vector(tok), LazyList(nextTree)))
+          }
+        }
+        if branches.isEmpty then tree.DeadEnd
+        else tree.Node(Vector.empty, branches)
+    })
+
+  build(0)
+
 def lexAll(
   input: String,
   tokenizers: List[Tokenizer],
   mode: LexMode
-): List[List[Token]] =
-  lazy val chars = input.toCharArray
-  lazy val len = chars.length
-
-  var frontier: List[LexState] =
-    List(LexState(0, 0, Nil))
-
-  var completed = List.empty[LexState]
-
-  while frontier.nonEmpty do
-    lazy val nextStates =
-      frontier.flatMap {
-        state =>
-          if state.pos >= len then Nil
-          else
-            tokenizers.flatMap {
-              tokenizer =>
-                tokenizer(input, chars, state.pos).map {
-                  case (tok, newPos) => state.push(tok, newPos)
-                }
-            }
-      }
-
-    lazy val (done, cont) = nextStates.partition(_.pos == len)
-
-    mode match
-      case LexMode.BestOnly if done.nonEmpty =>
-        return done.sortBy(_.cost).map(_.freeze)
-      case _ =>
-        completed ++= done
-        frontier = cont
-
-  lazy val sorted = completed.sortBy(_.cost)
-
-  mode match
-    case LexMode.TopN(n) => sorted.take(n).map(_.freeze)
-    case _               => sorted.map(_.freeze)
+): tree[Token] =
+  lexToTree(input, tokenizers)
 
 // ====================================== 
 // デリミタ
