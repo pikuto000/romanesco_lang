@@ -9,25 +9,12 @@ import Undeterminable.*
 enum Token:
   case Op(lexeme: String)
   case Ident(lexeme: String)
+  case Keyword(lexeme: String)
   case WS(lexeme: String)
   case Number(lexeme: String)
   case Delim(lexeme: String)
 
 
-// ====================================== 
-// Lexer 状態
-// ====================================== 
-
-final case class LexState(
-  pos: Int,
-  cost: Int,
-  tokensRev: List[Token]
-):
-  inline def push(tok: Token, newPos: Int): LexState =
-    LexState(newPos, cost + 1, tok +: tokensRev)
-
-  inline def freeze: List[Token] =
-    tokensRev.reverse
 
 
 // ====================================== 
@@ -41,13 +28,13 @@ def lexRegex(
   converter: String => Token
 ): Tokenizer =
   (input, _, pos) =>
-    lazy val s = input.substring(pos)
-    lazy val matcher = pattern.pattern.matcher(s)
-    lazy val builder = List.newBuilder[(Token, Int)]
+    val s = input.substring(pos)
+    val matcher = pattern.pattern.matcher(s)
+    val builder = List.newBuilder[(Token, Int)]
     var len = 1
-    lazy val maxLen = s.length
+    val maxLen = s.length
     while len <= maxLen do
-      lazy val sub = s.substring(0, len)
+      val sub = s.substring(0, len)
       if matcher.reset(sub).matches() then
         builder += ((converter(sub), pos + len))
       len += 1
@@ -58,10 +45,10 @@ def lexRegexLongest(
   converter: String => Token
 ): Tokenizer =
   (input, _, pos) =>
-    lazy val matcher = pattern.pattern.matcher(input)
+    val matcher = pattern.pattern.matcher(input)
     matcher.region(pos, input.length)
     if matcher.lookingAt() then
-      lazy val sub = matcher.group()
+      val sub = matcher.group()
       List((converter(sub), pos + sub.length))
     else
       Nil
@@ -85,16 +72,16 @@ def lexToTree(
   input: String,
   tokenizers: List[Tokenizer]
 ): tree[Token] =
-  lazy val chars = input.toCharArray
-  lazy val len = chars.length
-  lazy val memo = scala.collection.mutable.Map.empty[Int, tree[Token]]
+  val chars = input.toCharArray
+  val len = chars.length
+  val memo = scala.collection.mutable.Map.empty[Int, tree[Token]]
 
   def build(pos: Int): tree[Token] =
     memo.getOrElseUpdate(pos, {
       if pos == len then
         tree.Node(Vector.empty, LazyList.empty)
       else
-        lazy val branches = tokenizers.to(LazyList).flatMap { tokenizer =>
+        val branches = tokenizers.to(LazyList).flatMap { tokenizer =>
           tokenizer(input, chars, pos).to(LazyList).flatMap { (tok, nextPos) =>
             build(nextPos) match
               case tree.DeadEnd => None
@@ -119,7 +106,7 @@ def lexAll(
 // ====================================== 
 def lexDelim(delimiters: Set[String]): Tokenizer =
   (input, chars, pos) =>
-    lazy val builder = List.newBuilder[(Token, Int)]
+    val builder = List.newBuilder[(Token, Int)]
     for d <- delimiters do
       if input.startsWith(d, pos) then
         builder += ((Token.Delim(d), pos + d.length))

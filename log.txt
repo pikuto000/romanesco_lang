@@ -1,169 +1,37 @@
-== Mode: All ==
-== Input: input.txt ==
-
-== Result Tree ==
-ДдДЯДЯ Node@6c3708b3(vals: [])
-    ДеДЯДЯ Node@887af79(vals: [Op(<)])
-    Да   ДдДЯДЯ Node@5bc79255(vals: [])
-    Да       ДеДЯДЯ Node@47ef968d(vals: [Op(<)])
-    Да       Да   ДдДЯДЯ Node@23e028a9(vals: [])
-    Да       Да       ДеДЯДЯ Node@3dd4520b(vals: [Op(<)])
-    Да       Да       Да   ДдДЯДЯ Node@5ae63ade(vals: [])
-    Да       Да       Да       ДеДЯДЯ Node@610694f1(vals: [Op(<)])
-    Да       Да       Да       Да   ДдДЯДЯ Node@43814d18(vals: [])
-    Да       Да       Да       Да       ДеДЯДЯ Node@5c5a1b69(vals: [Op(<)])
-    Да       Да       Да       Да       Да   ДдДЯДЯ Node@3701eaf6(vals: [])
-    Да       Да       Да       Да       Да       ДеДЯДЯ Node@627551fb(vals: [Op(<)])
-    Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@2b552920(vals: [])
-    Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@2758fe70(vals: [Op(<)])
-    Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@1f36e637(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@578486a3(vals: [Op(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@551aa95a(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@35d176f7(vals: [Op(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@1dfe2924(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@50b494a6(vals: [Op(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@3cef309d(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@32709393(vals: [Op(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@3d99d22e(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@49fc609f(vals: [Op(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@cd2dae5(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@3a883ce7(vals: [Op(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@4973813a(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@6321e813(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@79be0360(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@22a67b4(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@57855c9a(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@3b084709(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@3224f60b(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@63e2203c(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@1efed156(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@6737fd8f(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@72b6cbcc(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@a7e666(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@68bbe345(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@30b8a058(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@7494e528(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@4bbfb90a(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@7c29daf3(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@9660f4e(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@5a8806ef(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@6c49835d(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@5e853265(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@67205a84(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@7d0587f1(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@5d76b067(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@2a17b7b6(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@4f063c0a(vals: [Op(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@1e6d1014(vals: [])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@614ddd49(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@1e6d1014(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@1f554b06(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@1e6d1014(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@694e1548(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@2a17b7b6(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@1c3a4799(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@2a17b7b6(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@131276c2(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@7d0587f1(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@26aa12dd(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@7d0587f1(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@3fd7a715(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@5e853265(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@711f39f9(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@5e853265(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@71bbf57e(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@5a8806ef(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@7f13d6e(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@5a8806ef(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@51cdd8a(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@7c29daf3(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@d44fc21(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@7c29daf3(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@23faf8f2(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@7494e528(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@2d6eabae(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@7494e528(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@4e7dc304(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@68bbe345(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@64729b1e(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@68bbe345(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@10bbd20a(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@72b6cbcc(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@48503868(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@72b6cbcc(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@6895a785(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@1efed156(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@184f6be2(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@1efed156(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@56aac163(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@3224f60b(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@1f7030a6(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@3224f60b(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@5a1c0542(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@57855c9a(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@396f6598(vals: [Op(>>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@57855c9a(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@394e1a0f(vals: [Delim(>)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@79be0360(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@27a5f880(vals: [Delim(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@4973813a(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@1d29cf23(vals: [Op(<<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@4973813a(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@5f282abb(vals: [Delim(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@cd2dae5(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@167fdd33(vals: [Op(<<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@cd2dae5(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@1e965684(vals: [Delim(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@3d99d22e(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@4d95d2a2(vals: [Op(<<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@3d99d22e(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@53f65459(vals: [Delim(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@3cef309d(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@3b088d51(vals: [Op(<<)])
-    Да       Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@3cef309d(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@1786dec2(vals: [Delim(<)])
-    Да       Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@1dfe2924(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@74650e52(vals: [Op(<<)])
-    Да       Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@1dfe2924(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@15d0c81b(vals: [Delim(<)])
-    Да       Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@551aa95a(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       ДеДЯДЯ Node@6acdbdf5(vals: [Op(<<)])
-    Да       Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@551aa95a(vals: []) (already seen)
-    Да       Да       Да       Да       Да       Да       ДдДЯДЯ Node@4b1c1ea0(vals: [Delim(<)])
-    Да       Да       Да       Да       Да       Да           ДдДЯДЯ Node@1f36e637(vals: []) (already seen)
-    Да       Да       Да       Да       Да       ДеДЯДЯ Node@17579e0f(vals: [Op(<<)])
-    Да       Да       Да       Да       Да       Да   ДдДЯДЯ Node@1f36e637(vals: []) (already seen)
-    Да       Да       Да       Да       Да       ДдДЯДЯ Node@4d41cee(vals: [Delim(<)])
-    Да       Да       Да       Да       Да           ДдДЯДЯ Node@2b552920(vals: []) (already seen)
-    Да       Да       Да       Да       ДеДЯДЯ Node@3712b94(vals: [Op(<<)])
-    Да       Да       Да       Да       Да   ДдДЯДЯ Node@2b552920(vals: []) (already seen)
-    Да       Да       Да       Да       ДдДЯДЯ Node@2833cc44(vals: [Delim(<)])
-    Да       Да       Да       Да           ДдДЯДЯ Node@3701eaf6(vals: []) (already seen)
-    Да       Да       Да       ДеДЯДЯ Node@33f88ab(vals: [Op(<<)])
-    Да       Да       Да       Да   ДдДЯДЯ Node@3701eaf6(vals: []) (already seen)
-    Да       Да       Да       ДдДЯДЯ Node@27a8c74e(vals: [Delim(<)])
-    Да       Да       Да           ДдДЯДЯ Node@43814d18(vals: []) (already seen)
-    Да       Да       ДеДЯДЯ Node@2d8f65a4(vals: [Op(<<)])
-    Да       Да       Да   ДдДЯДЯ Node@43814d18(vals: []) (already seen)
-    Да       Да       ДдДЯДЯ Node@1b68ddbd(vals: [Delim(<)])
-    Да       Да           ДдДЯДЯ Node@5ae63ade(vals: []) (already seen)
-    Да       ДеДЯДЯ Node@646d64ab(vals: [Op(<<)])
-    Да       Да   ДдДЯДЯ Node@5ae63ade(vals: []) (already seen)
-    Да       ДдДЯДЯ Node@59e5ddf(vals: [Delim(<)])
-    Да           ДдДЯДЯ Node@23e028a9(vals: []) (already seen)
-    ДеДЯДЯ Node@536aaa8d(vals: [Op(<<)])
-    Да   ДдДЯДЯ Node@23e028a9(vals: []) (already seen)
-    ДдДЯДЯ Node@e320068(vals: [Delim(<)])
-        ДдДЯДЯ Node@5bc79255(vals: []) (already seen)
-
-
-== targetTokenResultMatching (round-trip check) ==
-ДдДЯДЯ Node@1f57539(vals: [])
-    ДеДЯДЯ Node@76f2b07d(vals: [Op(>)])
-    Да   ДдДЯДЯ Node@704a52ec(vals: [])
-    ДдДЯДЯ Node@6ee52dcd(vals: [Delim(>)])
-        ДдДЯДЯ Node@704a52ec(vals: []) (already seen)
-
-[0] List(Op(>))
-[1] List(Delim(>))
-
+[info] welcome to sbt 1.11.7 (Oracle Corporation Java 25.0.1)
+[info] loading settings for project romanesco-build-build-build from metals.sbt...
+[info] loading project definition from C:\Users\Cocoa\romanesco\project\project\project
+[info] loading settings for project romanesco-build-build from metals.sbt...
+[info] loading project definition from C:\Users\Cocoa\romanesco\project\project
+[success] Generated .bloop\romanesco-build-build.json
+[success] Total time: 5 s, completed 2026/01/13 5:35:07
+[info] loading settings for project romanesco-build from metals.sbt, plugins.sbt...
+[info] loading project definition from C:\Users\Cocoa\romanesco\project
+[info] loading settings for project root from build.sbt...
+[info] set current project to lexer (in build file:/C:/Users/Cocoa/romanesco/)
+[warn] there's a key that's not used by any other settings/tasks:
+[warn]  
+[warn] * root / run / mainClass
+[warn]   +- C:\Users\Cocoa\romanesco\build.sbt:9
+[warn]  
+[warn] note: a setting might still be used by a command; to exclude a key from this `lintUnused` check
+[warn] either append it to `Global / excludeLintKeys` or call .withRank(KeyRanks.Invisible) on the key
+[info] compiling 2 Scala sources to C:\Users\Cocoa\romanesco\target\scala-3.7.4\classes ...
+[error] -- [E007] Type Mismatch Error: C:\Users\Cocoa\romanesco\scala\Main.scala:115:32 
+[error] 115 |      println(s"    ${Stmt.show(stmt)}")
+[error]     |                                ^^^^
+[error]     |                                Found:    (stmt : List[Parsing.Stmt])
+[error]     |                                Required: Parsing.Stmt
+[error]     |
+[error]     | longer explanation available when compiling with `-explain`
+[error] -- Error: C:\Users\Cocoa\romanesco\scala\Parsing\Parser.scala:62:10 ------------
+[error] 62 |          Token.Op("=") :: rest3 <- Some(rest2)
+[error]    |          ^^^^^^^^^^^^^^^^^^^^^^
+[error]    |pattern's type ::[Lexing.Token] is more specialized than the right hand side expression's type List[Lexing.Token]
+[error]    |
+[error]    |If the narrowing is intentional, this can be communicated by adding the `case` keyword before the full pattern,
+[error]    |which will result in a filtering for expression (using `withFilter`).
+[error]    |This patch can be rewritten automatically under -rewrite -source 3.2-migration.
+[error] two errors found
+[error] (Compile / compileIncremental) Compilation failed
+[error] Total time: 10 s, completed 2026/01/13 5:35:19

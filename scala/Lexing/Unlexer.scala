@@ -11,12 +11,14 @@ object UnLexer:
         List(op)
       case Token.Ident(name) =>
         List(name)
+      case Token.Keyword(kw) =>
+        List(kw)
       case Token.WS(ws) =>
         List(ws)
       case Token.Number(num) =>
         List(num)
       case Token.Delim(d) =>
-        List(d.toString)
+        List(d)
 
   def unlex(
     tokens: List[Token]
