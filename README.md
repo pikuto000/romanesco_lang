@@ -1,42 +1,180 @@
-# Romanesco (Reduced)
+# romanesco
 
-A minimal, typeless compiled language backed by the Z3 SMT solver.
+**すべてが「適用（application）」である**プログラミング言語。以下の特徴を備えています：
+- **非決定的レキシカル分析・構文解析** - あらゆる解釈の可能性を探索
+- **制約ベースのセマンティクス** - 型システムの代わりに論理制約を採用
+- **カスタマイズ可能な構文** - マクロによるミックスフィックス（Mixfix）演算子の定義
+- **Z3 SMTソルバの統合** - コンパイル時の制約解消
 
-This project was originally an ambitious attempt at a universal, self-modifying language. It has been drastically reduced to its core value proposition: using an SMT solver for execution and safety verification.
+名前の由来はカリフラワーの一種である「ロマネスコ」。そのフラクタル構造は、言語の再帰的で自己相似的な設計を反映しています。
 
-## Features
+## 哲学
 
-- **Z3 Solver Integration:** Variables and expressions are directly mapped to Z3 constraints.
-- **Safety:** The solver verifies the feasibility of your code.
-- **Simplicity:** No macros, no complex optimizations. Just parsing and solving.
+romanescoはコア部分で過激なミニマリズムを採用しつつ、メタプログラミングによって表現力を最大化します。
 
-## Requirements
+1. **すべては適用である** - 唯一の原始的な操作は関数適用のみ
+2. **型はなく、制約のみ** - SMTで検証された論理制約による安全性
+3. **コンパイル時は非決定的、実行時は決定的** - 実行前にすべての曖昧さを解消
+4. **デフォルトで衛生的マクロ** - 必要に応じて `@current` エスケープハッチを使用可能
+5. **空白非依存** - `fx`, `f x`, `f    x` はすべて等価
 
-- Scala 3.7.4 (or compatible)
-- sbt 1.12.0 (or compatible)
-- Z3 installed and accessible (via `z3-turnkey` dependency)
+## 現在のステータス
 
-## Usage
+🚧 **開発初期段階** - コア・インフラストラクチャを構築中：
 
-Run the compiler with a source file:
+- ✅ メモ化付き非決定的レキサー
+- ✅ 非決定的パーサー
+- ✅ ミックスフィックス・マクロ定義のパース
+- ⏳ Z3ソルバ統合（基盤は完了、ロジックは保留中）
+- ⏳ 制約ベースのセマンティクス
+- ⏳ LLVMバックエンド
+
+## 必要要件
+
+- **Scala** 3.7.4+
+- **sbt** 1.12.0+
+- **Z3** (`z3-turnkey` 依存関係経由)
+
+## ビルド
 
 ```bash
-sbt "run <file>"
+sbt compile
 ```
 
-## Example
+## 使い方
 
-```
-x = 10;
-y = 20;
-z = 30;
-x + y == z
+```bash
+sbt "run <input-file> [mode]"
 ```
 
-Output:
+**モード:**
+- `all` - すべてのトークン化の可能性を表示（デフォルト）
+- `best` - 最長のトークン列のみ表示
+- `topN:<n>` - 上位N個のトークン化を表示
+
+**例:**
+
+```bash
+sbt "run input.txt all"
 ```
-Solver Status: SATISFIABLE
-x = 10
-y = 20
-z = 30
+
+## サンプルコード
+
+```romanesco
+// マクロ定義 (ミックスフィックス構文)
+syntax test [X] = { X }
+
+// 代入
+x = 42
+
+// 制約付き式
+compute = {
+  x > 0;
+  x * 2
+}
 ```
+
+## アーキテクチャ
+
+```
+scala/
+├── Main.scala           - エントリーポイントとCLI
+├── Tree.scala           - 非決定的木構造
+├── Lexing/
+│   ├── Lexer.scala      - 曖昧さを保持したトークン化
+│   └── Unlexer.scala    - トークン → 文字列（デバッグ用）
+├── Parsing/
+│   ├── Parser.scala     - 非決定的パーサー
+│   └── AST.scala        - 抽象構文木（AST）
+└── Solver/
+    └── Solver.scala     - Z3統合（進行中）
+```
+
+## 設計上の決定
+
+### 非決定的レキシカル分析
+レキサーは、木構造を使用して検索空間を効率的に表現し、**すべての可能なトークン化**を同時に探索します。メモ化により、各位置の処理は一度だけ行われます。
+
+### コンパイル時 vs 実行時
+- **コンパイル時**: 非決定的。すべての可能性を探索。
+- **実行時**: 決定的。制約によってすべての曖昧さが解消された状態。
+
+### 空白の独立性
+`fx` は以下のように解釈されます：
+1. 単一の識別子 `fx`
+2. `f` を `x` に適用する `f x`
+
+パーサーと制約ソルバが、文脈に基づいて正しい解釈を決定します。
+
+## ロードマップ
+
+**フェーズ 1: 基盤構築** (現在)
+- [x] 非決定的レキサー
+- [x] 非決定的パーサー
+- [x] 基本的なAST
+- [ ] デリミタのバランス制約
+
+**フェーズ 2: 制約**
+- [ ] Z3制約の生成
+- [ ] コンパイル時の制約解消
+- [ ] 制約による曖昧さの解消
+
+**フェーズ 3: セマンティクス**
+- [ ] ラムダ式
+- [ ] 制約ベースのパターンマッチング
+- [ ] 衛生的なマクロ展開
+
+**フェーズ 4: コード生成**
+- [ ] LLVM IR生成
+- [ ] 最適化パス
+- [ ] バイナリ出力
+
+## 哲学の詳細
+
+### 「すべては適用である」
+ラムダや束縛さえも適用として表現されます：
+```romanesco
+lambda(x, body)  // 内部的: apply(apply(LAMBDA, x), body)
+let x = v in e   // 内部的: apply(lambda(x, e), v)
+```
+
+### 型より制約論理
+`x: Int` と書く代わりに、以下のように記述します：
+```romanesco
+{
+  x > 0;
+  x < 100;
+  compute(x)
+}
+```
+Z3がコンパイル時にこれらの制約を検証します。
+
+### エスケープハッチ付き衛生的マクロ
+```romanesco
+syntax define $name = $body = {
+  bind($name, $body)  // 定義時の環境をキャプチャ
+}
+
+// 明示的な現在の環境へのアクセス
+syntax debug $expr = {
+  log("evaluating");
+  @current $expr  // 呼び出し側の環境を使用
+}
+```
+
+## 貢献について
+
+本プロジェクトは実験的な研究プロジェクトです。フィードバックやアイデアは大歓迎ですが、設計の進化に伴い過激な変更が行われることを覚悟してください。
+
+## ライセンス
+
+未定（TBD）
+
+## 謝辞
+
+以下の影響を受けています：
+- **Lisp** - データとしてのコード、マクロ
+- **Haskell** - 優雅な構文、純粋性
+- **Prolog** - 論理プログラミング、単一化
+- **Nim** - メタプログラミング、コンパイル時実行
+- **Forth** - ミニマリズム、セルフホスティング
