@@ -173,7 +173,7 @@ object Parser:
     parseBinaryOp(
       tokens,
       parseAdditive,
-      Set("==", "!=", "<", ">", "<=", ">=")
+      Set("=", "<", ">", "<=", ">=","&", "|", "not")
     )
   
   /** 加減算: +, - */
