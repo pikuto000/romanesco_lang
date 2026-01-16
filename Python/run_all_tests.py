@@ -14,7 +14,7 @@ def run_tests():
         try:
             # Run the compiler with eval option
             result = subprocess.run(
-                ["python", "Python/main.py", test_file, "eval"],
+                ["python", "Python/main.py", test_file, "eval", "debug"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8'

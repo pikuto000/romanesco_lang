@@ -17,7 +17,7 @@ class Token:
     def __repr__(self):
         return f"{self.__class__.__name__}({self.s})"
     
-    def __eq__(self, other):
+    def __eq__(self, other: object):
         return isinstance(other, self.__class__) and self.s == other.s
 
 class Op(Token): pass

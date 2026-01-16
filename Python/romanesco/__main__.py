@@ -4,7 +4,7 @@ import time
 import re
 from typing import List, Set, Dict
 
-from . import lexing, parsing, undeterminable, core
+from . import lexing, parsing, core
 
 class TokenizerConfig:
     def __init__(self, keywords: Set[str], operators: Dict[str, lexing.Token], delimiters: Set[str]):

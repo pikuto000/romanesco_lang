@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Any, Optional, Iterable, Set, Callable
-from romanesco.lexing import Token, Ident, WS, Op, Delim, Number
+from typing import List, Tuple, Dict, Any, Optional, Iterable, Callable
+from romanesco.lexing import Token, WS, Number
 from romanesco import undeterminable
 
 # ======================================

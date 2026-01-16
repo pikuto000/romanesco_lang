@@ -225,7 +225,7 @@ def eval_apply(f: Expr, arg: Expr, env: Env) -> List[Tuple[Value, Env]]:
         f_val = env1.resolve(f_val)
         if isinstance(f_val, PrimOp):
             op = f_val.name
-            if op in ["and", "or", "seq", "="]: 
+            if op in ["and", "or", "seq", "="]:
                 results.append((PartialBinOp(op, left_expr=arg), env1))
             elif op == "lambda":
                 if isinstance(arg, Atom): results.append((PartialBinOp("lambda", left_val=LogicVar(hash((arg.name, env1.nonce)), arg.name)), env1))

@@ -2,7 +2,6 @@ import z3
 from typing import List, Set
 from romanesco import undeterminable
 from romanesco.lexing import Token, Delim, Ident, Number
-from romanesco import parsing
 from romanesco.parsing import Expr, Num, Var, Call, Block
 
 # ======================================
