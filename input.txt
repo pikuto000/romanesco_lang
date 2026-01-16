@@ -1,2 +1,1 @@
-syntax test [X] = { X }
-test 100
+= x 100

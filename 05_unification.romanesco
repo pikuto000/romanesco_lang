@@ -1,0 +1,6 @@
+// Test 05: Unification (pattern matching)
+// Expected: x = 42, result = 42
+
+= x 42
+= result x
+result

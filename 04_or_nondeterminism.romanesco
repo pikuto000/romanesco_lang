@@ -1,0 +1,5 @@
+// Test 04: Or operator (non-determinism)
+// Expected: 2 solutions - Result = 1 or Result = 2
+
+= result or 1 2
+result

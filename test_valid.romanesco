@@ -1,7 +1,0 @@
-syntax test [X] = { X }
-
-x = 6*7+3/3
-compute = {
-  x > 0
-  x * 2
-}

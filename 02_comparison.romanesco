@@ -1,0 +1,5 @@
+// Test 02: Comparison
+// Expected: Result = true
+
+= x > 5 3
+x
