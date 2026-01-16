@@ -1,6 +1,6 @@
 package Core
 
-import Parsing.{Expr as ASTExpr, Stmt, Pattern}
+import Parsing.{Expr as ASTExpr, Stmt}
 
 /**
  * AST → Core変換器
@@ -8,30 +8,12 @@ import Parsing.{Expr as ASTExpr, Stmt, Pattern}
 object Translator:
   import Core.Expr.*
   
-  def translateStmt(stmt: Stmt): (Option[String], Expr) = stmt match
-    case Stmt.ExprStmt(expr) =>
-      (None, translateExpr(expr))
-    
-    case Stmt.Assignment(name, value) =>
-      (Some(name), translateExpr(value))
-    
-    case Stmt.MacroDef(name, patterns, body) =>
-      val coreBody = translateExpr(body)
-      (Some(name), coreBody)
-  
   def translateExpr(expr: ASTExpr): Expr = expr match
     case ASTExpr.Num(value) =>
       Atom(value)
     
     case ASTExpr.Var(name) =>
       Atom(name)
-    
-    case ASTExpr.BinOp(op, left, right) =>
-      // op left right → apply(apply(op, left), right)
-      val opExpr = Atom(op)
-      val leftExpr = translateExpr(left)
-      val rightExpr = translateExpr(right)
-      Apply(Apply(opExpr, leftExpr), rightExpr)
     
     case ASTExpr.Call(f, args) =>
       // f(a, b, c) → apply(apply(apply(f, a), b), c)
@@ -45,26 +27,19 @@ object Translator:
       val bodyExpr = translateExpr(body)
       Apply(Apply(Atom("lambda"), Atom(param)), bodyExpr)
     
-    case ASTExpr.Block(stmts) =>
-      translateBlock(stmts)
+    case ASTExpr.Block(exprs) =>
+      translateBlock(exprs)
   
-  private def translateBlock(stmts: List[Stmt]): Expr =
-    stmts match
+  private def translateBlock(exprs: List[ASTExpr]): Expr =
+    exprs match
       case Nil =>
         Atom("true")
       
-      case single :: Nil =>
-        translateStmt(single) match
-          case (None, expr) => expr
-          case (Some(name), value) => 
-            Apply(Apply(Atom("="), Atom(name)), value)
+      case first :: Nil =>
+        translateExpr(first)
       
       case first :: rest =>
-        val firstExpr = translateStmt(first) match
-          case (None, expr) => expr
-          case (Some(name), value) =>
-            Apply(Apply(Atom("="), Atom(name)), value)
-        
+        val firstExpr = translateExpr(first)
         val restExpr = translateBlock(rest)
         Apply(Apply(Atom("seq"), firstExpr), restExpr)
   
@@ -72,12 +47,13 @@ object Translator:
     val bindings = scala.collection.mutable.Map.empty[String, Expr]
     var lastExpr: Option[Expr] = None
     
-    stmts.foreach { stmt =>
-      translateStmt(stmt) match
-        case (Some(name), value) =>
-          bindings(name) = value
-        case (None, expr) =>
-          lastExpr = Some(expr)
+    stmts.foreach { case Stmt.ExprStmt(expr) =>
+      expr match
+        // 代入の検出: = name value
+        case ASTExpr.Call(ASTExpr.Var("="), ASTExpr.Var(name) :: value :: Nil) =>
+          bindings(name) = translateExpr(value)
+        case _ =>
+          lastExpr = Some(translateExpr(expr))
     }
     
     (bindings.toMap, lastExpr)

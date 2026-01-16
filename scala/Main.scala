@@ -169,7 +169,7 @@ def buildTokenizers(config: TokenizerConfig): List[Lexing.Tokenizer] =
   import Lexing.*
   
   val identRegex = "[a-zA-Z_][a-zA-Z_0-9]*".r
-  val wsRegex = "[ \\t\\r]+".r
+  val wsRegex = "([ \\t\\r\\n;]|//.*)+".r
   val numberRegex = "[0-9]+".r
   
   def keysToRegex(keys: Iterable[String]): scala.util.matching.Regex =
