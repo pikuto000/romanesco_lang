@@ -1,5 +1,4 @@
-from typing import List, Generic, TypeVar, Optional, Tuple, Set
-import sys
+from typing import List, Generic, TypeVar, Tuple, Set
 
 T = TypeVar('T')
 

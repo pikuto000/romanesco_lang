@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Set, Callable, TypeVar, Generic, Any, Dict
+from typing import List, Optional, TypeVar, Generic, Dict
 from dataclasses import dataclass
 from romanesco.lexing import Token, Op, Ident, Keyword, Number, Delim, WS
 from romanesco import undeterminable
@@ -233,9 +233,29 @@ def parse_primary(tokens: List[Token]) -> Optional[ParseResult[Expr]]:
     if isinstance(t, Number): return ParseResult(Num(t.lexeme), tokens[1:])
     if isinstance(t, (Ident, Op, Keyword)): return ParseResult(Var(t.lexeme), tokens[1:])
     if isinstance(t, Delim) and t.lexeme == "(":
+        # Parse the first expression inside (maybe a function)
         res = parse_expr(tokens[1:])
-        if res and res.remaining and isinstance(res.remaining[0], Delim) and res.remaining[0].lexeme == ")":
-            return ParseResult(res.value, res.remaining[1:])
+        if not res: return None
+        
+        current_expr = res.value
+        current_tokens = res.remaining
+        
+        # Continue applying any following expressions within the same parenthesis
+        while current_tokens and not (isinstance(current_tokens[0], Delim) and current_tokens[0].lexeme == ")"):
+            arg_res = parse_expr(current_tokens)
+            if arg_res:
+                if isinstance(current_expr, Call):
+                    current_expr.args.append(arg_res.value)
+                else:
+                    current_expr = Call(current_expr, [arg_res.value])
+                current_tokens = arg_res.remaining
+            else: break
+            
+        if current_tokens and current_tokens[0].lexeme == ")":
+            # Parenthesized expression acts as a single saturated value (arity 0)
+            # relative to the outer context, unless it's a function.
+            # For pure Lisp style, it just returns the call.
+            return ParseResult(current_expr, current_tokens[1:])
     if isinstance(t, Delim) and t.lexeme == "{":
         res_list = []
         current = tokens[1:]

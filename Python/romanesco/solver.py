@@ -1,5 +1,5 @@
 import z3
-from typing import List, Dict, Set, Optional, Any
+from typing import List, Set
 from romanesco import undeterminable
 from romanesco.lexing import Token, Delim, Ident, Number
 from romanesco import parsing
@@ -83,7 +83,9 @@ def check_ast_constraints(exprs: List[Expr]) -> bool:
         if isinstance(expr, parsing.Num):
             return True
         elif isinstance(expr, parsing.Var):
-            return expr.name in defined_vars or expr.name in local_vars
+            # In logic programming context, unknown variables are allowed
+            # as they become Logic Variables at runtime.
+            return True
         elif isinstance(expr, parsing.Call):
             # '=' in expression
             if isinstance(expr.f, parsing.Var) and expr.f.name == "=":

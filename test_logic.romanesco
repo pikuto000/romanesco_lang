@@ -1,0 +1,13 @@
+(= Cons (lambda a (lambda b (and a b))))
+(= Nil false)
+
+(= myList (Cons 1 (Cons 2 Nil)))
+
+// member x list
+(= member (lambda x (lambda l (or
+  (= l (Cons x rest))
+  (and (= l (Cons h r)) (member x r))
+))))
+
+// 探索実行
+(and (member z myList) z)

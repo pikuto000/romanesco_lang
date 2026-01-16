@@ -23,6 +23,9 @@ def main():
     use_debug = "debug" in options
     use_eval = "eval" in options
     
+    if use_debug:
+        core.DEBUG_EVAL = True
+
     mode_arg = next((a for a in args if a not in ["prune", "debug", "eval", input_path]), "all")
     mode = parse_mode(mode_arg) or lexing.All()
 
@@ -107,9 +110,7 @@ def main():
         ast_paths = ast_tree.flatten_paths()
         
         if ast_paths and ast_paths[0]:
-            # ast_tree is Tree[List[Expr]]
             exprs = ast_paths[0][0]
-            
             print("== Evaluation ==")
             eval_start = time.time() * 1000
             
@@ -117,20 +118,22 @@ def main():
                 all_results = core.eval_program(exprs)
                 eval_end = time.time() * 1000
                 
-                print(f"  Found {len(all_results)} possible solutions:")
-                for i, (env, result) in enumerate(all_results):
-                    print(f"  --- Solution {i} ---")
-                    print("    Environment bindings:")
-                    # Filter out prelude
-                    for name, expr in env.bindings.items():
-                        if name not in core.prelude_bindings:
-                            print(f"      {name} = {core.show_core_expr(expr)}")
-                    
-                    if result is not None:
-                        print(f"    Result: {result}")
-                    else:
-                        print("    No result")
-                    print()
+                if not all_results:
+                    print("  No solutions found.")
+                else:
+                    print(f"  Found {len(all_results)} possible solutions:")
+                    for i, (env, result) in enumerate(all_results):
+                        print(f"  --- Solution {i} ---")
+                        # Show important substitutions
+                        if env.subs:
+                            print("    Substitutions:")
+                            for vid, val in env.subs.items():
+                                res_val = env.resolve(val)
+                                print(f"      ID {hex(vid)[-4:]} = {res_val}")
+                        
+                        if result is not None:
+                            print(f"    Result: {result}")
+                        print()
                     
                 print(f"  Time: {int(eval_end - eval_start)}ms")
                 print()
@@ -181,7 +184,6 @@ def build_tokenizers(config: TokenizerConfig) -> List[lexing.Tokenizer]:
     ws_regex = r"([ \t\r\n;]|//.*)+"
     number_regex = r"[0-9]+"
     
-    # Sort operators by length desc to match longest first in regex alternation
     sorted_ops = sorted(config.operators.keys(), key=len, reverse=True)
     op_regex = "|".join(re.escape(k) for k in sorted_ops)
     
@@ -197,34 +199,26 @@ def build_tokenizers(config: TokenizerConfig) -> List[lexing.Tokenizer]:
 
 def print_lexing_results(token_tree: undeterminable.Tree[lexing.Token], time_ms: int):
     print("== Lexing (final) ==")
-    
     token_paths = token_tree.flatten_paths()
     display_count = 5
-    
     for i, tokens in enumerate(token_paths[:display_count]):
         filtered = [t.lexeme for t in tokens if not isinstance(t, lexing.WS)]
         print(f"  Path {i}: {" ".join(filtered)}")
-        
     if len(token_paths) > display_count:
         print(f"  ... and {len(token_paths) - display_count} more paths")
-        
     print(f"  Time: {time_ms}ms")
     print(f"  Found {len(token_paths)} token sequences")
     print()
 
 def print_parsing_results(ast_tree: undeterminable.Tree[List[parsing.Expr]], time_ms: int):
     print("== Parsing ==")
-    
     ast_paths = ast_tree.flatten_paths()
-    
     for i, exprs in enumerate(ast_paths):
         print(f"  Parse {i}:")
         for expr in exprs:
             print(f"    {parsing.show_expr(expr)}")
-            
     if not ast_paths:
         print("  No valid parse trees")
-        
     print(f"  Time: {time_ms}ms")
     print(f"  Found {len(ast_paths)} parse trees")
     print()
@@ -236,13 +230,12 @@ def parse_mode(arg: str) -> Optional[lexing.LexMode]:
         try:
             n = int(arg[5:])
             return lexing.TopN(n)
-        except:
-            return None
+        except: return None
     return None
 
 def print_usage():
-    print("""Usage:
-  python main.py <input-file> [options...]\n
+    print("""Usage: python main.py <input-file> [options...]
+
 Options:
   all      - All possible tokenizations (default)
   best     - Only the longest tokenization

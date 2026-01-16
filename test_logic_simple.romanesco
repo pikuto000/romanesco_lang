@@ -1,0 +1,8 @@
+(= Cons (lambda a (lambda b (and a b))))
+(= myList (Cons 1 (Cons 2 false)))
+
+// x を探索する（定義ではなく実行制約）
+(or (= myList (Cons x rest)) (= myList (Cons h (Cons x r))))
+
+// 結果
+x
