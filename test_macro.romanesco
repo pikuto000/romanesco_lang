@@ -1,0 +1,7 @@
+// if-then-elseマクロの定義
+syntax if if [C] then [T] else [E] = or (and C T) E
+
+= x 10
+= result if > x 5 then 100 else 200
+
+= check if == result 100 then true else false

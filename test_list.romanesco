@@ -1,0 +1,8 @@
+Cons = \a -> \b -> a and b
+Nil = false
+
+myList = Cons 1 (Cons 2 (Cons 3 Nil))
+
+head = \x -> x = Cons first rest and head = first
+
+result = head(myList)

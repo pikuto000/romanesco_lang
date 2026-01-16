@@ -1,0 +1,13 @@
+= add lambda a lambda b + a b
+= x add 1 2
+
+= Cons lambda a lambda b and a b
+= Nil false
+
+= myList Cons 1 (Cons 2 (Cons 3 Nil))
+
+// prefix version of head
+// We want to unify x with Cons first rest, then just return first
+= head lambda x and (= x Cons first rest) first
+
+= result head myList
