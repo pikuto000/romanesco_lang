@@ -2,11 +2,6 @@ package Parsing
 
 /**
  * romanesco抽象構文木（AST）
- * 
- * 現在は暫定的な実装。将来的に以下を追加予定：
- * - ラムダ式
- * - 制約式
- * - 適用（全ての基本）
  */
 
 /** 式 */
@@ -14,8 +9,9 @@ enum Expr:
   case Num(value: String)                           // 数値リテラル
   case Var(name: String)                            // 変数参照
   case BinOp(op: String, left: Expr, right: Expr)  // 二項演算
-  case Call(name: String, args: List[Expr])         // 関数呼び出し
+  case Call(f: Expr, args: List[Expr])              // 関数呼び出し
   case Block(stmts: List[Stmt])                     // ブロック式
+  case Lambda(param: String, body: Expr)            // ラムダ式
 
 /** ステートメント */
 enum Stmt:
@@ -39,8 +35,9 @@ object Expr:
     case Num(v) => v
     case Var(n) => n
     case BinOp(op, l, r) => s"(${show(l)} $op ${show(r)})"
-    case Call(n, args) => s"$n(${args.map(show).mkString(", ")})"
+    case Call(f, args) => s"${show(f)}(${args.map(show).mkString(", ")})"
     case Block(stmts) => s"{ ${stmts.map(Stmt.show).mkString("; ")} }"
+    case Lambda(param, body) => s"\\$param -> ${show(body)}"
 
 object Stmt:
   /** ステートメントを文字列表現に変換 */

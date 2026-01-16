@@ -41,35 +41,37 @@ object Solver:
    * @return バランスが取れているか
    */
   def checkDelimiterBalance(tokens: List[Token]): Boolean =
-    scala.util.Using.resource(createContext()) { ctx =>
-      val solver = ctx.mkSolver()
-      
-      // 各デリミタペアについて検証
-      delimiterPairs.foreach { case (open, close) =>
-        val openCount = tokens.count {
-          case Token.Delim(d) if d == open => true
-          case _ => false
-        }
-        val closeCount = tokens.count {
-          case Token.Delim(d) if d == close => true
-          case _ => false
+    boundary {
+      scala.util.Using.resource(createContext()) { ctx =>
+        val solver = ctx.mkSolver()
+        
+        // 各デリミタペアについて検証
+        delimiterPairs.foreach { case (open, close) =>
+          val openCount = tokens.count {
+            case Token.Delim(d) if d == open => true
+            case _ => false
+          }
+          val closeCount = tokens.count {
+            case Token.Delim(d) if d == close => true
+            case _ => false
+          }
+          
+          // Z3制約：開きと閉じの数が等しい
+          val openVar = ctx.mkIntConst(s"open_$open")
+          val closeVar = ctx.mkIntConst(s"close_$close")
+          
+          solver.add(ctx.mkEq(openVar, ctx.mkInt(openCount)))
+          solver.add(ctx.mkEq(closeVar, ctx.mkInt(closeCount)))
+          solver.add(ctx.mkEq(openVar, closeVar))
         }
         
-        // Z3制約：開きと閉じの数が等しい
-        val openVar = ctx.mkIntConst(s"open_$open")
-        val closeVar = ctx.mkIntConst(s"close_$close")
+        // ネストの正しさも検証
+        if !checkNestingOrder(tokens) then
+          boundary.break(false)
         
-        solver.add(ctx.mkEq(openVar, ctx.mkInt(openCount)))
-        solver.add(ctx.mkEq(closeVar, ctx.mkInt(closeCount)))
-        solver.add(ctx.mkEq(openVar, closeVar))
+        // Z3で検証
+        solver.check() == Status.SATISFIABLE
       }
-      
-      // ネストの正しさも検証
-      if !checkNestingOrder(tokens) then
-        return false
-      
-      // Z3で検証
-      solver.check() == Status.SATISFIABLE
     }
   
   /**
@@ -78,25 +80,27 @@ object Solver:
    * 閉じ括弧が対応する開き括弧より前に来ないことを確認
    */
   private def checkNestingOrder(tokens: List[Token]): Boolean =
-    val stack = scala.collection.mutable.Stack[String]()
-    
-    tokens.foreach {
-      case Token.Delim(d) =>
-        if delimiterPairs.contains(d) then
-          // 開き括弧
-          stack.push(d)
-        else if delimiterPairs.values.toSet.contains(d) then
-          // 閉じ括弧
-          if stack.isEmpty then
-            return false
-          val open = stack.pop()
-          if delimiterPairs.get(open) != Some(d) then
-            return false
-      case _ => // 他のトークンは無視
+    boundary {
+      val stack = scala.collection.mutable.Stack[String]()
+      
+      tokens.foreach {
+        case Token.Delim(d) =>
+          if delimiterPairs.contains(d) then
+            // 開き括弧
+            stack.push(d)
+          else if delimiterPairs.values.toSet.contains(d) then
+            // 閉じ括弧
+            if stack.isEmpty then
+              boundary.break(false)
+            val open = stack.pop()
+            if delimiterPairs.get(open) != Some(d) then
+              boundary.break(false)
+        case _ => // 他のトークンは無視
+      }
+      
+      // 全て閉じられている必要がある
+      stack.isEmpty
     }
-    
-    // 全て閉じられている必要がある
-    stack.isEmpty
   
   /**
    * 識別子の命名規則を検証
