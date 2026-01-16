@@ -1,0 +1,5 @@
+// Test 07: Cons List
+= Cons (lambda a (lambda b (and a b)))
+= Nil false
+= myList (Cons 1 (Cons 2 (Cons 3 Nil)))
+myList

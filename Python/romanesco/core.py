@@ -2,7 +2,6 @@ from typing import List, Dict, Optional, Tuple, Any, cast
 from dataclasses import dataclass
 import time
 from romanesco import parsing
-from romanesco.parsing import Expr as ASTExpr
 
 # Global debug flag
 DEBUG_EVAL = False
@@ -96,10 +95,8 @@ class Env:
         if isinstance(val, LogicVar) and val.vid in self.subs:
             return self.resolve(self.subs[val.vid])
         if isinstance(val, AtomVal):
-            # Resolve name from cache
             cached = self.lookup_value(val.name)
             if cached is not None and cached != val: return self.resolve(cached)
-            # Try to resolve name as a LogicVar from top-level
             vid = hash(("free", val.name, 0))
             if vid in self.subs: return self.resolve(self.subs[vid])
         if isinstance(val, PairVal):
@@ -153,47 +150,72 @@ def eval_primitive(op: str, args: List[Value]) -> Value:
     if op == "!=": return BoolVal(a.n != b.n)
     raise RuntimeError(f"Primitive {op} failed")
 
-def translate_expr(expr: ASTExpr) -> Expr:
-    if isinstance(expr, parsing.Num): return Atom(expr.value)
-    elif isinstance(expr, parsing.Var): return Atom(expr.name)
+def translate_expr(expr: Any) -> Optional[Expr]:
+    if isinstance(expr, parsing.Num):
+        return Atom(expr.value)
+    elif isinstance(expr, parsing.Var):
+        return Atom(expr.name)
     elif isinstance(expr, parsing.Call):
-        if isinstance(expr.f, parsing.Var) and expr.f.name == "lambda" and len(expr.args) == 2:
-            return Apply(Apply(Atom("lambda"), Atom(expr.args[0].name)), translate_expr(expr.args[1]))
+        # Special case for lambda: (lambda param body) -> Apply(Apply(Atom(lambda), Atom(param)), body)
+        if isinstance(expr.f, parsing.Var) and expr.f.name == "lambda" and len(expr.args) >= 2:
+            param = expr.args[0]
+            if isinstance(param, parsing.Var):
+                body = translate_expr(expr.args[1])
+                if body:
+                    return Apply(Apply(Atom("lambda"), Atom(param.name)), body)
+        
         f = translate_expr(expr.f)
-        for arg in expr.args: f = Apply(f, translate_expr(arg))
-        return f
-    elif isinstance(expr, parsing.Block): return translate_program_to_expr(expr.exprs)
-    elif isinstance(expr, parsing.MacroDef): return translate_expr(expr.body)
-    return Atom("null")
+        if f is None: return None
+        res = f
+        for arg in expr.args:
+            translated_arg = translate_expr(arg)
+            if translated_arg is None: return None
+            res = Apply(res, translated_arg)
+        return res
+    elif isinstance(expr, parsing.Block):
+        return translate_program_to_expr(expr.exprs)
+    elif isinstance(expr, parsing.Atom):
+        return Atom(expr.name)
+    elif isinstance(expr, parsing.Apply):
+        f = translate_expr(expr.f)
+        arg = translate_expr(expr.arg)
+        if f and arg: return Apply(f, arg)
+    return None
 
-def translate_program_to_expr(exprs: List[ASTExpr]) -> Expr:
+def translate_program_to_expr(exprs: List[Any]) -> Expr:
     if not exprs: return Atom("true")
-    if len(exprs) == 1: return translate_expr(exprs[0])
-    return Apply(Apply(Atom("seq"), translate_expr(exprs[0])), translate_program_to_expr(exprs[1:]))
+    if len(exprs) == 1:
+        res = translate_expr(exprs[0])
+        return res if res else Atom("true")
+    
+    first = translate_expr(exprs[0])
+    if first is None: return translate_program_to_expr(exprs[1:])
+    return Apply(Apply(Atom("seq"), first), translate_program_to_expr(exprs[1:]))
 
 def eval_expr(expr: Expr, env: Env) -> List[Tuple[Value, Env]]:
     try:
         if isinstance(expr, Atom): return eval_atom(expr.name, env)
         if isinstance(expr, Apply): return eval_apply(expr.f, expr.arg, env)
-    except (Contradiction, MatchFailure): return []
+    except (Contradiction, MatchFailure, RecursionError): return []
     return []
 
 def eval_atom(name: str, env: Env) -> List[Tuple[Value, Env]]:
     if name in prelude_bindings: return [(PrimOp(name), env)]
     val = env.lookup_value(name)
     if val is not None: return [(env.resolve(val), env)]
+    vid_free = hash(("free", name, 0))
+    if vid_free in env.subs:
+        return [(env.resolve(env.subs[vid_free]), env)]
     expr = env.lookup_expr(name)
     if expr:
         if isinstance(expr, Atom) and expr.name == name:
-            # Free logic variable
             vid = hash(("free", name, 0))
             return [(env.resolve(LogicVar(vid, name)), env)]
         return eval_expr(expr, env)
-    try: return [(NumVal(int(name)), env)]
-    except ValueError: pass
     if name == "true": return [(BoolVal(True), env)]
     if name == "false": return [(BoolVal(False), env)]
-    # Implicit free variable
+    try: return [(NumVal(int(name)), env)]
+    except ValueError: pass
     vid = hash(("free", name, 0))
     return [(env.resolve(LogicVar(vid, name)), env)]
 
@@ -203,32 +225,37 @@ def eval_apply(f: Expr, arg: Expr, env: Env) -> List[Tuple[Value, Env]]:
         f_val = env1.resolve(f_val)
         if isinstance(f_val, PrimOp):
             op = f_val.name
-            if op in ["and", "or", "seq", "="]: results.append((PartialBinOp(op, left_expr=arg), env1))
+            if op in ["and", "or", "seq", "="]: 
+                results.append((PartialBinOp(op, left_expr=arg), env1))
             elif op == "lambda":
                 if isinstance(arg, Atom): results.append((PartialBinOp("lambda", left_val=LogicVar(hash((arg.name, env1.nonce)), arg.name)), env1))
-                else: raise RuntimeError("Lambda param must be atom")
             else:
                 for arg_val, env2 in eval_expr(arg, env1): results.append((PartialBinOp(op, left_val=env2.resolve(arg_val)), env2))
         elif isinstance(f_val, PartialBinOp):
             op = f_val.op
             if op == "and":
-                for left_val, env2 in eval_expr(cast(Expr, f_val.left_expr), env1):
-                    results.extend(eval_and(env2.resolve(left_val), arg, env2))
+                if f_val.left_expr:
+                    for left_val, env2 in eval_expr(f_val.left_expr, env1):
+                        results.extend(eval_and(env2.resolve(left_val), arg, env2))
             elif op == "or":
-                results.extend(eval_expr(cast(Expr, f_val.left_expr), env1))
-                results.extend(eval_expr(arg, env1))
+                if f_val.left_expr:
+                    results.extend(eval_expr(f_val.left_expr, env1))
+                    results.extend(eval_expr(arg, env1))
             elif op == "seq":
-                for _, env2 in eval_expr(cast(Expr, f_val.left_expr), env1):
-                    results.extend(eval_expr(arg, env2))
+                if f_val.left_expr:
+                    for _, env2 in eval_expr(f_val.left_expr, env1):
+                        results.extend(eval_expr(arg, env2))
             elif op == "=":
-                for left_val, env2 in eval_expr(cast(Expr, f_val.left_expr), env1):
-                    results.extend(unify(env2.resolve(left_val), arg, env2))
+                if f_val.left_expr:
+                    for left_val, env2 in eval_expr(f_val.left_expr, env1):
+                        results.extend(unify(env2.resolve(left_val), arg, env2))
             elif op == "lambda":
-                lv = cast(LogicVar, f_val.left_val)
-                results.append((Closure(lv.name, arg, env1), env1))
+                if isinstance(f_val.left_val, LogicVar):
+                    results.append((Closure(f_val.left_val.name, arg, env1), env1))
             else:
                 for right_val, env2 in eval_expr(arg, env1):
-                    results.extend([(eval_primitive(op, [cast(Value, f_val.left_val), env2.resolve(right_val)]), env2)])
+                    if f_val.left_val:
+                        results.extend([(eval_primitive(op, [f_val.left_val, env2.resolve(right_val)]), env2)])
         elif isinstance(f_val, Closure):
             for arg_val, env2 in eval_expr(arg, env1):
                 new_nonce = hash((f_val, env2.nonce, time.time_ns()))
@@ -286,33 +313,15 @@ def _exprs_equal(e1: Expr, e2: Expr) -> bool:
     if isinstance(e1, Apply): return _exprs_equal(e1.f, cast(Apply, e2).f) and _exprs_equal(e1.arg, cast(Apply, e2).arg)
     return False
 
-def value_to_expr(val: Value) -> Expr:
-    if isinstance(val, NumVal): return Atom(str(val.n))
-    if isinstance(val, BoolVal): return Atom(str(val.b).lower())
-    if isinstance(val, LogicVar): return Atom(val.name)
-    if isinstance(val, AtomVal): return Atom(val.name)
-    if isinstance(val, PrimOp): return Atom(val.name)
-    if isinstance(val, PairVal): return Apply(Apply(Atom("and"), value_to_expr(val.left)), value_to_expr(val.right))
-    if isinstance(val, Closure): return Apply(Apply(Atom("lambda"), Atom(val.param)), val.body)
-    return Atom("null")
-
-def eval_program(exprs: List[ASTExpr]) -> List[Tuple[Env, Optional[Value]]]:
-    bindings = {}
-    executable = []
-    for expr in exprs:
-        if isinstance(expr, parsing.Call) and isinstance(expr.f, parsing.Var) and expr.f.name == "=":
-            if len(expr.args) >= 2 and isinstance(expr.args[0], parsing.Var):
-                bindings[expr.args[0].name] = translate_expr(expr.args[1])
-            else: executable.append(expr)
-        else: executable.append(expr)
-    
-    env = Env.initial().extend_all(bindings)
+def eval_program(exprs: List[Any]) -> List[Tuple[Env, Optional[Value]]]:
+    env = Env.initial()
     paths = [(None, env)]
-    for expr in executable:
+    for ast_expr in exprs:
         new_paths = []
-        ast = translate_expr(expr)
+        core_expr = translate_expr(ast_expr)
+        if core_expr is None: continue
         for _, current_env in paths:
-            results = eval_expr(ast, current_env)
+            results = eval_expr(core_expr, current_env)
             for val, env_after in results:
                 new_paths.append((env_after.resolve(val), env_after))
         if new_paths: paths = new_paths

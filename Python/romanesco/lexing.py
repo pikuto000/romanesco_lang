@@ -26,6 +26,7 @@ class Keyword(Token): pass
 class WS(Token): pass
 class Number(Token): pass
 class Delim(Token): pass
+class String(Token): pass
 
 # ======================================
 # Tokenizer Types and Constructors

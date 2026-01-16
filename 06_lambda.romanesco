@@ -1,6 +1,0 @@
-// Test 06: Lambda function
-// Expected: result = 10
-
-= double (lambda x (+ x x))
-= result (double 5)
-result

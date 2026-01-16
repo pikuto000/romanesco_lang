@@ -1,0 +1,4 @@
+// Test 06: Lambda
+= double (lambda x (+ x x))
+= result (double 5)
+result

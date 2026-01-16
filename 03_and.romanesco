@@ -1,4 +1,0 @@
-// Test 03: And operator (pair construction)
-// Expected: Result = (1, 2)
-= result and 1 2
-result

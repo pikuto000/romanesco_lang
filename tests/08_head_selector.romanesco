@@ -1,16 +1,10 @@
-// Test 08: Selector (head function with pattern matching)
-// Expected: result = 1
-
+// Test 08: Selector
 = Cons (lambda a (lambda b (and a b)))
 = Nil true
-
 = myList (Cons 1 (Cons 2 Nil))
-
-// head extracts first element
 = head lambda lst {
   = lst (Cons first rest)
   first
 }
-
 = result (head myList)
 result

@@ -1,0 +1,8 @@
+syntax [L] = [R] -> = L R
+syntax [L] + [R] -> + L R
+
+= prefixSum + 1 2
+prefixSum
+
+infixSum = 3 + 4
+infixSum

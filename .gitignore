@@ -31,13 +31,13 @@ metals.sbt
 .idea_modules
 /.worksheet/
 
-# Scala CLI
+# Logs
+*.log
 
-.scala-build/
+# Temporary test files
+test_*.romanesco
+macros.romanesco
 
-
-
-# Python
 
 __pycache__/
 
