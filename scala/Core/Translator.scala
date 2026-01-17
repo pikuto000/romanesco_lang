@@ -67,3 +67,4 @@ object Translator:
   
   private def isBinOp(name: String): Boolean =
     Set("+", "-", "*", "/", ">", "<", ">=", "<=", "==", "!=", "and", "or", "=", "seq").contains(name)
+  

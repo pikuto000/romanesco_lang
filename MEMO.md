@@ -11,7 +11,7 @@
 
 ### 2. 構造的書き換え (現在の実装)
 トークン列を論理的な「ユニット（Unit）」に分割してからマッチングを行う方式。
-- **ユニットの定義**: 
+- **ユニットの定義**:
     - 括弧 `()` や `{}` で囲まれたバランスの取れたグループ
     - 演算子の項数（Arity）に基づいたプレフィックス適用
     - 単一の識別子や数値
@@ -24,32 +24,19 @@ Python版およびScala版の両方で、評価結果を `List[(Value, Env)]` �
 - `or` 演算子による分岐の探索。
 - `unify`（単一化）による制約の解消と環境へのバインディング。
 
+## 暗黙的ビット幅推論 (Z3-based)
+Romanescoランタイムは、完全に暗黙的なZ3ベースのビット幅推論システムを採用している。
+
+### 特徴
+- **Zero-Syntax Control**: 算術演算子（`+`, `*`等）が自動的にビット幅推論をトリガーする。明示的な型宣言は不要。
+- **最適化**:
+    - `x + 0`: 幅を維持。
+    - `x * 1`: 幅を維持。
+    - `x * 0`: 1ビットに短縮。
+- **安全なフォールバック**: ビット幅を特定できない場合は無限精度（Z3 Int）として扱い、安全性を確保。
+- **グローバル最適化**: `z3.Optimize` を使用し、プログラム全体で制約を満たしつつ最小のビット幅を算出する。
+
 ## 実装のパリティ
-Python版でのプロトタイピングとデバッグを経て、洗練されたロジックをScala版へ逆輸入（Backport）した。
-- Python: `RewritingEngine`, `match_one_expression`
-- Scala: `RewritingEngine`, `matchOneExpression`
-
-### Implicit Bit-Width Inference (Z3-based)
-
-The Romanesco runtime now employs a fully implicit, Z3-based bit-width inference system. Users no longer need to declare `BitVec` types or bit-widths manually.
-
-#### Key Features:
-- **Zero-Syntax Control**: Arithmetic operators automatically trigger bit-width inference.
-- **Constant Propagation**: The inference engine performs constant folding during analysis. If a variable is bound to a constant (e.g., `= x 15`), its exact bit-length is used.
-- **Value-Aware Optimization**: 
-  - `x + 0` or `0 + x`: Width remains the same as `x`.
-  - `x * 1` or `1 * x`: Width remains the same as `x`.
-  - `x * 0`: Width becomes 1 bit.
-  - Constant expressions (e.g., `15 + 1`) result in the exact bit-length of the result (`5` bits).
-- **Safety Guaranteed (Fallback)**: When values are unknown, safe growth rules apply (`+` adds 1 bit, `*` sums widths).
-- **Global Optimization**: Uses `z3.Optimize` to find the minimum global bit-widths that satisfy all constraints across the entire program.
-- **Unification**: Operands of binary operations are unified to the same bit-width where possible, mimicking hardware signal alignment.
-- **Implicit Casting**: Assignments (`=`) automatically cast values to the inferred width of the target variable.
-
-#### Examples:
-```romanesco
-= x 15      // Inferred as 4-bit
-= y 1       // Unified to 4-bit (due to addition with x)
-= z + x y   // Inferred as 5-bit (max(4,4)+1)
-z           // Result: 16 (Safe from overflow)
-```
+Python版でのプロトタイピングとデバッグを経て、洗練されたロジックをScala版へ移植した。
+- `WidthInference` クラスによる推論の統合。
+- `Solver` によるトークンツリーの枝刈りへの推論結果の活用。

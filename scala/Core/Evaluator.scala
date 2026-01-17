@@ -28,7 +28,10 @@ object Evaluator:
         case Some(Atom(n)) if n == name => List((AtomVal(name), env))
         case Some(expr) => eval(expr, env)
         case None =>
-          if name.toIntOption.isDefined then List((NumVal(name.toIntOption.get), env))
+          if name.toIntOption.isDefined then 
+            val iv = name.toInt
+            val w = env.lookupWidth(name).getOrElse(Math.max(1L, java.math.BigInteger.valueOf(iv.toLong).bitLength().toLong))
+            List((NumVal(iv, Some(w)), env))
           else if name == "true" then List((BoolVal(true), env))
           else if name == "false" then List((BoolVal(false), env))
           else List((AtomVal(name), env))
@@ -118,7 +121,7 @@ object Evaluator:
     case _ => v
 
   private def valueToExpr(value: Value): Expr = value match
-    case NumVal(n) => Atom(n.toString)
+    case NumVal(n, _) => Atom(n.toString)
     case BoolVal(b) => Atom(b.toString)
     case AtomVal(name) => Atom(name)
     case PrimOp(name) => Atom(name)
@@ -126,21 +129,52 @@ object Evaluator:
     case Closure(param, body, _) => Apply(Apply(Atom("lambda"), Atom(param)), body)
     case _ => Atom("null")
 
-  def evalProgram(stmts: List[Parsing.Stmt]): (Env, Option[Value]) =
-    var paths = List[(Option[Value], Env)]((None, Env.initial))
-    
-    for (case Parsing.Stmt.ExprStmt(astExpr) <- stmts) do
-      val coreExpr = Translator.translateExpr(astExpr)
-      paths = paths.flatMap { case (_, currentEnv) =>
-        coreExpr match
-          case Apply(Apply(Atom("="), Atom(name)), valueExpr) =>
-            eval(valueExpr, currentEnv).map { case (v, e) =>
-              (Some(v), e.extend(name, valueToExpr(v)))
-            }
-          case _ =>
-            eval(coreExpr, currentEnv).map { case (v, e) => (Some(v), e) }
-      }
-    
-    paths.headOption match
-      case Some((v, e)) => (e, v.map(res => resolve(res, e)))
-      case None => (Env.initial, None)
+    def evalProgram(stmts: List[Parsing.Stmt]): (Env, Option[Value]) =
+
+      val astExprs = stmts.collect { case Parsing.Stmt.ExprStmt(e) => e }
+
+      val coreExprs = astExprs.map(Translator.translateExpr)
+
+      
+
+      val inference = new Solver.WidthInference()
+
+      val widths = inference.infer(astExprs)
+
+      
+
+      val initialEnv = Env.initial.extendAllWidths(widths)
+
+      var paths = List[(Option[Value], Env)]((None, initialEnv))
+
+      
+
+      for (coreExpr <- coreExprs) do
+
+        paths = paths.flatMap { case (_, currentEnv) =>
+
+          coreExpr match
+
+            case Apply(Apply(Atom("="), Atom(name)), valueExpr) =>
+
+              eval(valueExpr, currentEnv).map { case (v, e) =>
+
+                (Some(v), e.extend(name, valueToExpr(v)))
+
+              }
+
+            case _ =>
+
+              eval(coreExpr, currentEnv).map { case (v, e) => (Some(v), e) }
+
+        }
+
+      
+
+      paths.headOption match
+
+        case Some((v, e)) => (e, v.map(res => resolve(res, e)))
+
+        case None => (initialEnv, None)
+
+  

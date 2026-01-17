@@ -176,5 +176,27 @@ def lexAll(
   mode: LexMode,
   debug: Boolean = false
 ): tree[Token] =
-  // TODO: modeに応じたフィルタリング
-  lexToTree(input, tokenizers, debug)
+  val fullTree = lexToTree(input, tokenizers, debug)
+  
+  mode match
+    case LexMode.All => fullTree
+    case LexMode.BestOnly =>
+      val paths = fullTree.flattenPaths
+      if paths.isEmpty then tree.DeadEnd
+      else
+        val best = paths.minBy(_.length)
+        rebuildTree(List(best))
+    case LexMode.TopN(n) =>
+      val paths = fullTree.flattenPaths.take(n)
+      if paths.isEmpty then tree.DeadEnd
+      else rebuildTree(paths)
+
+def rebuildTree(paths: List[List[Token]]): tree[Token] =
+  if paths.isEmpty then tree.DeadEnd
+  else
+    tree.fork(paths.map(buildPath))
+
+private def buildPath(tokens: List[Token]): tree[Token] =
+  tokens match
+    case Nil => tree.Node(Vector.empty, List.empty)
+    case head :: tail => tree.single(head, buildPath(tail))

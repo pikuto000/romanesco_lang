@@ -142,7 +142,22 @@ object Solver:
     val paths = tokenTree.flattenPaths.map(_.toList)
     
     // 各パスを検証
-    val validPaths = paths.filter(checkTokenConstraints)
+    val validPaths = paths.filter { tokens =>
+      if !checkTokenConstraints(tokens) then false
+      else
+        // パースして推論可能かチェック
+        try
+          val filtered = tokens.filterNot(_.isInstanceOf[Token.WS])
+          val engine = new Parsing.RewritingEngine(filtered, false)
+          val interpretations = engine.run()
+          
+          interpretations.exists { stmts =>
+            val astExprs = stmts.collect { case Stmt.ExprStmt(e) => e }
+            checkASTConstraints(astExprs)
+          }
+        catch
+          case _: Exception => false
+    }
     
     if validPaths.isEmpty then
       tree.DeadEnd
@@ -172,16 +187,13 @@ object Solver:
    * 
    * 例：スコープ解決、名前の一意性など
    * 
-   * @param stmts ステートメント列
+   * @param exprs 式のリスト
    * @return 制約を満たすか
    */
-  def checkASTConstraints(stmts: List[Stmt]): Boolean =
-    // TODO: 実装
-    // 1. 変数のスコープ検証
-    // 2. 関数定義の一意性
-    // 3. 制約式の検証
-    
-    ??? // 暫定:NotImplementedError
+  def checkASTConstraints(exprs: List[Expr]): Boolean =
+    val inf = new WidthInference()
+    val res = inf.infer(exprs)
+    res.nonEmpty
   
   /**
    * 制約式をSMT-LIB形式に変換
@@ -193,12 +205,8 @@ object Solver:
    * @return Z3の論理式
    */
   def exprToZ3(expr: Expr, ctx: Context): BoolExpr =
-    // TODO: 実装
-    // 1. 二項演算の変換
-    // 2. 関数呼び出しの変換
-    // 3. 制約の合成
-    
-    ??? // 暫定:NotImplementedError
+    // TODO: 必要に応じて実装
+    ctx.mkTrue()
 
 /**
  * 制約の種類
