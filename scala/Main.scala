@@ -52,7 +52,7 @@ import java.nio.charset.StandardCharsets
   val lexEnd = System.currentTimeMillis()
   
   if useDebug then
-    println(rawTokenTree.drawTree)
+    println(s"${rawTokenTree.drawTree}".replace("\n", "\n  ").replace("\r","\\r"))
   
   println("== Lexing (before pruning) ==")
   val rawPaths = rawTokenTree.flattenPaths.map(_.toList)
@@ -103,7 +103,7 @@ import java.nio.charset.StandardCharsets
         
         println(s"  Environment bindings:")
         env.bindings.filterKeys(!Prelude.bindings.contains(_)).foreach { case (name, expr) =>
-          println(s"    $name = ${Translator.showExpr(expr)}")
+          println(s"    $name = ${Translator.showExpr(expr)}".replace("\n", "\n  ").replace("\r","\\r"))
         }
         
         println()
@@ -221,7 +221,7 @@ def printParsingResults(astTree: Undeterminable.tree[List[Parsing.Stmt]], timeMs
     println(s"  Parse $i:")
     stmts.foreach { st =>
       st.foreach { s =>
-        println(s"    ${Parsing.Stmt.show(s)}")
+        println(s"    ${Parsing.Stmt.show(s)}".replace("\n", "\n  ").replace("\r","\\r"))
       }
     }
   }

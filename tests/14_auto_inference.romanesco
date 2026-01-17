@@ -1,0 +1,6 @@
+// Test 14: Automatic Bit-Width Inference
+// Correct prefix notation: = z + x y
+= x 15
+= y 1
+= z + x y
+z

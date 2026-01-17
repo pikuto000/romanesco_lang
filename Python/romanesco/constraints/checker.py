@@ -1,8 +1,8 @@
 import z3
 from typing import List, Set
-from romanesco import undeterminable
-from romanesco.lexing import Token, Delim, Ident, Number
-from romanesco.parsing import Expr, Num, Var, Call, Block
+from .. import undeterminable
+from ..lexing import Token, Delim, Ident, Number
+from ..syntax import ast
 
 # ======================================
 # Solver (Z3 / Constraints)
@@ -62,48 +62,48 @@ def check_identifier_rules(tokens: List[Token]) -> bool:
 def check_token_constraints(tokens: List[Token]) -> bool:
     return check_delimiter_balance(tokens) and check_identifier_rules(tokens)
 
-def check_ast_constraints(exprs: List[Expr]) -> bool:
+def check_ast_constraints(exprs: List[ast.Expr]) -> bool:
     # 1. Simple Scope Validation
-    defined_vars = {"true", "false", "and", "or", "seq", "=", "+", "-", "*", "/", ">", "<", ">=", "<=", "==", "!=", "lambda"}
+    defined_vars = {"true", "false", "and", "or", "seq", "=", "+", "-", "*", "/", ">", "<", ">=", "<=", "==", "!=", "lambda", "bv", "bvadd", "bvsub", "bvand", "bvor"}
     
-    def check_expr(expr: Expr, local_vars: Set[str]) -> bool:
-        if isinstance(expr, Num):
+    def check_expr(expr: ast.Expr, local_vars: Set[str]) -> bool:
+        if isinstance(expr, ast.Num):
             return True
-        elif isinstance(expr, Var):
+        elif isinstance(expr, ast.Var):
             return True
-        elif isinstance(expr, Call):
+        elif isinstance(expr, ast.Call):
             # '=' in expression
-            if isinstance(expr.f, Var) and expr.f.name == "=":
-                def collect_vars(e: Expr):
-                    if isinstance(e, Var): local_vars.add(e.name)
-                    elif isinstance(e, Call):
+            if isinstance(expr.f, ast.Var) and expr.f.name == "=":
+                def collect_vars(e: ast.Expr):
+                    if isinstance(e, ast.Var): local_vars.add(e.name)
+                    elif isinstance(e, ast.Call):
                         collect_vars(e.f)
                         for a in e.args: collect_vars(a)
                 for arg in expr.args: collect_vars(arg)
                 return True
             # 'lambda' in expression
-            if isinstance(expr.f, Var) and expr.f.name == "lambda" and len(expr.args) >= 2:
+            if isinstance(expr.f, ast.Var) and expr.f.name == "lambda" and len(expr.args) >= 2:
                 param = expr.args[0]
-                if isinstance(param, Var):
+                if isinstance(param, ast.Var):
                     new_locals = local_vars.copy()
                     new_locals.add(param.name)
                     return check_expr(expr.args[1], new_locals)
             
             return check_expr(expr.f, local_vars) and all(check_expr(arg, local_vars) for arg in expr.args)
-        elif isinstance(expr, Block):
+        elif isinstance(expr, ast.Block):
             current_locals = local_vars.copy()
             for e in expr.exprs:
                 if not check_expr(e, current_locals): return False
-                if isinstance(e, Call) and isinstance(e.f, Var) and e.f.name == "=":
-                    if e.args and isinstance(e.args[0], Var):
+                if isinstance(e, ast.Call) and isinstance(e.f, ast.Var) and e.f.name == "=":
+                    if e.args and isinstance(e.args[0], ast.Var):
                         current_locals.add(e.args[0].name)
             return True
-        return True # Default for Atom/Apply
+        return True 
 
     # Top-level pass
     for expr in exprs:
-        if isinstance(expr, Call) and isinstance(expr.f, Var) and expr.f.name == "=":
-            if expr.args and isinstance(expr.args[0], Var):
+        if isinstance(expr, ast.Call) and isinstance(expr.f, ast.Var) and expr.f.name == "=":
+            if expr.args and isinstance(expr.args[0], ast.Var):
                 defined_vars.add(expr.args[0].name)
             
     for expr in exprs:

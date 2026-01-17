@@ -17,14 +17,12 @@ def run_tests():
                 ["python", "Python/main.py", test_file, "eval", "debug"],
                 capture_output=True,
                 text=True,
-                encoding='utf-8'
+                encoding='utf-8',
+                errors='replace'
             )
             
             if result.stdout:
-                # Filter out unimportant lines and show the result
-                lines = [l for l in result.stdout.splitlines() if l.startswith("Result:") or "solutions" in l]
-                for line in lines:
-                    print(line)
+                print(result.stdout)
             
             if result.stderr:
                 print(f"Error:\n{result.stderr}")

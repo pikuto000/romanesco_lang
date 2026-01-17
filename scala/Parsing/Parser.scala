@@ -306,7 +306,6 @@ class RewritingEngine(initialTokens: List[Token], debug: Boolean = false):
                   val args = interpretations.head.drop(1).collect { case Stmt.ExprStmt(arg) => arg }
                   Expr.Call(e, args)
                 else e
-              case _ => Expr.Var("null")
           else Expr.Var("null")
 
         case "{" =>

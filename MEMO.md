@@ -29,6 +29,23 @@ Python版でのプロトタイピングとデバッグを経て、洗練され�
 - Python: `RewritingEngine`, `match_one_expression`
 - Scala: `RewritingEngine`, `matchOneExpression`
 
-## 今後の課題
-- **衛生的なマクロ**: 展開時の名前衝突を防ぐための Nonce（一意な接尾辞）の導入。
-- **Z3統合の深化**: パーサーが生成した複数の解釈を、Z3による意味論的検証で絞り込む。
+### Implicit Bit-Width Inference (Z3-based)
+
+The Romanesco runtime now employs a fully implicit, Z3-based bit-width inference system. Users no longer need to declare `BitVec` types or bit-widths manually.
+
+#### Key Features:
+- **Zero-Syntax Control**: Arithmetic operators (`+`, `-`, `*`, `/`) automatically trigger bit-width inference when applied to integer literals or variables.
+- **Safety Guaranteed (Bit-growth)**:
+  - `x + y`: Result width is `max(width(x), width(y)) + 1` to prevent overflow.
+  - `x * y`: Result width is `width(x) + width(y)`.
+- **Global Optimization**: Uses `z3.Optimize` to find the minimum global bit-widths that satisfy all constraints across the entire program.
+- **Unification**: Operands of binary operations are unified to the same bit-width where possible, mimicking hardware signal alignment.
+- **Implicit Casting**: Assignments (`=`) automatically cast values to the inferred width of the target variable.
+
+#### Examples:
+```romanesco
+= x 15      // Inferred as 4-bit
+= y 1       // Unified to 4-bit (due to addition with x)
+= z + x y   // Inferred as 5-bit (max(4,4)+1)
+z           // Result: 16 (Safe from overflow)
+```

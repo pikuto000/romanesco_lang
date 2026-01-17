@@ -1,0 +1,6 @@
+// Test 15: Multiplication Bit-Width Growth
+// 3 (2 bits) * 7 (3 bits) = 21 (5 bits)
+= a 3
+= b 7
+= c * a b
+c

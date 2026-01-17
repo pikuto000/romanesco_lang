@@ -1,0 +1,9 @@
+// Test 16: Complex Propagation
+// x=10(4bit), y=20(5bit)
+// a = x + y -> 6bit
+// b = a + x -> 7bit
+= x 10
+= y 20
+= a + x y
+= b + a x
+b
