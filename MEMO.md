@@ -34,10 +34,14 @@ Python版でのプロトタイピングとデバッグを経て、洗練され�
 The Romanesco runtime now employs a fully implicit, Z3-based bit-width inference system. Users no longer need to declare `BitVec` types or bit-widths manually.
 
 #### Key Features:
-- **Zero-Syntax Control**: Arithmetic operators (`+`, `-`, `*`, `/`) automatically trigger bit-width inference when applied to integer literals or variables.
-- **Safety Guaranteed (Bit-growth)**:
-  - `x + y`: Result width is `max(width(x), width(y)) + 1` to prevent overflow.
-  - `x * y`: Result width is `width(x) + width(y)`.
+- **Zero-Syntax Control**: Arithmetic operators automatically trigger bit-width inference.
+- **Constant Propagation**: The inference engine performs constant folding during analysis. If a variable is bound to a constant (e.g., `= x 15`), its exact bit-length is used.
+- **Value-Aware Optimization**: 
+  - `x + 0` or `0 + x`: Width remains the same as `x`.
+  - `x * 1` or `1 * x`: Width remains the same as `x`.
+  - `x * 0`: Width becomes 1 bit.
+  - Constant expressions (e.g., `15 + 1`) result in the exact bit-length of the result (`5` bits).
+- **Safety Guaranteed (Fallback)**: When values are unknown, safe growth rules apply (`+` adds 1 bit, `*` sums widths).
 - **Global Optimization**: Uses `z3.Optimize` to find the minimum global bit-widths that satisfy all constraints across the entire program.
 - **Unification**: Operands of binary operations are unified to the same bit-width where possible, mimicking hardware signal alignment.
 - **Implicit Casting**: Assignments (`=`) automatically cast values to the inferred width of the target variable.

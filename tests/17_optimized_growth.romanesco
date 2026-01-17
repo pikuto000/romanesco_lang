@@ -1,0 +1,8 @@
+// Test 17: Optimized Bit-Width Growth
+// x=15 (4bit). z = x + 0 should remain 4bit.
+// w = x + 1 should grow to 5bit.
+= x 15
+= z + x 0
+= w + x 1
+z
+w
