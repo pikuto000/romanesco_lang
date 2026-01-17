@@ -1,126 +1,58 @@
-import z3
-from typing import List, Set
-from .. import undeterminable
-from ..lexing import Token, Delim, Ident, Number
+from typing import List, Dict, Optional
 from ..syntax import ast
+from ..inference.solver import WidthInference
+from ..lexing import Token, WS
+from .. import undeterminable
 
-# ======================================
-# Solver (Z3 / Constraints)
-# ======================================
-
-delimiter_pairs = {
-    "(": ")",
-    "{": "}",
-    "[": "]"
-}
-
-def check_delimiter_balance(tokens: List[Token]) -> bool:
-    if not check_nesting_order(tokens):
-        return False
-
-    ctx = z3.Context()
-    solver = z3.Solver(ctx=ctx)
+def prune_token_tree(tree: undeterminable.Tree[Token]) -> undeterminable.Tree[Token]:
+    """
+    Use Z3 to eliminate tokenization paths that will never satisfy bit-width constraints.
+    """
+    paths = tree.flatten_paths()
+    valid_paths = []
     
-    for open_char, close_char in delimiter_pairs.items():
-        open_count = sum(1 for t in tokens if isinstance(t, Delim) and t.lexeme == open_char)
-        close_count = sum(1 for t in tokens if isinstance(t, Delim) and t.lexeme == close_char)
-        
-        open_var = z3.Int(f"open_{open_char}", ctx=ctx)
-        close_var = z3.Int(f"close_{close_char}", ctx=ctx)
-        
-        solver.add(open_var == open_count)
-        solver.add(close_var == close_count)
-        solver.add(open_var == close_var)
-        
-    return solver.check() == z3.sat
-
-def check_nesting_order(tokens: List[Token]) -> bool:
-    stack: List[str] = []
-    close_chars = set(delimiter_pairs.values())
+    # We need a way to quickly check if a token path is 'plausible'
+    # For now, we'll try to parse and infer. If it fails Unsat, it's an invalid path.
+    from ..parser.main import parse_all
     
-    for t in tokens:
-        if isinstance(t, Delim):
-            d = t.lexeme
-            if d in delimiter_pairs:
-                stack.append(d)
-            elif d in close_chars:
-                if not stack: return False
-                open_char = stack.pop()
-                if delimiter_pairs.get(open_char) != d: return False
-    return len(stack) == 0
-
-def check_identifier_rules(tokens: List[Token]) -> bool:
-    for t in tokens:
-        if isinstance(t, Ident):
-            if not t.lexeme: return False
-            first = t.lexeme[0]
-            if not (first.isalpha() or first == '_'): return False
-        elif isinstance(t, Number):
-            if not t.lexeme.isdigit(): return False
-    return True
-
-def check_token_constraints(tokens: List[Token]) -> bool:
-    return check_delimiter_balance(tokens) and check_identifier_rules(tokens)
+    for tokens in paths:
+        try:
+            # Filter WS for parsing
+            filtered = [t for t in tokens if not isinstance(t, WS)]
+            ast_tree = parse_all(filtered)
+            ast_paths = ast_tree.flatten_paths()
+            
+            is_plausible = False
+            for exprs in ast_paths:
+                # exprs is List[ast.Expr]
+                inf = WidthInference()
+                # If Z3 finds it SAT, this token path is plausible
+                if inf.infer(exprs):
+                    is_plausible = True
+                    break
+            
+            if is_plausible:
+                valid_paths.append(tokens)
+        except:
+            # If it doesn't even parse, it's not a valid path
+            continue
+            
+    if not valid_paths:
+        return undeterminable.DeadEnd()
+        
+    return _rebuild_tree(valid_paths)
 
 def check_ast_constraints(exprs: List[ast.Expr]) -> bool:
-    # 1. Simple Scope Validation
-    defined_vars = {"true", "false", "and", "or", "seq", "=", "+", "-", "*", "/", ">", "<", ">=", "<=", "==", "!=", "lambda", "bv", "bvadd", "bvsub", "bvand", "bvor"}
-    
-    def check_expr(expr: ast.Expr, local_vars: Set[str]) -> bool:
-        if isinstance(expr, ast.Num):
-            return True
-        elif isinstance(expr, ast.Var):
-            return True
-        elif isinstance(expr, ast.Call):
-            # '=' in expression
-            if isinstance(expr.f, ast.Var) and expr.f.name == "=":
-                def collect_vars(e: ast.Expr):
-                    if isinstance(e, ast.Var): local_vars.add(e.name)
-                    elif isinstance(e, ast.Call):
-                        collect_vars(e.f)
-                        for a in e.args: collect_vars(a)
-                for arg in expr.args: collect_vars(arg)
-                return True
-            # 'lambda' in expression
-            if isinstance(expr.f, ast.Var) and expr.f.name == "lambda" and len(expr.args) >= 2:
-                param = expr.args[0]
-                if isinstance(param, ast.Var):
-                    new_locals = local_vars.copy()
-                    new_locals.add(param.name)
-                    return check_expr(expr.args[1], new_locals)
-            
-            return check_expr(expr.f, local_vars) and all(check_expr(arg, local_vars) for arg in expr.args)
-        elif isinstance(expr, ast.Block):
-            current_locals = local_vars.copy()
-            for e in expr.exprs:
-                if not check_expr(e, current_locals): return False
-                if isinstance(e, ast.Call) and isinstance(e.f, ast.Var) and e.f.name == "=":
-                    if e.args and isinstance(e.args[0], ast.Var):
-                        current_locals.add(e.args[0].name)
-            return True
-        return True 
+    """
+    Check if a given AST path satisfies bit-width constraints.
+    """
+    inf = WidthInference()
+    res = inf.infer(exprs)
+    return len(res) > 0
 
-    # Top-level pass
-    for expr in exprs:
-        if isinstance(expr, ast.Call) and isinstance(expr.f, ast.Var) and expr.f.name == "=":
-            if expr.args and isinstance(expr.args[0], ast.Var):
-                defined_vars.add(expr.args[0].name)
-            
-    for expr in exprs:
-        if not check_expr(expr, set()): return False
-    return True
-
-def prune_token_tree(token_tree: undeterminable.Tree[Token]) -> undeterminable.Tree[Token]:
-    paths = token_tree.flatten_paths()
-    valid_paths = [p for p in paths if check_token_constraints(p)]
-    if not valid_paths: return undeterminable.DeadEnd()
-    return rebuild_tree(valid_paths)
-
-def rebuild_tree(paths: List[List[Token]]) -> undeterminable.Tree[Token]:
+def _rebuild_tree(paths: List[List[Token]]) -> undeterminable.Tree[Token]:
     if not paths: return undeterminable.DeadEnd()
-    branches = [build_path(p) for p in paths]
-    return undeterminable.fork(branches)
-
-def build_path(tokens: List[Token]) -> undeterminable.Tree[Token]:
-    if not tokens: return undeterminable.Node([], [])
-    return undeterminable.single(tokens[0], build_path(tokens[1:]))
+    def build_path(tokens: List[Token]) -> undeterminable.Tree[Token]:
+        if not tokens: return undeterminable.Node([], [])
+        return undeterminable.single(tokens[0], build_path(tokens[1:]))
+    return undeterminable.fork([build_path(p) for p in paths])

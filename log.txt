@@ -1,1237 +1,387 @@
-[info] welcome to sbt 1.12.0 (Oracle Corporation Java 25.0.1)
-[info] loading settings for project romanesco-build-build from metals.sbt...
-[info] loading project definition from C:\Users\Cocoa\romanesco\project\project
-[info] loading settings for project romanesco-build from metals.sbt...
-[info] loading project definition from C:\Users\Cocoa\romanesco\project
-[info] loading settings for project root from build.sbt...
-[info] set current project to romanesco (in build file:/C:/Users/Cocoa/romanesco/)
-[info] running run tests/09_infix_macro.romanesco debug eval prune
-=== Romanesco Compiler ===
-Input: tests/09_infix_macro.romanesco
-Mode: All
-Z3 Pruning: enabled
+=== Romanesco Compiler (Python Port) ===
+Input: C:\Users\Cocoa\romanesco\tests\08_head_selector.romanesco
+Mode: <romanesco.lexing.All object at 0x0000044544597090>
+Z3 Pruning: disabled
 Debug mode: enabled
 Evaluation: enabled
-Input size: 107 chars
 
-[DEBUG] pos=0: char='s' remaining='syntax [L]...'
-[DEBUG]   Tokenizer matched: syntax@6
-[DEBUG] pos=6: char=' ' remaining=' [L] = [R]...'
-[DEBUG]   Tokenizer matched:  @7
-[DEBUG] pos=7: char='[' remaining='[L] = [R] ...'
-[DEBUG]   Tokenizer matched: [@8
-[DEBUG] pos=8: char='L' remaining='L] = [R] -...'
-[DEBUG]   Tokenizer matched: L@9
-[DEBUG] pos=9: char=']' remaining='] = [R] ->...'
-[DEBUG]   Tokenizer matched: ]@10
-[DEBUG] pos=10: char=' ' remaining=' = [R] -> ...'
-[DEBUG]   Tokenizer matched:  @11
-[DEBUG] pos=11: char='=' remaining='= [R] -> =...'
-[DEBUG]   Tokenizer matched: =@12
-[DEBUG] pos=12: char=' ' remaining=' [R] -> = ...'
-[DEBUG]   Tokenizer matched:  @13
-[DEBUG] pos=13: char='[' remaining='[R] -> = L...'
-[DEBUG]   Tokenizer matched: [@14
-[DEBUG] pos=14: char='R' remaining='R] -> = L ...'
-[DEBUG]   Tokenizer matched: R@15
-[DEBUG] pos=15: char=']' remaining='] -> = L R...'
-[DEBUG]   Tokenizer matched: ]@16
-[DEBUG] pos=16: char=' ' remaining=' -> = L R\n...'
-[DEBUG]   Tokenizer matched:  @17
-[DEBUG] pos=17: char='-' remaining='-> = L R\ns...'
-[DEBUG]   Tokenizer matched: ->@19
-[DEBUG] pos=19: char=' ' remaining=' = L R\nsyn...'
-[DEBUG]   Tokenizer matched:  @20
-[DEBUG] pos=20: char='=' remaining='= L R\nsynt...'
-[DEBUG]   Tokenizer matched: =@21
-[DEBUG] pos=21: char=' ' remaining=' L R\nsynta...'
-[DEBUG]   Tokenizer matched:  @22
-[DEBUG] pos=22: char='L' remaining='L R\nsyntax...'
-[DEBUG]   Tokenizer matched: L@23
-[DEBUG] pos=23: char=' ' remaining=' R\nsyntax ...'
-[DEBUG]   Tokenizer matched:  @24
-[DEBUG] pos=24: char='R' remaining='R\nsyntax [...'
-[DEBUG]   Tokenizer matched: R@25
-[DEBUG] pos=25: char='\n' remaining='\nsyntax [L...'
-[DEBUG]   Tokenizer matched: \n@26
-[DEBUG] pos=26: char='s' remaining='syntax [L]...'
-[DEBUG]   Tokenizer matched: syntax@32
-[DEBUG] pos=32: char=' ' remaining=' [L] + [R]...'
-[DEBUG]   Tokenizer matched:  @33
-[DEBUG] pos=33: char='[' remaining='[L] + [R] ...'
-[DEBUG]   Tokenizer matched: [@34
-[DEBUG] pos=34: char='L' remaining='L] + [R] -...'
-[DEBUG]   Tokenizer matched: L@35
-[DEBUG] pos=35: char=']' remaining='] + [R] ->...'
-[DEBUG]   Tokenizer matched: ]@36
-[DEBUG] pos=36: char=' ' remaining=' + [R] -> ...'
-[DEBUG]   Tokenizer matched:  @37
-[DEBUG] pos=37: char='+' remaining='+ [R] -> +...'
-[DEBUG]   Tokenizer matched: +@38
-[DEBUG] pos=38: char=' ' remaining=' [R] -> + ...'
-[DEBUG]   Tokenizer matched:  @39
-[DEBUG] pos=39: char='[' remaining='[R] -> + L...'
-[DEBUG]   Tokenizer matched: [@40
-[DEBUG] pos=40: char='R' remaining='R] -> + L ...'
-[DEBUG]   Tokenizer matched: R@41
-[DEBUG] pos=41: char=']' remaining='] -> + L R...'
-[DEBUG]   Tokenizer matched: ]@42
-[DEBUG] pos=42: char=' ' remaining=' -> + L R\n...'
-[DEBUG]   Tokenizer matched:  @43
-[DEBUG] pos=43: char='-' remaining='-> + L R\n\n...'
-[DEBUG]   Tokenizer matched: ->@45
-[DEBUG] pos=45: char=' ' remaining=' + L R\n\n= ...'
+[DEBUG] pos=0: char='/' remaining='// Test 08...'
+[DEBUG]   Tokenizer matched: // Test 08: Selector\n@21
+[DEBUG] pos=21: char='=' remaining='= Cons (la...'
+[DEBUG]   Tokenizer matched: =@22
+[DEBUG] pos=22: char=' ' remaining=' Cons (lam...'
+[DEBUG]   Tokenizer matched:  @23
+[DEBUG] pos=23: char='C' remaining='Cons (lamb...'
+[DEBUG]   Tokenizer matched: Cons@27
+[DEBUG] pos=27: char=' ' remaining=' (lambda a...'
+[DEBUG]   Tokenizer matched:  @28
+[DEBUG] pos=28: char='(' remaining='(lambda a ...'
+[DEBUG]   Tokenizer matched: (@29
+[DEBUG] pos=29: char='l' remaining='lambda a (...'
+[DEBUG]   Tokenizer matched: lambda@35
+[DEBUG] pos=35: char=' ' remaining=' a (lambda...'
+[DEBUG]   Tokenizer matched:  @36
+[DEBUG] pos=36: char='a' remaining='a (lambda ...'
+[DEBUG]   Tokenizer matched: a@37
+[DEBUG] pos=37: char=' ' remaining=' (lambda b...'
+[DEBUG]   Tokenizer matched:  @38
+[DEBUG] pos=38: char='(' remaining='(lambda b ...'
+[DEBUG]   Tokenizer matched: (@39
+[DEBUG] pos=39: char='l' remaining='lambda b (...'
+[DEBUG]   Tokenizer matched: lambda@45
+[DEBUG] pos=45: char=' ' remaining=' b (and a ...'
 [DEBUG]   Tokenizer matched:  @46
-[DEBUG] pos=46: char='+' remaining='+ L R\n\n= p...'
-[DEBUG]   Tokenizer matched: +@47
-[DEBUG] pos=47: char=' ' remaining=' L R\n\n= pr...'
+[DEBUG] pos=46: char='b' remaining='b (and a b...'
+[DEBUG]   Tokenizer matched: b@47
+[DEBUG] pos=47: char=' ' remaining=' (and a b)...'
 [DEBUG]   Tokenizer matched:  @48
-[DEBUG] pos=48: char='L' remaining='L R\n\n= pre...'
-[DEBUG]   Tokenizer matched: L@49
-[DEBUG] pos=49: char=' ' remaining=' R\n\n= pref...'
-[DEBUG]   Tokenizer matched:  @50
-[DEBUG] pos=50: char='R' remaining='R\n\n= prefi...'
-[DEBUG]   Tokenizer matched: R@51
-[DEBUG] pos=51: char='\n' remaining='\n\n= prefix...'
-[DEBUG]   Tokenizer matched: \n\n@53
-[DEBUG] pos=53: char='=' remaining='= prefixSu...'
-[DEBUG]   Tokenizer matched: =@54
-[DEBUG] pos=54: char=' ' remaining=' prefixSum...'
+[DEBUG] pos=48: char='(' remaining='(and a b))...'
+[DEBUG]   Tokenizer matched: (@49
+[DEBUG] pos=49: char='a' remaining='and a b)))...'
+[DEBUG]   Tokenizer matched: and@52
+[DEBUG] pos=52: char=' ' remaining=' a b)))\n= ...'
+[DEBUG]   Tokenizer matched:  @53
+[DEBUG] pos=53: char='a' remaining='a b)))\n= N...'
+[DEBUG]   Tokenizer matched: a@54
+[DEBUG] pos=54: char=' ' remaining=' b)))\n= Ni...'
 [DEBUG]   Tokenizer matched:  @55
-[DEBUG] pos=55: char='p' remaining='prefixSum ...'
-[DEBUG]   Tokenizer matched: prefixSum@64
-[DEBUG] pos=64: char=' ' remaining=' + 1 2\npre...'
-[DEBUG]   Tokenizer matched:  @65
-[DEBUG] pos=65: char='+' remaining='+ 1 2\npref...'
-[DEBUG]   Tokenizer matched: +@66
-[DEBUG] pos=66: char=' ' remaining=' 1 2\nprefi...'
-[DEBUG]   Tokenizer matched:  @67
-[DEBUG] pos=67: char='1' remaining='1 2\nprefix...'
-[DEBUG]   Tokenizer matched: 1@68
-[DEBUG] pos=68: char=' ' remaining=' 2\nprefixS...'
-[DEBUG]   Tokenizer matched:  @69
-[DEBUG] pos=69: char='2' remaining='2\nprefixSu...'
-[DEBUG]   Tokenizer matched: 2@70
-[DEBUG] pos=70: char='\n' remaining='\nprefixSum...'
+[DEBUG] pos=55: char='b' remaining='b)))\n= Nil...'
+[DEBUG]   Tokenizer matched: b@56
+[DEBUG] pos=56: char=')' remaining=')))\n= Nil ...'
+[DEBUG]   Tokenizer matched: )@57
+[DEBUG] pos=57: char=')' remaining='))\n= Nil t...'
+[DEBUG]   Tokenizer matched: )@58
+[DEBUG] pos=58: char=')' remaining=')\n= Nil tr...'
+[DEBUG]   Tokenizer matched: )@59
+[DEBUG] pos=59: char='\n' remaining='\n= Nil tru...'
+[DEBUG]   Tokenizer matched: \n@60
+[DEBUG] pos=60: char='=' remaining='= Nil true...'
+[DEBUG]   Tokenizer matched: =@61
+[DEBUG] pos=61: char=' ' remaining=' Nil true\n...'
+[DEBUG]   Tokenizer matched:  @62
+[DEBUG] pos=62: char='N' remaining='Nil true\n=...'
+[DEBUG]   Tokenizer matched: Nil@65
+[DEBUG] pos=65: char=' ' remaining=' true\n= my...'
+[DEBUG]   Tokenizer matched:  @66
+[DEBUG] pos=66: char='t' remaining='true\n= myL...'
+[DEBUG]   Tokenizer matched: true@70
+[DEBUG] pos=70: char='\n' remaining='\n= myList ...'
 [DEBUG]   Tokenizer matched: \n@71
-[DEBUG] pos=71: char='p' remaining='prefixSum\n...'
-[DEBUG]   Tokenizer matched: prefixSum@80
-[DEBUG] pos=80: char='\n' remaining='\n\ninfixSum...'
-[DEBUG]   Tokenizer matched: \n\n@82
-[DEBUG] pos=82: char='i' remaining='infixSum =...'
-[DEBUG]   Tokenizer matched: infixSum@90
-[DEBUG] pos=90: char=' ' remaining=' = 3 + 4\ni...'
-[DEBUG]   Tokenizer matched:  @91
-[DEBUG] pos=91: char='=' remaining='= 3 + 4\nin...'
-[DEBUG]   Tokenizer matched: =@92
-[DEBUG] pos=92: char=' ' remaining=' 3 + 4\ninf...'
-[DEBUG]   Tokenizer matched:  @93
-[DEBUG] pos=93: char='3' remaining='3 + 4\ninfi...'
-[DEBUG]   Tokenizer matched: 3@94
-[DEBUG] pos=94: char=' ' remaining=' + 4\ninfix...'
-[DEBUG]   Tokenizer matched:  @95
-[DEBUG] pos=95: char='+' remaining='+ 4\ninfixS...'
-[DEBUG]   Tokenizer matched: +@96
-[DEBUG] pos=96: char=' ' remaining=' 4\ninfixSu...'
-[DEBUG]   Tokenizer matched:  @97
-[DEBUG] pos=97: char='4' remaining='4\ninfixSum...'
-[DEBUG]   Tokenizer matched: 4@98
-[DEBUG] pos=98: char='\n' remaining='\ninfixSum...'
-[DEBUG]   Tokenizer matched: \n@99
-[DEBUG] pos=99: char='i' remaining='infixSum...'
-[DEBUG]   Tokenizer matched: infixSum@107
-[DEBUG] pos=107: Reached end of input
-[DEBUG]   Tokenizer matched: \n@99
-[DEBUG]   Tokenizer matched: \n@81
-[DEBUG] pos=81: char='\n' remaining='\ninfixSum ...'
-[DEBUG]   Tokenizer matched: \n@82
-[DEBUG]   Tokenizer matched: \n@82
-[DEBUG]   Tokenizer matched: \n@71
-[DEBUG]   Tokenizer matched: \n@52
-[DEBUG] pos=52: char='\n' remaining='\n= prefixS...'
-[DEBUG]   Tokenizer matched: \n@53
-[DEBUG]   Tokenizer matched: \n@53
-[DEBUG]   Tokenizer matched: \n@26
- @5f3438e8 -> Keyword(syntax) @641265c2 ->  @2412bed7 -> WS( ) @4664a045 ->  @c7b94ef -> Delim([) @105611de ->  @2183f105 -> Ident(L) @42061bf8 ->  @120a33bb -> Delim(]) @327208c5 ->  @c47cc57 -> WS( ) @7e6cdffc ->  @3db8ac61 -> Op(=) @1faebf33 ->  @2d39ede5 -> WS( ) @35b25481 ->  @4d913df2 -> Delim([) @27ac4454 ->  @4598d381 -> Ident(R) @62a991ef ->  @26134ee5 -> Delim(]) @63d83097 ->  @605ff3b6 -> WS( ) @4e5730bb ->  @720f3bf2 -> Op(->) @5071e1ac ->  @4f2c6a57 -> WS( ) @380949e1 ->  @33d235b9 -> Op(=) @6c71ceee ->  @40a37fe5 -> WS( ) @32977051 ->  @104af447 -> Ident(L) @722e5e1e ->  @29294be9 -> WS( ) @20b5b365 ->  @679a93f8 -> Ident(R) @67c4ffbb ->  @45186a9
-  ├── WS(
-  ) @3ac47448 ->  @7abd6d8c -> Keyword(syntax) @72d1c8bc ->  @6aa5e1f0 -> WS( ) @73daaed8 ->  @629a6c22 -> Delim([) @1ef2dce5 ->  @5b9d04aa -> Ident(L) @7d17cd6f ->  @4c5d4593 -> Delim(]) @4440bd09 ->  @774b497f -> WS( ) @34f48e4c ->  @12a3349c -> Op(+) @53ca7b34 ->  @7ee7c083 -> WS( ) @6e71a7fd ->  @65fd797b -> Delim([) @65eead2b ->  @254d8acd -> Ident(R) @46e09fd6 ->  @48d800d0 -> Delim(]) @58cf7b15 ->  @111d9923 -> WS( ) @5341aaf9 ->  @5b17fec1 -> Op(->) @78a32165 ->  @58a7bd3 -> WS( ) @5bc21ff9 ->  @3f4713b6 -> Op(+) @5e8ea532 ->  @80c09d3 -> WS( ) @43fae2fc ->  @44a78396 -> Ident(L) @6fab1905 ->  @781d7b2 -> WS( ) @137828bc ->  @6bbbb276 -> Ident(R) @5c6ffd35 ->  @55da8d4d
-  │   ├── WS(
-  
-  ) @7b56282 ->  @31ab5800 -> Op(=) @120e9d55 ->  @13bfdabc -> WS( ) @3f321b3b ->  @54b23f85 -> Ident(prefixSum) @32b0e473 ->  @5fb7a2a3 -> WS( ) @707391ad ->  @35f8d631 -> Op(+) @5e3f81 ->  @629e2793 -> WS( ) @e0c2c94 ->  @7db63a3a -> Number(1) @ce5b03a ->  @1fd4ac8a -> WS( ) @70d35b68 ->  @3cf8c8a2 -> Number(2) @1dbddb67 ->  @273784a6
-  │   │   ├── WS(
-  ) @4d558333 ->  @3792ffe3 -> Ident(prefixSum) @44876c95 ->  @5f8ed217
-  │   │   │   ├── WS(
-  
-  ) @3ea39ece ->  @1eee031e -> Ident(infixSum) @61f23792 ->  @48454fd1 -> WS( ) @6ab2edf9 ->  @4aae542 -> Op(=) @74141ce2 ->  @16cdee76 -> WS( ) @6bed0473 ->  @38be7cb9 -> Number(3) @6c999440 ->  @15de79fb -> WS( ) @161339af ->  @5d03c460 -> Op(+) @7d987014 ->  @1befcffd -> WS( ) @143e536e ->  @57ddb54d -> Number(4) @697b6772 ->  @c8edd87
-  │   │   │   │   ├── WS(
-  ) @6acd5a5b ->  @5080ed92 -> Ident(infixSum) @62724007 ->  @186acb2b
-  │   │   │   │   └── Delim(
-  ) @18f555ff -> (ref: @5080ed92)
-  │   │   │   └── Delim(
-  ) @4fced70e ->  @3f4cd488
-  │   │   │       ├── WS(
-  ) @713163d9 -> (ref: @1eee031e)
-  │   │   │       └── Delim(
-  ) @43598aad -> (ref: @1eee031e)
-  │   │   └── Delim(
-  ) @7a16436f -> (ref: @3792ffe3)
-  │   └── Delim(
-  ) @23272031 ->  @5972a027
-  │       ├── WS(
-  ) @56714546 -> (ref: @31ab5800)
-  │       └── Delim(
-  ) @1e3479dc -> (ref: @31ab5800)
-  └── Delim(
-  ) @408f483 -> (ref: @7abd6d8c)
-  
-== Lexing (before pruning) ==
-  Found 72 token sequences
-  Time: 65ms
+[DEBUG] pos=71: char='=' remaining='= myList (...'
+[DEBUG]   Tokenizer matched: =@72
+[DEBUG] pos=72: char=' ' remaining=' myList (C...'
+[DEBUG]   Tokenizer matched:  @73
+[DEBUG] pos=73: char='m' remaining='myList (Co...'
+[DEBUG]   Tokenizer matched: myList@79
+[DEBUG] pos=79: char=' ' remaining=' (Cons 1 (...'
+[DEBUG]   Tokenizer matched:  @80
+[DEBUG] pos=80: char='(' remaining='(Cons 1 (C...'
+[DEBUG]   Tokenizer matched: (@81
+[DEBUG] pos=81: char='C' remaining='Cons 1 (Co...'
+[DEBUG]   Tokenizer matched: Cons@85
+[DEBUG] pos=85: char=' ' remaining=' 1 (Cons 2...'
+[DEBUG]   Tokenizer matched:  @86
+[DEBUG] pos=86: char='1' remaining='1 (Cons 2 ...'
+[DEBUG]   Tokenizer matched: 1@87
+[DEBUG] pos=87: char=' ' remaining=' (Cons 2 N...'
+[DEBUG]   Tokenizer matched:  @88
+[DEBUG] pos=88: char='(' remaining='(Cons 2 Ni...'
+[DEBUG]   Tokenizer matched: (@89
+[DEBUG] pos=89: char='C' remaining='Cons 2 Nil...'
+[DEBUG]   Tokenizer matched: Cons@93
+[DEBUG] pos=93: char=' ' remaining=' 2 Nil))\n=...'
+[DEBUG]   Tokenizer matched:  @94
+[DEBUG] pos=94: char='2' remaining='2 Nil))\n= ...'
+[DEBUG]   Tokenizer matched: 2@95
+[DEBUG] pos=95: char=' ' remaining=' Nil))\n= h...'
+[DEBUG]   Tokenizer matched:  @96
+[DEBUG] pos=96: char='N' remaining='Nil))\n= he...'
+[DEBUG]   Tokenizer matched: Nil@99
+[DEBUG] pos=99: char=')' remaining='))\n= head ...'
+[DEBUG]   Tokenizer matched: )@100
+[DEBUG] pos=100: char=')' remaining=')\n= head l...'
+[DEBUG]   Tokenizer matched: )@101
+[DEBUG] pos=101: char='\n' remaining='\n= head la...'
+[DEBUG]   Tokenizer matched: \n@102
+[DEBUG] pos=102: char='=' remaining='= head lam...'
+[DEBUG]   Tokenizer matched: =@103
+[DEBUG] pos=103: char=' ' remaining=' head lamb...'
+[DEBUG]   Tokenizer matched:  @104
+[DEBUG] pos=104: char='h' remaining='head lambd...'
+[DEBUG]   Tokenizer matched: head@108
+[DEBUG] pos=108: char=' ' remaining=' lambda ls...'
+[DEBUG]   Tokenizer matched:  @109
+[DEBUG] pos=109: char='l' remaining='lambda lst...'
+[DEBUG]   Tokenizer matched: lambda@115
+[DEBUG] pos=115: char=' ' remaining=' lst {\n  =...'
+[DEBUG]   Tokenizer matched:  @116
+[DEBUG] pos=116: char='l' remaining='lst {\n  = ...'
+[DEBUG]   Tokenizer matched: lst@119
+[DEBUG] pos=119: char=' ' remaining=' {\n  = lst...'
+[DEBUG]   Tokenizer matched:  @120
+[DEBUG] pos=120: char='{' remaining='{\n  = lst ...'
+[DEBUG]   Tokenizer matched: {@121
+[DEBUG] pos=121: char='\n' remaining='\n  = lst (...'
+[DEBUG]   Tokenizer matched: \n  @124
+[DEBUG] pos=124: char='=' remaining='= lst (Con...'
+[DEBUG]   Tokenizer matched: =@125
+[DEBUG] pos=125: char=' ' remaining=' lst (Cons...'
+[DEBUG]   Tokenizer matched:  @126
+[DEBUG] pos=126: char='l' remaining='lst (Cons ...'
+[DEBUG]   Tokenizer matched: lst@129
+[DEBUG] pos=129: char=' ' remaining=' (Cons fir...'
+[DEBUG]   Tokenizer matched:  @130
+[DEBUG] pos=130: char='(' remaining='(Cons firs...'
+[DEBUG]   Tokenizer matched: (@131
+[DEBUG] pos=131: char='C' remaining='Cons first...'
+[DEBUG]   Tokenizer matched: Cons@135
+[DEBUG] pos=135: char=' ' remaining=' first res...'
+[DEBUG]   Tokenizer matched:  @136
+[DEBUG] pos=136: char='f' remaining='first rest...'
+[DEBUG]   Tokenizer matched: first@141
+[DEBUG] pos=141: char=' ' remaining=' rest)\n  f...'
+[DEBUG]   Tokenizer matched:  @142
+[DEBUG] pos=142: char='r' remaining='rest)\n  fi...'
+[DEBUG]   Tokenizer matched: rest@146
+[DEBUG] pos=146: char=')' remaining=')\n  first\n...'
+[DEBUG]   Tokenizer matched: )@147
+[DEBUG] pos=147: char='\n' remaining='\n  first\n}...'
+[DEBUG]   Tokenizer matched: \n  @150
+[DEBUG] pos=150: char='f' remaining='first\n}\n= ...'
+[DEBUG]   Tokenizer matched: first@155
+[DEBUG] pos=155: char='\n' remaining='\n}\n= resul...'
+[DEBUG]   Tokenizer matched: \n@156
+[DEBUG] pos=156: char='}' remaining='}\n= result...'
+[DEBUG]   Tokenizer matched: }@157
+[DEBUG] pos=157: char='\n' remaining='\n= result ...'
+[DEBUG]   Tokenizer matched: \n@158
+[DEBUG] pos=158: char='=' remaining='= result (...'
+[DEBUG]   Tokenizer matched: =@159
+[DEBUG] pos=159: char=' ' remaining=' result (h...'
+[DEBUG]   Tokenizer matched:  @160
+[DEBUG] pos=160: char='r' remaining='result (he...'
+[DEBUG]   Tokenizer matched: result@166
+[DEBUG] pos=166: char=' ' remaining=' (head myL...'
+[DEBUG]   Tokenizer matched:  @167
+[DEBUG] pos=167: char='(' remaining='(head myLi...'
+[DEBUG]   Tokenizer matched: (@168
+[DEBUG] pos=168: char='h' remaining='head myLis...'
+[DEBUG]   Tokenizer matched: head@172
+[DEBUG] pos=172: char=' ' remaining=' myList)\nr...'
+[DEBUG]   Tokenizer matched:  @173
+[DEBUG] pos=173: char='m' remaining='myList)\nre...'
+[DEBUG]   Tokenizer matched: myList@179
+[DEBUG] pos=179: char=')' remaining=')\nresult\n...'
+[DEBUG]   Tokenizer matched: )@180
+[DEBUG] pos=180: char='\n' remaining='\nresult\n...'
+[DEBUG]   Tokenizer matched: \n@181
+[DEBUG] pos=181: char='r' remaining='result\n...'
+[DEBUG]   Tokenizer matched: result@187
+[DEBUG] pos=187: char='\n' remaining='\n...'
+[DEBUG]   Tokenizer matched: \n@188
+[DEBUG] pos=188: Reached end of input
+[DEBUG]   Tokenizer matched: and@52
+[DEBUG]   Tokenizer matched: /@1
+[DEBUG] pos=1: char='/' remaining='/ Test 08:...'
+[DEBUG]   Tokenizer matched: /@2
+[DEBUG] pos=2: char=' ' remaining=' Test 08: ...'
+[DEBUG]   Tokenizer matched:  @3
+[DEBUG] pos=3: char='T' remaining='Test 08: S...'
+[DEBUG]   Tokenizer matched: Test@7
+[DEBUG] pos=7: char=' ' remaining=' 08: Selec...'
+[DEBUG]   Tokenizer matched:  @8
+[DEBUG] pos=8: char='0' remaining='08: Select...'
+[DEBUG]   Tokenizer matched: 08@10
+[DEBUG] pos=10: char=':' remaining=': Selector...'
+[DEBUG]   Tokenizer matched: :@11
+[DEBUG] pos=11: char=' ' remaining=' Selector\n...'
+[DEBUG]   Tokenizer matched:  @12
+[DEBUG] pos=12: char='S' remaining='Selector\n=...'
+[DEBUG]   Tokenizer matched: Selector@20
+[DEBUG] pos=20: char='\n' remaining='\n= Cons (l...'
+[DEBUG]   Tokenizer matched: \n@21
+ @0x445448a5d10
+������ WS(// Test 08: Selector
+) @0x445448a54d0 ->  @0x445448a5470 -> Op(=) @0x445448a5410 ->  @0x445448a53b0 -> WS( ) @0x445448a5350 ->  @0x445448a52f0 -> Ident(Cons) @0x445448a5290 ->  @0x445448a5230 -> WS( ) @0x445448a51d0 ->  @0x445448a5170 -> Delim(() @0x445448a5110 ->  @0x445448a50b0 -> Ident(lambda) @0x445448a5050 ->  @0x445448a4ff0 -> WS( ) @0x445448a4f90 ->  @0x445448a4f30 -> Ident(a) @0x445448a4ed0 ->  @0x445448a4e70 -> WS( ) @0x445448a4e10 ->  @0x445448a4db0 -> Delim(() @0x445448a4d50 ->  @0x445448a4cf0 -> Ident(lambda) @0x445448a4c90 ->  @0x445448a4c30 -> WS( ) @0x445448a4bd0 ->  @0x445448a4b70 -> Ident(b) @0x445448a4b10 ->  @0x445448a4ab0 -> WS( ) @0x445448a4a50 ->  @0x445448a49f0 -> Delim(() @0x445448a4990 ->  @0x445448a4930
+��   ������ Op(and) @0x445448a4870 ->  @0x445448a4810 -> WS( ) @0x445448a47b0 ->  @0x445448a4750 -> Ident(a) @0x445448a46f0 ->  @0x445448a4690 -> WS( ) @0x445448a4630 ->  @0x445448a45d0 -> Ident(b) @0x445448a4570 ->  @0x445448a4510 -> Delim()) @0x445448a44b0 ->  @0x445448a4450 -> Delim()) @0x445448a43f0 ->  @0x445448a4390 -> Delim()) @0x445448a4330 ->  @0x445448a42d0 -> WS(
+) @0x445448a4270 ->  @0x445448a4210 -> Op(=) @0x445448a41b0 ->  @0x445448a4150 -> WS( ) @0x445448a40f0 ->  @0x445448a4090 -> Ident(Nil) @0x445448a4030 ->  @0x445448a3fd0 -> WS( ) @0x445448a3f70 ->  @0x445448a3f10 -> Ident(true) @0x445448a3eb0 ->  @0x445448a3e50 -> WS(
+) @0x445448a3df0 ->  @0x445448a3d90 -> Op(=) @0x445448a3d30 ->  @0x445448a3cd0 -> WS( ) @0x445448a3c70 ->  @0x445448a3c10 -> Ident(myList) @0x445448a3bb0 ->  @0x445448a3b50 -> WS( ) @0x445448a3af0 ->  @0x445448a3a90 -> Delim(() @0x445448a3a30 ->  @0x445448a39d0 -> Ident(Cons) @0x445448a3970 ->  @0x445448a3910 -> WS( ) @0x445448a38b0 ->  @0x445448a3850 -> Number(1) @0x445448a37f0 ->  @0x445448a3790 -> WS( ) @0x445448a3730 ->  @0x445448a36d0 -> Delim(() @0x445448a3670 ->  @0x445448a3610 -> Ident(Cons) @0x445448a35b0 ->  @0x445448a3550 -> WS( ) @0x445448a34f0 ->  @0x445448a3490 -> Number(2) @0x445448a3430 ->  @0x445448a33d0 -> WS( ) @0x445448a3370 ->  @0x445448a3310 -> Ident(Nil) @0x445448a32b0 ->  @0x445448a3250 -> Delim()) @0x445448a31f0 ->  @0x445448a3190 -> Delim()) @0x445448a3130 ->  @0x445448a30d0 -> WS(
+) @0x445448a3070 ->  @0x445448a3010 -> Op(=) @0x445448a2fb0 ->  @0x445448a2b30 -> WS( ) @0x445448a2830 ->  @0x445448a2b90 -> Ident(head) @0x445448a2bf0 ->  @0x445448a2a10 -> WS( ) @0x445448a2ad0 ->  @0x445448a29b0 -> Ident(lambda) @0x445448a0d30 ->  @0x445448a1210 -> WS( ) @0x445448a2050 ->  @0x445448a1b70 -> Ident(lst) @0x445448a1030 ->  @0x445448a1e70 -> WS( ) @0x445448a19f0 ->  @0x445448a20b0 -> Delim({) @0x445448a2110 ->  @0x445448a0c10 -> WS(
+  ) @0x445448a1d50 ->  @0x445448a1810 -> Op(=) @0x445448a0250 ->  @0x445448a1270 -> WS( ) @0x445448a0850 ->  @0x445448a2dd0 -> Ident(lst) @0x445448a2e30 ->  @0x445448a2ef0 -> WS( ) @0x445448a2d70 ->  @0x445448a2c50 -> Delim(() @0x445448a1510 ->  @0x445448a1630 -> Ident(Cons) @0x445448a2cb0 ->  @0x445448a14b0 -> WS( ) @0x445448a1ff0 ->  @0x445448a2890 -> Ident(first) @0x445448a2710 ->  @0x445448a22f0 -> WS( ) @0x445448a26b0 ->  @0x445448a2770 -> Ident(rest) @0x445448a25f0 ->  @0x445448a0430 -> Delim()) @0x445448a07f0 ->  @0x445448a0730 -> WS(
+  ) @0x445448a2470 ->  @0x445448a2350 -> Ident(first) @0x445448a27d0 ->  @0x445448a21d0 -> WS(
+) @0x445448a2230 ->  @0x445448a24d0 -> Delim(}) @0x445448a2170 ->  @0x445448a23b0 -> WS(
+) @0x445455c6980 ->  @0x445455c6910 -> Op(=) @0x44544880510 ->  @0x44544880e90 -> WS( ) @0x44544736690 ->  @0x445447365f0 -> Ident(result) @0x44544736550 ->  @0x445447f1d50 -> WS( ) @0x445447f1c90 ->  @0x445447f1bd0 -> Delim(() @0x445447f1b10 ->  @0x445446f15f0 -> Ident(head) @0x445446f16d0 ->  @0x445446f1f90 -> WS( ) @0x445455a2910 ->  @0x445455a2810 -> Ident(myList) @0x445455a2710 ->  @0x445455a2610 -> Delim()) @0x445445aa010 ->  @0x445445a9ed0 -> WS(
+) @0x445445a9d90 ->  @0x445445a9c50 -> Ident(result) @0x445445a9b10 ->  @0x445445a99d0 -> WS(
+) @0x445445a9890 ->  @0x44544597b10
+��   ������ Ident(and) @0x445448a48d0 -> (ref: @0x445448a4810)
+������ Op(/) @0x445448a5cb0 ->  @0x445448a5c50 -> Op(/) @0x445448a5bf0 ->  @0x445448a5b90 -> WS( ) @0x445448a5b30 ->  @0x445448a5ad0 -> Ident(Test) @0x445448a5a70 ->  @0x445448a5a10 -> WS( ) @0x445448a59b0 ->  @0x445448a5950 -> Number(08) @0x445448a58f0 ->  @0x445448a5890 -> Delim(:) @0x445448a5830 ->  @0x445448a57d0 -> WS( ) @0x445448a5770 ->  @0x445448a5710 -> Ident(Selector) @0x445448a56b0 ->  @0x445448a5650 -> WS(
+) @0x445448a55f0 -> (ref: @0x445448a5470)
 
-== Z3 Constraint Pruning ==
-  Before: 72 sequences
-  After: 72 sequences
-  Eliminated: 0 invalid sequences
-  Time: 1252ms
+== Lexing (before pruning) ==
+  Found 4 token sequences
+  Time: 1ms
 
 == Lexing (final) ==
-  Path 0: syntax [ L ] = [ R ] -> = L R syntax [ L ] + [ R ] -> + L R = prefixSum + 1 2 prefixSum infixSum = 3 + 4 infixSum
-  Path 1: syntax [ L ] = [ R ] -> = L R syntax [ L ] + [ R ] -> + L R = prefixSum + 1 2 prefixSum infixSum = 3 + 4 
- infixSum
-  Path 2: syntax [ L ] = [ R ] -> = L R syntax [ L ] + [ R ] -> + L R = prefixSum + 1 2 prefixSum 
- infixSum = 3 + 4 infixSum
-  Path 3: syntax [ L ] = [ R ] -> = L R syntax [ L ] + [ R ] -> + L R = prefixSum + 1 2 prefixSum 
- infixSum = 3 + 4 
- infixSum
-  Path 4: syntax [ L ] = [ R ] -> = L R syntax [ L ] + [ R ] -> + L R = prefixSum + 1 2 prefixSum 
- 
- infixSum = 3 + 4 infixSum
-  ... and 67 more paths
-  Time: 65ms
-  Found 72 token sequences
+  Path 0: = Cons ( lambda a ( lambda b ( and a b ) ) ) = Nil true = myList ( Cons 1 ( Cons 2 Nil ) ) = head lambda lst { = lst ( Cons first rest ) first } = result ( head myList ) result
+  Path 1: = Cons ( lambda a ( lambda b ( and a b ) ) ) = Nil true = myList ( Cons 1 ( Cons 2 Nil ) ) = head lambda lst { = lst ( Cons first rest ) first } = result ( head myList ) result
+  Path 2: / / Test 08 : Selector = Cons ( lambda a ( lambda b ( and a b ) ) ) = Nil true = myList ( Cons 1 ( Cons 2 Nil ) ) = head lambda lst { = lst ( Cons first rest ) first } = result ( head myList ) result
+  Path 3: / / Test 08 : Selector = Cons ( lambda a ( lambda b ( and a b ) ) ) = Nil true = myList ( Cons 1 ( Cons 2 Nil ) ) = head lambda lst { = lst ( Cons first rest ) first } = result ( head myList ) result
+  Time: 1ms
+  Found 4 token sequences
 
+[REWRITE] Starting Rewriting Engine with 50 tokens
+[REWRITE] Parsing expr at 0: =
+[REWRITE] Parsing expr at 1: Cons
+[REWRITE] Parsing expr at 2: (
+[REWRITE] Parsing expr at 3: lambda
+[REWRITE] Parsing expr at 5: (
+[REWRITE] Parsing expr at 6: lambda
+[REWRITE] Parsing expr at 8: (
+[REWRITE] Parsing expr at 9: and
+[REWRITE] Parsing expr at 10: a
+[REWRITE] Parsing expr at 11: b
+[REWRITE] Parsed Stmt: Call(Var(=), [Var(Cons), Call(Lambda(a, Call(Lambda(b, Call(Call(Var(and), [Var(a), Var(b)]), [])), [])), [])])
+[REWRITE] Parsing expr at 15: =
+[REWRITE] Parsing expr at 16: Nil
+[REWRITE] Parsing expr at 17: true
+[REWRITE] Parsed Stmt: Call(Var(=), [Var(Nil), Var(true)])
+[REWRITE] Parsing expr at 18: =
+[REWRITE] Parsing expr at 19: myList
+[REWRITE] Parsing expr at 20: (
+[REWRITE] Parsing expr at 21: Cons
+[REWRITE] Parsing expr at 22: 1
+[REWRITE] Parsing expr at 23: (
+[REWRITE] Parsing expr at 24: Cons
+[REWRITE] Parsing expr at 25: 2
+[REWRITE] Parsing expr at 26: Nil
+[REWRITE] Parsed Stmt: Call(Var(=), [Var(myList), Call(Var(Cons), [Num(1), Call(Var(Cons), [Num(2), Var(Nil)])])])
+[REWRITE] Parsing expr at 29: =
+[REWRITE] Parsing expr at 30: head
+[REWRITE] Parsing expr at 31: lambda
+[REWRITE] Parsing expr at 33: {
+[REWRITE] Parsing expr at 34: =
+[REWRITE] Parsing expr at 35: lst
+[REWRITE] Parsing expr at 36: (
+[REWRITE] Parsing expr at 37: Cons
+[REWRITE] Parsing expr at 38: first
+[REWRITE] Parsing expr at 39: rest
+[REWRITE] Parsing expr at 41: first
+[REWRITE] Parsed Stmt: Call(Var(=), [Var(head), Lambda(lst, Block([Call(Var(=), [Var(lst), Call(Var(Cons), [Var(first), Var(rest)])]), Var(first)]))])
+[REWRITE] Parsing expr at 43: =
+[REWRITE] Parsing expr at 44: result
+[REWRITE] Parsing expr at 45: (
+[REWRITE] Parsing expr at 46: head
+[REWRITE] Parsing expr at 47: myList
+[REWRITE] Parsed Stmt: Call(Var(=), [Var(result), Call(Var(head), [Var(myList)])])
+[REWRITE] Parsing expr at 49: result
+[REWRITE] Parsed Stmt: Var(result)
 == Parsing ==
   Parse 0:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    infixSum
-    =(+(3, 4), infixSum)
-  Parse 1:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 2:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), infixSum)
-  Parse 3:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 4:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    
-  
-    =(infixSum, 3)
-    +(4, infixSum)
-  Parse 5:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    
-  
-    =(infixSum, 3)
-    +(4, 
-  )
-    infixSum
-  Parse 6:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    infixSum
-    =(+(3, 4), infixSum)
-  Parse 7:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 8:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), infixSum)
-  Parse 9:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 10:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    
-  
-    =(infixSum, 3)
-    +(4, infixSum)
-  Parse 11:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    
-  
-    =(infixSum, 3)
-    +(4, 
-  )
-    infixSum
-  Parse 12:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 13:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    infixSum
-  Parse 14:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 15:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    infixSum
-  Parse 16:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    
-  
-    =(infixSum, 3)
-    +(4, infixSum)
-  Parse 17:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    
-  
-    =(infixSum, 3)
-    +(4, 
-  )
-    infixSum
-  Parse 18:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 19:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    infixSum
-  Parse 20:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 21:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    infixSum
-  Parse 22:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    
-  
-    =(infixSum, 3)
-    +(4, infixSum)
-  Parse 23:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    
-  
-    =(infixSum, 3)
-    +(4, 
-  )
-    infixSum
-  Parse 24:
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    =(prefixSum, +(1, 2))
-    infixSum
-  Parse 25:
-    prefixSum
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    infixSum
-  Parse 26:
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    =(prefixSum, +(1, 2))
-    infixSum
-  Parse 27:
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    infixSum
-  Parse 28:
-    prefixSum
-    
-  
-    
-  
-    =(infixSum, 3)
-    +(4, infixSum)
-  Parse 29:
-    prefixSum
-    
-  
-    
-  
-    =(infixSum, 3)
-    +(4, 
-  )
-    infixSum
-  Parse 30:
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    prefixSum
-    infixSum
-  Parse 31:
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    prefixSum
-    
-  
-    infixSum
-  Parse 32:
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    prefixSum
-    
-  
-    infixSum
-  Parse 33:
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    prefixSum
-    
-  
-    
-  
-    infixSum
-  Parse 34:
-    infixSum
-  Parse 35:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    infixSum
-    =(+(3, 4), infixSum)
-  Parse 36:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 37:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), infixSum)
-  Parse 38:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 39:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    =(+(
-  , 
-  ), 
-  )
-    
-  
-    
-  
-    4
-    infixSum
-  Parse 40:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    =(+(
-  , 
-  ), 
-  )
-    
-  
-    
-  
-    4
-    
-  
-    infixSum
-  Parse 41:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    infixSum
-    =(+(3, 4), infixSum)
-  Parse 42:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 43:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), infixSum)
-  Parse 44:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 45:
-    =(prefixSum, +(1, 2))
-    =(+(
-  , prefixSum), 
-  )
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    4
-    infixSum
-  Parse 46:
-    =(prefixSum, +(1, 2))
-    =(+(
-  , prefixSum), 
-  )
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    4
-    
-  
-    infixSum
-  Parse 47:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 48:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    infixSum
-  Parse 49:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 50:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    infixSum
-  Parse 51:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    =(+(
-  , 
-  ), 
-  )
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    4
-    
-  
-    infixSum
-  Parse 52:
-    =(prefixSum, +(1, 2))
-    prefixSum
-    =(+(
-  , 
-  ), 
-  )
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    4
-    
-  
-    
-  
-    infixSum
-  Parse 53:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 54:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    infixSum
-  Parse 55:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    infixSum
-  Parse 56:
-    =(prefixSum, +(1, 2))
-    
-  
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    infixSum
-  Parse 57:
-    =(prefixSum, +(1, 2))
-    =(+(
-  , prefixSum), 
-  )
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    4
-    
-  
-    infixSum
-  Parse 58:
-    =(prefixSum, +(1, 2))
-    =(+(
-  , prefixSum), 
-  )
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    4
-    
-  
-    
-  
-    infixSum
-  Parse 59:
-    prefixSum
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    =(prefixSum, +(1, 2))
-    infixSum
-  Parse 60:
-    prefixSum
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    
-  
-    
-  
-    infixSum
-  Parse 61:
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), 
-  )
-    
-  
-    =(prefixSum, +(1, 2))
-    infixSum
-  Parse 62:
-    prefixSum
-    
-  
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    
-  
-    
-  
-    infixSum
-  Parse 63:
-    prefixSum
-    =(+(=(=(=(
-  , 
-  ), 
-  ), 
-  ), 
-  ), 
-  )
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    =(
-  , 
-  )
-    
-  
-    4
-    
-  
-    
-  
-    
-  
-    =(prefixSum, +(1, 2))
-    infixSum
-  Parse 64:
-    prefixSum
-    =(+(=(=(=(
-  , 
-  ), 
-  ), 
-  ), 
-  ), 
-  )
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    
-  
-    =(
-  , 
-  )
-    
-  
-    4
-    
-  
-    
-  
-    
-  
-    =(prefixSum, +(1, 2))
-    
-  
-    infixSum
-  Parse 65:
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    
-  
-    
-  
-    prefixSum
-    infixSum
-  Parse 66:
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    
-  
-    
-  
-    prefixSum
-    
-  
-    infixSum
-  Parse 67:
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    
-  
-    
-  
-    prefixSum
-    
-  
-    infixSum
-  Parse 68:
-    infixSum
-    =(+(3, 4), =(
-  , 
-  ))
-    
-  
-    
-  
-    
-  
-    prefixSum
-    
-  
-    
-  
-    infixSum
-  Parse 69:
-    infixSum
-  Time: 189ms
-  Found 70 parse trees
+    [Call(Var(=), [Var(Cons), Call(Lambda(a, Call(Lambda(b, Call(Call(Var(and), [Var(a), Var(b)]), [])), [])), [])]), Call(Var(=), [Var(Nil), Var(true)]), Call(Var(=), [Var(myList), Call(Var(Cons), [Num(1), Call(Var(Cons), [Num(2), Var(Nil)])])]), Call(Var(=), [Var(head), Lambda(lst, Block([Call(Var(=), [Var(lst), Call(Var(Cons), [Var(first), Var(rest)])]), Var(first)]))]), Call(Var(=), [Var(result), Call(Var(head), [Var(myList)])]), Var(result)]
+  Time: 1ms
+  Found 1 parse trees
 
-== Evaluation ==
-  Environment bindings:
-    prefixSum = 3
-    infixSum = 7
-
-  Result: 7
-  Time: 22ms
+== Evaluation (Path 0) ==
+[INFER] Starting Bit-Width Inference with Optimization
+[INFER] Inference Successful: {'a': 0, 'b': 0, 'Cons': 0, 'true': 0, 'Nil': 0, 'myList': 2, 'lst': 0, 'first': 0, 'rest': 0, 'head': 0, 'result': 2}
+[EVAL] --- Stmt 0 ---
+[EVAL] Apply: <=> applied to Atom(Cons)
+[EVAL] Apply: PartialBinOp(op='=', left_val=Atom(Cons), right_expr=None) applied to Apply(Apply(Atom(lambda), Atom(a)), Apply(Apply(Atom(lambda), Atom(b)), Apply(Apply(Atom(and), Atom(a)), Atom(b))))
+[EVAL] Apply: <lambda> applied to Atom(a)
+[EVAL] Apply: <lambda a> applied to Apply(Apply(Atom(lambda), Atom(b)), Apply(Apply(Atom(and), Atom(a)), Atom(b)))
+[EVAL]   -> Defined Closure: lambda a ...
+[EVAL] Free Atom Cons: Creating pattern/logic variable
+[EVAL] Unifying: Cons <-> <lambda a>
+[EVAL]   -> Matching atom pattern Cons to <lambda a>
+[EVAL] --- Stmt 1 ---
+[EVAL] Apply: <=> applied to Atom(Nil)
+[EVAL] Apply: PartialBinOp(op='=', left_val=Atom(Nil), right_expr=None) applied to Atom(true)
+[EVAL] Free Atom Nil: Creating pattern/logic variable
+[EVAL] Unifying: Nil <-> true
+[EVAL]   -> Matching atom pattern Nil to true
+[EVAL] --- Stmt 2 ---
+[EVAL] Apply: <=> applied to Atom(myList)
+[EVAL] Apply: PartialBinOp(op='=', left_val=Atom(myList), right_expr=None) applied to Apply(Apply(Atom(Cons), Atom(1)), Apply(Apply(Atom(Cons), Atom(2)), Atom(Nil)))
+[EVAL] Lookup Cons: Found <lambda a>
+[EVAL] Apply: <lambda a> applied to Atom(1)
+[EVAL] Literal 1: val=1, bit_width=1
+[EVAL]   -> Calling Closure a with 1
+[EVAL] Apply: <lambda> applied to Atom(b)
+[EVAL] Apply: <lambda b> applied to Apply(Apply(Atom(and), Atom(a)), Atom(b))
+[EVAL]   -> Defined Closure: lambda b ...
+[EVAL] Apply: <lambda b> applied to Apply(Apply(Atom(Cons), Atom(2)), Atom(Nil))
+[EVAL] Lookup Cons: Found <lambda a>
+[EVAL] Apply: <lambda a> applied to Atom(2)
+[EVAL] Literal 2: val=2, bit_width=2
+[EVAL]   -> Calling Closure a with 2
+[EVAL] Apply: <lambda> applied to Atom(b)
+[EVAL] Apply: <lambda b> applied to Apply(Apply(Atom(and), Atom(a)), Atom(b))
+[EVAL]   -> Defined Closure: lambda b ...
+[EVAL] Apply: <lambda b> applied to Atom(Nil)
+[EVAL] Lookup Nil: Found true
+[EVAL]   -> Calling Closure b with true
+[EVAL] Apply: <and> applied to Atom(a)
+[EVAL] Lookup a: Found 1
+[EVAL] Apply: PartialBinOp(op='and', left_val=IntVal(val=1, width=1), right_expr=None) applied to Atom(b)
+[EVAL] Lookup b: Found true
+[EVAL]   -> Primitive and Result: (1, true)
+[EVAL]   -> Calling Closure b with (1, true)
+[EVAL] Apply: <and> applied to Atom(a)
+[EVAL] Lookup a: Found 1
+[EVAL] Apply: PartialBinOp(op='and', left_val=IntVal(val=1, width=1), right_expr=None) applied to Atom(b)
+[EVAL] Lookup b: Found true
+[EVAL]   -> Primitive and Result: (1, true)
+[EVAL] Free Atom myList: Creating pattern/logic variable
+[EVAL] Unifying: myList <-> (1, true)
+[EVAL]   -> Matching atom pattern myList to (1, true)
+[EVAL] --- Stmt 3 ---
+[EVAL] Apply: <=> applied to Atom(head)
+[EVAL] Apply: PartialBinOp(op='=', left_val=Atom(head), right_expr=None) applied to Apply(Apply(Atom(lambda), Atom(lst)), Apply(Apply(Atom(seq), Apply(Apply(Atom(=), Atom(lst)), Apply(Apply(Atom(Cons), Atom(first)), Atom(rest)))), Atom(first)))
+[EVAL] Apply: <lambda> applied to Atom(lst)
+[EVAL] Apply: <lambda lst> applied to Apply(Apply(Atom(seq), Apply(Apply(Atom(=), Atom(lst)), Apply(Apply(Atom(Cons), Atom(first)), Atom(rest)))), Atom(first))
+[EVAL]   -> Defined Closure: lambda lst ...
+[EVAL] Free Atom head: Creating pattern/logic variable
+[EVAL] Unifying: head <-> <lambda lst>
+[EVAL]   -> Matching atom pattern head to <lambda lst>
+[EVAL] --- Stmt 4 ---
+[EVAL] Apply: <=> applied to Atom(result)
+[EVAL] Apply: PartialBinOp(op='=', left_val=Atom(result), right_expr=None) applied to Apply(Atom(head), Atom(myList))
+[EVAL] Lookup head: Found <lambda lst>
+[EVAL] Apply: <lambda lst> applied to Atom(myList)
+[EVAL] Lookup myList: Found (1, true)
+[EVAL]   -> Calling Closure lst with (1, true)
+[EVAL] Apply: <seq> applied to Apply(Apply(Atom(=), Atom(lst)), Apply(Apply(Atom(Cons), Atom(first)), Atom(rest)))
+[EVAL] Apply: <=> applied to Atom(lst)
+[EVAL] Apply: PartialBinOp(op='=', left_val=Atom(lst), right_expr=None) applied to Apply(Apply(Atom(Cons), Atom(first)), Atom(rest))
+[EVAL] Lookup Cons: Found <lambda a>
+[EVAL] Apply: <lambda a> applied to Atom(first)
+[EVAL] Free Atom first: Creating pattern/logic variable
+[EVAL]   -> Calling Closure a with first
+[EVAL] Apply: <lambda> applied to Atom(b)
+[EVAL] Apply: <lambda b> applied to Apply(Apply(Atom(and), Atom(a)), Atom(b))
+[EVAL]   -> Defined Closure: lambda b ...
+[EVAL] Apply: <lambda b> applied to Atom(rest)
+[EVAL] Free Atom rest: Creating pattern/logic variable
+[EVAL]   -> Calling Closure b with rest
+[EVAL] Apply: <and> applied to Atom(a)
+[EVAL] Lookup a: Found 1
+[EVAL] Apply: PartialBinOp(op='and', left_val=IntVal(val=1, width=1), right_expr=None) applied to Atom(b)
+[EVAL] Lookup b: Found true
+[EVAL]   -> Primitive and Result: (1, true)
+[EVAL] Lookup lst: Found (1, true)
+[EVAL] Unifying: (1, true) <-> (1, true)
+[EVAL]   -> Values are equal
+[EVAL] Apply: PartialBinOp(op='seq', left_val=None, right_expr=None) applied to Atom(first)
+[EVAL] Free Atom first: Creating pattern/logic variable
+[EVAL] Free Atom result: Creating pattern/logic variable
+[EVAL] Unifying: result <-> first
+[EVAL]   -> Matching atom pattern result to first
+[EVAL] --- Stmt 5 ---
+[EVAL] Lookup result: Found first
+  Found 1 possible solutions:
+  --- Solution 0 ---
+Result: first
+  Time: 52ms
 
 
-Total time: 1596ms
-[success] Total time: 4 s, completed 2026/01/16 18:55:24
+Total time: 58ms
