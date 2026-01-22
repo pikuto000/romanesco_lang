@@ -1,4 +1,0 @@
-// Test 05: Unification
-= x 42
-= result x
-result

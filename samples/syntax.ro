@@ -1,0 +1,8 @@
+syntax IF = "if"
+syntax THEN = "then"
+syntax MY_IF_STMT = ( IDENTIFIER "=" NUMBER )
+
+# 1つ目の制約
+x = 10
+# 2つ目の制約
+y = 20

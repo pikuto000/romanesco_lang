@@ -81,4 +81,4 @@ var/
 
 .installed.cfg
 
-*.egg
+*.egg/.lake

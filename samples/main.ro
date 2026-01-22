@@ -1,0 +1,3 @@
+macro list2(a, b) = cons(?a, cons(?b, []))
+macro append(x, y, z) = true()
+list2(1, 2)

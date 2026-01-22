@@ -1,0 +1,17 @@
+name = "romanesco"
+version = "0.1.0"
+defaultTargets = ["romanesco"]
+
+[[lean_lib]]
+name = "Romanesco"
+roots = ["Romanesco.AST", "Romanesco.Parser", "Romanesco.Engine", "Romanesco.DynamicParser"]
+
+[[lean_exe]]
+name = "romanesco"
+root = "Main"
+supportInterpreter = true
+
+[[require]]
+name = "batteries"
+git = "https://github.com/leanprover-community/batteries"
+rev = "main"
