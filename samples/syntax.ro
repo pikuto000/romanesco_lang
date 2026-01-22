@@ -1,8 +1,13 @@
-syntax IF = "if"
-syntax THEN = "then"
-syntax MY_IF_STMT = ( IDENTIFIER "=" NUMBER )
+syntax CHAR = range("a", "z")
+syntax DIGIT = range("0", "9")
 
-# 1つ目の制約
-x = 10
-# 2つ目の制約
-y = 20
+syntax MY_IDENT = ( CHAR CHAR * )
+syntax MY_NUMBER = ( DIGIT DIGIT * )
+
+# 代入文の定義 (空白を許容)
+syntax assignment = ( MY_IDENT ws "=" ws MY_NUMBER )
+syntax statement = assignment
+
+# 実行
+score = 100
+level = 5

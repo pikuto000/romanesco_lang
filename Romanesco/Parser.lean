@@ -50,10 +50,10 @@ def takeWhile (p : Char → Bool) (cs : List Char) : List Char × List Char :=
 partial def pAll (t : Target) (cs : List Char) : List POut :=
   let cs' := skipWs cs
   match t with
-  | Target.Term => 
+  | Target.Term =>
       match cs' with
       | [] => []
-      | '?' :: rest => 
+      | '?' :: rest =>
           let p := takeWhile isIdChar rest
           if p.1.isEmpty then [] else [{ rest := skipWs p.2, term := some (Term.var (String.ofList p.1)) }]
       | '[' :: rest =>
@@ -77,21 +77,21 @@ partial def pAll (t : Target) (cs : List Char) : List POut :=
             let name := String.ofList p.1
             let r' := skipWs p.2
             match r' with
-            | '(' :: argsStart => 
+            | '(' :: argsStart =>
                 let argsStart' := skipWs argsStart
                 match argsStart' with
                 | ')' :: r'' => [{ rest := skipWs r'', term := some (Term.compound name []) }]
                 | _ =>
                     (pAll Target.Args argsStart').filterMap (fun res =>
                       match res.args with
-                      | some ts => 
+                      | some ts =>
                           match skipWs res.rest with
                           | ')' :: r'' => some { rest := skipWs r'', term := some (Term.compound name ts) }
                           | _ => none
                       | _ => none)
             | _ => [{ rest := skipWs p.2, term := some (Term.atom name) }]
           else []
-  | Target.Args => 
+  | Target.Args =>
       let resTerms := pAll Target.Term cs'
       List.flatten (resTerms.map (fun res =>
         match res.term with
@@ -116,7 +116,7 @@ partial def pAll (t : Target) (cs : List Char) : List POut :=
                 match r2.term with
                 | some t2 => some { rest := r2.rest, constraint := some (Constraint.equal t1 t2) }
                 | _ => none)
-            | _ => 
+            | _ =>
                 match t1 with
                 | Term.compound name args => [{ rest := res.rest, constraint := some (Constraint.call name args) }]
                 | _ => [{ rest := res.rest, constraint := some (Constraint.fact t1) }]
@@ -149,7 +149,7 @@ partial def pAll (t : Target) (cs : List Char) : List POut :=
             match skipWs p2.2 with
             | ')' :: r4 =>
                 match skipWs r4 with
-                | '=' :: r5 => 
+                | '=' :: r5 =>
                     (pAll Target.Term r5).filterMap (fun res =>
                       match res.term with
                       | some body => some { rest := skipWs res.rest, decl := some (Declaration.macroDef name params body) }
@@ -178,7 +178,7 @@ partial def pAll (t : Target) (cs : List Char) : List POut :=
         | _ => []
       else
         let res := pAll Target.Full cs'
-        res.filterMap (fun r => 
+        res.filterMap (fun r =>
           match r.constraint with
           | some c => some { rest := r.rest, decl := some (Declaration.action c) }
           | none => none)
@@ -188,9 +188,9 @@ partial def programDebug (cs : List Char) : List Declaration × String :=
   if cs'.isEmpty then ([], "")
   else
     match pAll Target.Decl cs' with
-    | res :: _ => 
+    | res :: _ =>
         match res.decl with
-        | some d => 
+        | some d =>
             let (ds, last) := programDebug res.rest
             (d :: ds, last)
         | none => ([], String.ofList (cs'.take 20))

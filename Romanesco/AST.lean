@@ -7,7 +7,7 @@ inductive Term
   | var : String → Term
   | compound : String → List Term → Term
   | list : List Term → Term
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, Inhabited, Hashable
 
 /-- 制約 --/
 inductive Constraint
@@ -16,22 +16,37 @@ inductive Constraint
   | disj : Constraint → Constraint → Constraint
   | fact : Term → Constraint
   | call : String → List Term → Constraint
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, Inhabited, Hashable
+
+/-- 字句・構文の役割カテゴリ --/
+inductive LexicalCategory
+  | prefix    -- 接頭詞 (!x)
+  | suffix    -- 接尾詞 (x?)
+  | infix     -- 中置 (x + y)
+  | unary     -- 単項 (Standalone)
+  | delimiter -- 括弧ペア ( (x) )
+  | separator -- 区切り文字 (x, y)
+  | keyword   -- 予約語 (syntax)
+  | comment   -- コメント (# ...)
+  deriving Repr, BEq, Inhabited, Hashable
 
 /-- 構文定義のためのメタデータ --/
 inductive SyntaxRule
-  | terminal : String → SyntaxRule       -- 固定文字列 (例: "if")
-  | nonTerminal : String → SyntaxRule    -- 他のルール参照 (例: expression)
-  | seq : List SyntaxRule → SyntaxRule   -- 連続 (A B C)
-  | alt : List SyntaxRule → SyntaxRule   -- 選択 (A | B)
-  | many : SyntaxRule → SyntaxRule       -- 繰り返し (A*)
-  deriving Repr, BEq, Inhabited
+  | terminal : String → SyntaxRule
+  | nonTerminal : String → SyntaxRule
+  | seq : List SyntaxRule → SyntaxRule
+  | alt : List SyntaxRule → SyntaxRule
+  | many : SyntaxRule → SyntaxRule
+  | anyChar : SyntaxRule
+  | charRange : Char → Char → SyntaxRule
+  | categorized : LexicalCategory → SyntaxRule → SyntaxRule -- カテゴリ付きルール
+  deriving Repr, BEq, Inhabited, Hashable
 
 /-- 宣言 --/
 inductive Declaration
   | macroDef : String → List String → Term → Declaration
-  | ruleDef : String → List String → Constraint → Declaration -- 述語定義
-  | syntaxDef : String → SyntaxRule → Declaration             -- 構文定義 (例: def syntax expr = ...)
+  | ruleDef : String → List String → Constraint → Declaration
+  | syntaxDef : String → SyntaxRule → Declaration
   | action : Constraint → Declaration
   deriving Repr, Inhabited
 

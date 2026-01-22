@@ -12,3 +12,8 @@ also this is included powerful macro systems.
 All toknized and parsed rules are can be added, edited, and deleted. 
 
 全ての構文ルール、字句規則は変更可能であり、追加はもちろん、編集したり、削除することもできます。
+
+
+In addition, ambiguous grammar, and toknize can be solved by using non-determinism.
+
+また、非決定性を用いることで、曖昧な文法、及び字句規則も解決できます。
