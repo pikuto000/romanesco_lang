@@ -11,6 +11,7 @@ enum Tree[T]{
     }
   }
 
+  //for debugging
   def prettyPrint(prefix: String = "", isLast: Boolean = true, isRoot: Boolean = true): String = {
     val marker = if (isRoot) "" else if (isLast) "+-- " else "|-- "
     val currentLine = s"$prefix$marker$valueString\n"
@@ -38,8 +39,20 @@ enum Tree[T]{
     this.match{
       case E() => "E"
       case V(v,b)=>{
-        s"V($v, ${b.map(_.toString).mkString("[ "," , "," ]")})".replace("\n","\\n").replace("\r","\\r")
+        s"V($v, ${b.map(_.toString).mkString("[",",","]")})".replace("\n","\\n").replace("\r","\\r")
       }
     }
+  }
+}
+
+object Tree {
+  def merge[T](trees: Vector[Tree[T]]): Vector[Tree[T]] = {
+    val vs = trees.collect { case v: Tree.V[T] => v }
+    val merged = vs.groupBy(_.value).map { case (value, group) =>
+      Tree.V(value, merge(group.flatMap(_.branch)))
+    }.toVector
+    
+    val hasEmpty = trees.exists { case Tree.E() => true; case _ => false }
+    if (hasEmpty) merged :+ Tree.E() else merged
   }
 }

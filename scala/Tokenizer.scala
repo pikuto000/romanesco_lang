@@ -12,66 +12,111 @@ final class Tokenizer(rules:Map[String,Regex])extends RegexParsers {
   type Col = Int
   type Token = Tuple4[Row,Col,TokenType,Content]
   type TokenTree = Tree[Token]
-  //ソースの内容を、解釈の可能性を全て残しながら再帰的にトークナイズする。
-  //解釈の可能性を残すために、Vector[TokenTree]型を用いる。
-  private val cache = mutable.Map[Int, Vector[TokenTree]]()
-  def toknize(s:String)(row:Row=0,col:Col=0,offset:Int=0):Vector[TokenTree]={
-    
-    if (cache.contains(offset)) {
-      logger.log(s"cache hit at offset $offset")
-      return cache(offset)
-    }
 
-    val result = if (s.isEmpty) {
+  // 木の構造自体をキャッシュする (offset, isEOF) -> 結果
+  private val cache = mutable.Map[(Int, Boolean), Vector[TokenTree]]()
+  
+  // 正規表現のマッチング結果をキャッシュする (startOffset, endOffset) -> マッチしたルールのリスト
+  private val matchCache = mutable.Map[(Int, Int), Vector[Regex]]()
+
+  private def getMatches(s: String, start: Int, len: Int): Vector[Regex] = {
+    matchCache.getOrElseUpdate((start, start + len), {
+      val sub = s.substring(0, len)
+      rules.values.filter(_.anchored.findFirstIn(sub).isDefined).toVector
+    })
+  }
+
+  // 統合トークナイズメソッド
+  def toknize(s: String): TokenTree = {
+    clearCache()
+    // 逆方向を先に走らせて matchCache を埋める（順序は任意）
+    toknizeFromEOF(s)(offset = s.length)
+    // 順方向の結果をメインのツリーとして採用
+    lazy val branches = toknizeFromSOF(s)()
+    Tree.V((0, 0, "SOF".r, "SOF"), branches)
+  }
+
+  // 前方向全探索トークナイズ
+  def toknizeFromSOF(s:String)(row:Row=0,col:Col=0,offset:Int=0):Vector[TokenTree]={
+    if (cache.contains((offset, false))) {
+      logger.log(s"SOF cache hit at offset $offset")
+      return cache((offset, false))
+    }
+    
+    lazy val result = if (s.isEmpty) {
       Vector(Tree.V((row, col, "EOF".r, "EOF"), Vector.empty))
     } else {
-      logger.log(s"tokenize start at line:${row+1} col:${col}, offset is $offset, string length:${s.length}")
-      
-      // 各ルールを適用して、マッチしたものをブランチとして追加する
-      rules.values.flatMap { r =>
-        parse(r, s) match {
-          case Success(result, next) if result.length > 0 =>
-            val new_row = row + result.count(_ == '\n')
-            val new_col = if (result.contains("\n")) result.length - result.lastIndexOf("\n") - 1 else col + result.length
-            val new_offset = offset + result.length
-            val nextString = next.source.subSequence(next.offset, next.source.length).toString
-            val subTrees = toknize(nextString)(new_row, new_col, new_offset)
-            Some(Tree.V((row, col, r, result), subTrees))
-          case _ => 
-            None
-        }
+      val rawBranches = (1 to s.length).flatMap { len =>
+        lazy val matchedRules = getMatches(s, offset, len)
+        lazy val matchedText = s.substring(0, len)
+        lazy val new_row = row + matchedText.count(_ == '\n')
+        lazy val new_col = if (matchedText.contains("\n")) matchedText.length - matchedText.lastIndexOf("\n") - 1 else col + matchedText.length
+        
+        lazy val nextString = s.substring(len)
+        lazy val subTrees = toknizeFromSOF(nextString)(new_row, new_col, offset + len)
+        matchedRules.map(r => Tree.V((row, col, r, matchedText), subTrees))
       }.toVector
+      Tree.merge(rawBranches)
     }
-
-    cache(offset) = result
+    cache((offset, false)) = result
     result
   }
-}
-@main def testTokenize={
-  //トークナイズのテスト
-  Debug.logger.switch(true)
-  val rules=Map(
-  "comment" -> "//.*".r,
-  "string" -> "\".*?\"".r,
-  "excramation" -> "!".r,
-  "semicolon" -> ";".r,
-  "identifier" -> "[a-zA-Z_][a-zA-Z0-9_]*".r,
-  "number" -> "[0-9]+".r,
-  "float" -> "[0-9]+\\.[0-9]+".r,
-  "whitespace" -> "\\s+".r,
-  "word" -> "\\S+".r
-  )
-  val tokenizer = new Tokenizer(rules)
-  val testString=
-    """!test;"""
-  val branches=tokenizer.toknize(testString)()
-  val resultTree=Tree.V((0,0,"SOF".r,"SOF"), branches)
-
-  println("\nTree structure:")
-  println(resultTree.prettyPrint())
   
-  println("\nFlattened paths (token contents):")
-  resultTree.flatten.foreach { p =>
-    println(p.map(t => s"'${t._4}'").mkString(" -> ").replace("\n","\\n").replace("\r","\\r"))
+  // 逆方向全探索トークナイズ
+  def toknizeFromEOF(s:String)(row:Row=0,col:Col=0,offset:Int=0):Vector[TokenTree]={
+    if (cache.contains((offset, true))) {
+      logger.log(s"EOF cache hit at offset $offset")
+      return cache((offset, true))
+    }
+    
+    lazy val result = if (s.isEmpty) {
+      Vector(Tree.V((row, col, "SOF".r, "SOF"), Vector.empty))
+    } else {
+      val rawBranches = (0 until s.length).flatMap { start =>
+        lazy val len = s.length - start
+        lazy val sub = s.substring(start)
+        lazy val matchedRules = getMatches(sub, start, len)
+        lazy val matchedText = sub
+        lazy val remainingString = s.substring(0, start)
+        
+        lazy val subTrees = toknizeFromEOF(remainingString)(row, col, start)
+        matchedRules.map(r => Tree.V((row, col, r, matchedText), subTrees))
+      }.toVector
+      Tree.merge(rawBranches)
+    }
+    cache((offset, true)) = result
+    result
   }
+  def clearCache() = {
+    cache.clear()
+    matchCache.clear()
+  }
+}
+
+@main def testTokenizer(): Unit = {
+  Debug.logger.switch(true) // 大量に出る場合は一旦オフ
+  val rules = Map(
+    "excramation" -> "!".r,
+    "semicolon" -> ";".r,
+    "identifier" -> "[a-zA-Z_][a-zA-Z0-9_]*".r,
+    "whitespace" -> "\\s+".r
+  )
+
+  def runTest(input: String): Unit = {
+    println(s"\n" + "=" * 40)
+    println(s"Testing input: '$input'")
+    lazy val tokenizer = new Tokenizer(rules)
+    val tree = tokenizer.toknize(input)
+    
+    println("\n--- TokenTree Structure ---")
+    println(tree.prettyPrint())
+    
+    lazy val paths = tree.flatten.map(_.map(_._4).mkString(" -> ")).toSet
+    println(s"--- Unique Interpretations (${paths.size} found) ---")
+    paths.toSeq.sorted.foreach(p => println(s"  $p"))
+  }
+
+  // 複数のパターンを検証
+  runTest("!test;")
+  runTest("abc def")
 }

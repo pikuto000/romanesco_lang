@@ -1,0 +1,700 @@
+logger enabled
+
+========================================
+Testing input: '!test;'
+EOF cache hit at offset 0
+EOF cache hit at offset 0
+EOF cache hit at offset 1
+EOF cache hit at offset 0
+EOF cache hit at offset 1
+EOF cache hit at offset 2
+EOF cache hit at offset 0
+EOF cache hit at offset 1
+EOF cache hit at offset 2
+EOF cache hit at offset 3
+EOF cache hit at offset 0
+EOF cache hit at offset 1
+EOF cache hit at offset 2
+EOF cache hit at offset 3
+EOF cache hit at offset 4
+SOF cache hit at offset 6
+SOF cache hit at offset 5
+SOF cache hit at offset 6
+SOF cache hit at offset 4
+SOF cache hit at offset 5
+SOF cache hit at offset 6
+SOF cache hit at offset 3
+SOF cache hit at offset 4
+SOF cache hit at offset 5
+SOF cache hit at offset 6
+SOF cache hit at offset 2
+SOF cache hit at offset 3
+SOF cache hit at offset 4
+SOF cache hit at offset 5
+SOF cache hit at offset 6
+
+--- TokenTree Structure ---
+(0,0,SOF,SOF)
+|-- (0,0,!,!test;)
+|   +-- (0,6,EOF,EOF)
+|-- (0,0,;,!test;)
+|   +-- (0,6,EOF,EOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,!test)
+|   +-- (0,5,;,;)
+|       +-- (0,6,EOF,EOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,!te)
+|   |-- (0,3,;,st;)
+|   |   +-- (0,6,EOF,EOF)
+|   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,s)
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   |   +-- (0,6,EOF,EOF)
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   |   +-- (0,5,;,;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   +-- (0,4,;,t;)
+|   |       +-- (0,6,EOF,EOF)
+|   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st)
+|   |   +-- (0,5,;,;)
+|   |       +-- (0,6,EOF,EOF)
+|   +-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st;)
+|       +-- (0,6,EOF,EOF)
+|-- (0,0,!,!test)
+|   +-- (0,5,;,;)
+|       +-- (0,6,EOF,EOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,!t)
+|   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |-- (0,3,;,st;)
+|   |   |   +-- (0,6,EOF,EOF)
+|   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,s)
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   |   |   +-- (0,6,EOF,EOF)
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   |   |   +-- (0,5,;,;)
+|   |   |   |       +-- (0,6,EOF,EOF)
+|   |   |   +-- (0,4,;,t;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st)
+|   |   |   +-- (0,5,;,;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   +-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st;)
+|   |       +-- (0,6,EOF,EOF)
+|   |-- (0,2,;,est;)
+|   |   +-- (0,6,EOF,EOF)
+|   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,es)
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   |   +-- (0,6,EOF,EOF)
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   |   +-- (0,5,;,;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   +-- (0,4,;,t;)
+|   |       +-- (0,6,EOF,EOF)
+|   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,est)
+|   |   +-- (0,5,;,;)
+|   |       +-- (0,6,EOF,EOF)
+|   +-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,est;)
+|       +-- (0,6,EOF,EOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,!test;)
+|   +-- (0,6,EOF,EOF)
+|-- (0,0,!,!)
+|   |-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,tes)
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   |   +-- (0,6,EOF,EOF)
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   |   +-- (0,5,;,;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   +-- (0,4,;,t;)
+|   |       +-- (0,6,EOF,EOF)
+|   |-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,te)
+|   |   |-- (0,3,;,st;)
+|   |   |   +-- (0,6,EOF,EOF)
+|   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,s)
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   |   |   +-- (0,6,EOF,EOF)
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   |   |   +-- (0,5,;,;)
+|   |   |   |       +-- (0,6,EOF,EOF)
+|   |   |   +-- (0,4,;,t;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st)
+|   |   |   +-- (0,5,;,;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   +-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st;)
+|   |       +-- (0,6,EOF,EOF)
+|   |-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,test)
+|   |   +-- (0,5,;,;)
+|   |       +-- (0,6,EOF,EOF)
+|   |-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   |-- (0,3,;,st;)
+|   |   |   |   +-- (0,6,EOF,EOF)
+|   |   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,s)
+|   |   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   |   |   |   +-- (0,6,EOF,EOF)
+|   |   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   |   |   |   +-- (0,5,;,;)
+|   |   |   |   |       +-- (0,6,EOF,EOF)
+|   |   |   |   +-- (0,4,;,t;)
+|   |   |   |       +-- (0,6,EOF,EOF)
+|   |   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st)
+|   |   |   |   +-- (0,5,;,;)
+|   |   |   |       +-- (0,6,EOF,EOF)
+|   |   |   +-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   |-- (0,2,;,est;)
+|   |   |   +-- (0,6,EOF,EOF)
+|   |   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,es)
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   |   |   +-- (0,6,EOF,EOF)
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   |   |   +-- (0,5,;,;)
+|   |   |   |       +-- (0,6,EOF,EOF)
+|   |   |   +-- (0,4,;,t;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,est)
+|   |   |   +-- (0,5,;,;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   +-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,est;)
+|   |       +-- (0,6,EOF,EOF)
+|   |-- (0,1,;,test;)
+|   |   +-- (0,6,EOF,EOF)
+|   +-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,test;)
+|       +-- (0,6,EOF,EOF)
+|-- (0,0,!,!tes)
+|   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   +-- (0,6,EOF,EOF)
+|   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   +-- (0,5,;,;)
+|   |       +-- (0,6,EOF,EOF)
+|   +-- (0,4,;,t;)
+|       +-- (0,6,EOF,EOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,!tes)
+|   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   +-- (0,6,EOF,EOF)
+|   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   +-- (0,5,;,;)
+|   |       +-- (0,6,EOF,EOF)
+|   +-- (0,4,;,t;)
+|       +-- (0,6,EOF,EOF)
+|-- (0,0,!,!t)
+|   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |-- (0,3,;,st;)
+|   |   |   +-- (0,6,EOF,EOF)
+|   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,s)
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   |   |   +-- (0,6,EOF,EOF)
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   |   |   +-- (0,5,;,;)
+|   |   |   |       +-- (0,6,EOF,EOF)
+|   |   |   +-- (0,4,;,t;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st)
+|   |   |   +-- (0,5,;,;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   +-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st;)
+|   |       +-- (0,6,EOF,EOF)
+|   |-- (0,2,;,est;)
+|   |   +-- (0,6,EOF,EOF)
+|   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,es)
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+|   |   |   +-- (0,6,EOF,EOF)
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+|   |   |   +-- (0,5,;,;)
+|   |   |       +-- (0,6,EOF,EOF)
+|   |   +-- (0,4,;,t;)
+|   |       +-- (0,6,EOF,EOF)
+|   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,est)
+|   |   +-- (0,5,;,;)
+|   |       +-- (0,6,EOF,EOF)
+|   +-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,est;)
+|       +-- (0,6,EOF,EOF)
++-- (0,0,!,!te)
+    |-- (0,3,;,st;)
+    |   +-- (0,6,EOF,EOF)
+    |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,s)
+    |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t;)
+    |   |   +-- (0,6,EOF,EOF)
+    |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,t)
+    |   |   +-- (0,5,;,;)
+    |   |       +-- (0,6,EOF,EOF)
+    |   +-- (0,4,;,t;)
+    |       +-- (0,6,EOF,EOF)
+    |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st)
+    |   +-- (0,5,;,;)
+    |       +-- (0,6,EOF,EOF)
+    +-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*,st;)
+        +-- (0,6,EOF,EOF)
+
+--- Unique Interpretations (32 found) ---
+  SOF -> ! -> t -> e -> s -> t -> ; -> EOF
+  SOF -> ! -> t -> e -> s -> t; -> EOF
+  SOF -> ! -> t -> e -> st -> ; -> EOF
+  SOF -> ! -> t -> e -> st; -> EOF
+  SOF -> ! -> t -> es -> t -> ; -> EOF
+  SOF -> ! -> t -> es -> t; -> EOF
+  SOF -> ! -> t -> est -> ; -> EOF
+  SOF -> ! -> t -> est; -> EOF
+  SOF -> ! -> te -> s -> t -> ; -> EOF
+  SOF -> ! -> te -> s -> t; -> EOF
+  SOF -> ! -> te -> st -> ; -> EOF
+  SOF -> ! -> te -> st; -> EOF
+  SOF -> ! -> tes -> t -> ; -> EOF
+  SOF -> ! -> tes -> t; -> EOF
+  SOF -> ! -> test -> ; -> EOF
+  SOF -> ! -> test; -> EOF
+  SOF -> !t -> e -> s -> t -> ; -> EOF
+  SOF -> !t -> e -> s -> t; -> EOF
+  SOF -> !t -> e -> st -> ; -> EOF
+  SOF -> !t -> e -> st; -> EOF
+  SOF -> !t -> es -> t -> ; -> EOF
+  SOF -> !t -> es -> t; -> EOF
+  SOF -> !t -> est -> ; -> EOF
+  SOF -> !t -> est; -> EOF
+  SOF -> !te -> s -> t -> ; -> EOF
+  SOF -> !te -> s -> t; -> EOF
+  SOF -> !te -> st -> ; -> EOF
+  SOF -> !te -> st; -> EOF
+  SOF -> !tes -> t -> ; -> EOF
+  SOF -> !tes -> t; -> EOF
+  SOF -> !test -> ; -> EOF
+  SOF -> !test; -> EOF
+
+========================================
+Testing input: 'abc def'
+EOF cache hit at offset 0
+EOF cache hit at offset 0
+EOF cache hit at offset 1
+EOF cache hit at offset 0
+EOF cache hit at offset 1
+EOF cache hit at offset 2
+EOF cache hit at offset 0
+EOF cache hit at offset 1
+EOF cache hit at offset 2
+EOF cache hit at offset 3
+EOF cache hit at offset 0
+EOF cache hit at offset 1
+EOF cache hit at offset 2
+EOF cache hit at offset 3
+EOF cache hit at offset 4
+EOF cache hit at offset 0
+EOF cache hit at offset 1
+EOF cache hit at offset 2
+EOF cache hit at offset 3
+EOF cache hit at offset 4
+EOF cache hit at offset 5
+SOF cache hit at offset 7
+SOF cache hit at offset 6
+SOF cache hit at offset 7
+SOF cache hit at offset 5
+SOF cache hit at offset 6
+SOF cache hit at offset 7
+SOF cache hit at offset 4
+SOF cache hit at offset 5
+SOF cache hit at offset 6
+SOF cache hit at offset 7
+SOF cache hit at offset 3
+SOF cache hit at offset 4
+SOF cache hit at offset 5
+SOF cache hit at offset 6
+SOF cache hit at offset 7
+SOF cache hit at offset 2
+SOF cache hit at offset 3
+SOF cache hit at offset 4
+SOF cache hit at offset 5
+SOF cache hit at offset 6
+SOF cache hit at offset 7
+
+--- TokenTree Structure ---
+(0,0,SOF,SOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,abc )
+|   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+|   |   +-- (0,7,EOF,EOF)
+|   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+|   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       +-- (0,7,EOF,EOF)
+|   +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+|       |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|       |       +-- (0,7,EOF,EOF)
+|       +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|           +-- (0,7,EOF,EOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,abc d)
+|   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       +-- (0,7,EOF,EOF)
+|   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|       +-- (0,7,EOF,EOF)
+|-- (0,0,\s+,abc de)
+|   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|       +-- (0,7,EOF,EOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,a)
+|   |-- (0,1,\s+,bc de)
+|   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       +-- (0,7,EOF,EOF)
+|   |-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,bc d)
+|   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |       +-- (0,7,EOF,EOF)
+|   |-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,b)
+|   |   |-- (0,2,\s+,c def)
+|   |   |   +-- (0,7,EOF,EOF)
+|   |   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,c)
+|   |   |   |-- (0,3,\s+, d)
+|   |   |   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, d)
+|   |   |   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   |-- (0,3,\s+, def)
+|   |   |   |   +-- (0,7,EOF,EOF)
+|   |   |   |-- (0,3,\s+, de)
+|   |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, def)
+|   |   |   |   +-- (0,7,EOF,EOF)
+|   |   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, de)
+|   |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   +-- (0,3,\s+, )
+|   |   |       |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+|   |   |       |   +-- (0,7,EOF,EOF)
+|   |   |       |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+|   |   |       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       |       +-- (0,7,EOF,EOF)
+|   |   |       +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+|   |   |           |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |           |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |           |       +-- (0,7,EOF,EOF)
+|   |   |           +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |   |               +-- (0,7,EOF,EOF)
+|   |   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,c )
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+|   |   |   |   +-- (0,7,EOF,EOF)
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+|   |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+|   |   |       |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       |       +-- (0,7,EOF,EOF)
+|   |   |       +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |   |           +-- (0,7,EOF,EOF)
+|   |   |-- (0,2,\s+,c d)
+|   |   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   |-- (0,2,\s+,c de)
+|   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,c d)
+|   |   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   |-- (0,2,\s+,c )
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+|   |   |   |   +-- (0,7,EOF,EOF)
+|   |   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+|   |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+|   |   |       |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       |       +-- (0,7,EOF,EOF)
+|   |   |       +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |   |           +-- (0,7,EOF,EOF)
+|   |   |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,c def)
+|   |   |   +-- (0,7,EOF,EOF)
+|   |   +-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,c de)
+|   |       +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |           +-- (0,7,EOF,EOF)
+|   |-- (0,1,\s+,bc def)
+|   |   +-- (0,7,EOF,EOF)
+|   |-- (0,1,\s+,bc d)
+|   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |       +-- (0,7,EOF,EOF)
+|   |-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,bc )
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+|   |   |   +-- (0,7,EOF,EOF)
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+|   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+|   |       |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       |       +-- (0,7,EOF,EOF)
+|   |       +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |           +-- (0,7,EOF,EOF)
+|   |-- (0,1,\s+,bc )
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+|   |   |   +-- (0,7,EOF,EOF)
+|   |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+|   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+|   |       |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       |       +-- (0,7,EOF,EOF)
+|   |       +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |           +-- (0,7,EOF,EOF)
+|   |-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,bc)
+|   |   |-- (0,3,\s+, d)
+|   |   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, d)
+|   |   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |   |       +-- (0,7,EOF,EOF)
+|   |   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   |-- (0,3,\s+, def)
+|   |   |   +-- (0,7,EOF,EOF)
+|   |   |-- (0,3,\s+, de)
+|   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, def)
+|   |   |   +-- (0,7,EOF,EOF)
+|   |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, de)
+|   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   +-- (0,3,\s+, )
+|   |       |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+|   |       |   +-- (0,7,EOF,EOF)
+|   |       |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+|   |       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       |       +-- (0,7,EOF,EOF)
+|   |       +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+|   |           |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |           |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |           |       +-- (0,7,EOF,EOF)
+|   |           +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |               +-- (0,7,EOF,EOF)
+|   |-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,bc de)
+|   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       +-- (0,7,EOF,EOF)
+|   +-- (0,1,[a-zA-Z_][a-zA-Z0-9_]*,bc def)
+|       +-- (0,7,EOF,EOF)
+|-- (0,0,\s+,abc d)
+|   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       +-- (0,7,EOF,EOF)
+|   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|       +-- (0,7,EOF,EOF)
+|-- (0,0,\s+,abc )
+|   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+|   |   +-- (0,7,EOF,EOF)
+|   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+|   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       +-- (0,7,EOF,EOF)
+|   +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+|       |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|       |       +-- (0,7,EOF,EOF)
+|       +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|           +-- (0,7,EOF,EOF)
+|-- (0,0,\s+,abc def)
+|   +-- (0,7,EOF,EOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,abc de)
+|   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|       +-- (0,7,EOF,EOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,abc def)
+|   +-- (0,7,EOF,EOF)
+|-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,abc)
+|   |-- (0,3,\s+, d)
+|   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |       +-- (0,7,EOF,EOF)
+|   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, d)
+|   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |   |       +-- (0,7,EOF,EOF)
+|   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|   |       +-- (0,7,EOF,EOF)
+|   |-- (0,3,\s+, def)
+|   |   +-- (0,7,EOF,EOF)
+|   |-- (0,3,\s+, de)
+|   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       +-- (0,7,EOF,EOF)
+|   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, def)
+|   |   +-- (0,7,EOF,EOF)
+|   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, de)
+|   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|   |       +-- (0,7,EOF,EOF)
+|   +-- (0,3,\s+, )
+|       |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+|       |   +-- (0,7,EOF,EOF)
+|       |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+|       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|       |       +-- (0,7,EOF,EOF)
+|       +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+|           |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+|           |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+|           |       +-- (0,7,EOF,EOF)
+|           +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+|               +-- (0,7,EOF,EOF)
++-- (0,0,[a-zA-Z_][a-zA-Z0-9_]*,ab)
+    |-- (0,2,\s+,c def)
+    |   +-- (0,7,EOF,EOF)
+    |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,c)
+    |   |-- (0,3,\s+, d)
+    |   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+    |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |   |   |       +-- (0,7,EOF,EOF)
+    |   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+    |   |       +-- (0,7,EOF,EOF)
+    |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, d)
+    |   |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+    |   |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |   |   |       +-- (0,7,EOF,EOF)
+    |   |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+    |   |       +-- (0,7,EOF,EOF)
+    |   |-- (0,3,\s+, def)
+    |   |   +-- (0,7,EOF,EOF)
+    |   |-- (0,3,\s+, de)
+    |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |   |       +-- (0,7,EOF,EOF)
+    |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, def)
+    |   |   +-- (0,7,EOF,EOF)
+    |   |-- (0,3,[a-zA-Z_][a-zA-Z0-9_]*, de)
+    |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |   |       +-- (0,7,EOF,EOF)
+    |   +-- (0,3,\s+, )
+    |       |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+    |       |   +-- (0,7,EOF,EOF)
+    |       |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+    |       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |       |       +-- (0,7,EOF,EOF)
+    |       +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+    |           |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+    |           |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |           |       +-- (0,7,EOF,EOF)
+    |           +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+    |               +-- (0,7,EOF,EOF)
+    |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,c )
+    |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+    |   |   +-- (0,7,EOF,EOF)
+    |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+    |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |   |       +-- (0,7,EOF,EOF)
+    |   +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+    |       |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+    |       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |       |       +-- (0,7,EOF,EOF)
+    |       +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+    |           +-- (0,7,EOF,EOF)
+    |-- (0,2,\s+,c d)
+    |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+    |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |   |       +-- (0,7,EOF,EOF)
+    |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+    |       +-- (0,7,EOF,EOF)
+    |-- (0,2,\s+,c de)
+    |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |       +-- (0,7,EOF,EOF)
+    |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,c d)
+    |   |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+    |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |   |       +-- (0,7,EOF,EOF)
+    |   +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+    |       +-- (0,7,EOF,EOF)
+    |-- (0,2,\s+,c )
+    |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,def)
+    |   |   +-- (0,7,EOF,EOF)
+    |   |-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,de)
+    |   |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |   |       +-- (0,7,EOF,EOF)
+    |   +-- (0,4,[a-zA-Z_][a-zA-Z0-9_]*,d)
+    |       |-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,e)
+    |       |   +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+    |       |       +-- (0,7,EOF,EOF)
+    |       +-- (0,5,[a-zA-Z_][a-zA-Z0-9_]*,ef)
+    |           +-- (0,7,EOF,EOF)
+    |-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,c def)
+    |   +-- (0,7,EOF,EOF)
+    +-- (0,2,[a-zA-Z_][a-zA-Z0-9_]*,c de)
+        +-- (0,6,[a-zA-Z_][a-zA-Z0-9_]*,f)
+            +-- (0,7,EOF,EOF)
+
+--- Unique Interpretations (64 found) ---
+  SOF -> a -> b -> c  -> d -> e -> f -> EOF
+  SOF -> a -> b -> c  -> d -> ef -> EOF
+  SOF -> a -> b -> c  -> de -> f -> EOF
+  SOF -> a -> b -> c  -> def -> EOF
+  SOF -> a -> b -> c ->   -> d -> e -> f -> EOF
+  SOF -> a -> b -> c ->   -> d -> ef -> EOF
+  SOF -> a -> b -> c ->   -> de -> f -> EOF
+  SOF -> a -> b -> c ->   -> def -> EOF
+  SOF -> a -> b -> c ->  d -> e -> f -> EOF
+  SOF -> a -> b -> c ->  d -> ef -> EOF
+  SOF -> a -> b -> c ->  de -> f -> EOF
+  SOF -> a -> b -> c ->  def -> EOF
+  SOF -> a -> b -> c d -> e -> f -> EOF
+  SOF -> a -> b -> c d -> ef -> EOF
+  SOF -> a -> b -> c de -> f -> EOF
+  SOF -> a -> b -> c def -> EOF
+  SOF -> a -> bc  -> d -> e -> f -> EOF
+  SOF -> a -> bc  -> d -> ef -> EOF
+  SOF -> a -> bc  -> de -> f -> EOF
+  SOF -> a -> bc  -> def -> EOF
+  SOF -> a -> bc ->   -> d -> e -> f -> EOF
+  SOF -> a -> bc ->   -> d -> ef -> EOF
+  SOF -> a -> bc ->   -> de -> f -> EOF
+  SOF -> a -> bc ->   -> def -> EOF
+  SOF -> a -> bc ->  d -> e -> f -> EOF
+  SOF -> a -> bc ->  d -> ef -> EOF
+  SOF -> a -> bc ->  de -> f -> EOF
+  SOF -> a -> bc ->  def -> EOF
+  SOF -> a -> bc d -> e -> f -> EOF
+  SOF -> a -> bc d -> ef -> EOF
+  SOF -> a -> bc de -> f -> EOF
+  SOF -> a -> bc def -> EOF
+  SOF -> ab -> c  -> d -> e -> f -> EOF
+  SOF -> ab -> c  -> d -> ef -> EOF
+  SOF -> ab -> c  -> de -> f -> EOF
+  SOF -> ab -> c  -> def -> EOF
+  SOF -> ab -> c ->   -> d -> e -> f -> EOF
+  SOF -> ab -> c ->   -> d -> ef -> EOF
+  SOF -> ab -> c ->   -> de -> f -> EOF
+  SOF -> ab -> c ->   -> def -> EOF
+  SOF -> ab -> c ->  d -> e -> f -> EOF
+  SOF -> ab -> c ->  d -> ef -> EOF
+  SOF -> ab -> c ->  de -> f -> EOF
+  SOF -> ab -> c ->  def -> EOF
+  SOF -> ab -> c d -> e -> f -> EOF
+  SOF -> ab -> c d -> ef -> EOF
+  SOF -> ab -> c de -> f -> EOF
+  SOF -> ab -> c def -> EOF
+  SOF -> abc  -> d -> e -> f -> EOF
+  SOF -> abc  -> d -> ef -> EOF
+  SOF -> abc  -> de -> f -> EOF
+  SOF -> abc  -> def -> EOF
+  SOF -> abc ->   -> d -> e -> f -> EOF
+  SOF -> abc ->   -> d -> ef -> EOF
+  SOF -> abc ->   -> de -> f -> EOF
+  SOF -> abc ->   -> def -> EOF
+  SOF -> abc ->  d -> e -> f -> EOF
+  SOF -> abc ->  d -> ef -> EOF
+  SOF -> abc ->  de -> f -> EOF
+  SOF -> abc ->  def -> EOF
+  SOF -> abc d -> e -> f -> EOF
+  SOF -> abc d -> ef -> EOF
+  SOF -> abc de -> f -> EOF
+  SOF -> abc def -> EOF
