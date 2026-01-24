@@ -37,6 +37,7 @@ inductive SyntaxRule
   | seq : List SyntaxRule → SyntaxRule
   | alt : List SyntaxRule → SyntaxRule
   | many : SyntaxRule → SyntaxRule
+  | many1 : SyntaxRule → SyntaxRule
   | anyChar : SyntaxRule
   | charRange : Char → Char → SyntaxRule
   | categorized : LexicalCategory → SyntaxRule → SyntaxRule -- カテゴリ付きルール
