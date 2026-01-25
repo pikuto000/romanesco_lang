@@ -55,4 +55,19 @@ object Tree {
     val hasEmpty = trees.exists { case Tree.E() => true; case _ => false }
     if (hasEmpty) merged :+ Tree.E() else merged
   }
+
+  def fromPaths[T](paths: Vector[Vector[T]]): Vector[Tree[T]] = {
+    paths.filter(_.nonEmpty).groupBy(_.head).map { case (value, subPaths) =>
+      Tree.V(value, fromPaths(subPaths.map(_.tail)))
+    }.toVector
+  }
+}
+
+type UInt = Int
+object Uint{
+  import scala.compiletime.error
+  inline def apply(inline n:Int):UInt={
+    inline if(n>=0)n else error("UInt cannot be negative")
+  }
+  extension(u:UInt)inline def toInt:Int=u
 }

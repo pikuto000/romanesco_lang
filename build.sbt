@@ -2,7 +2,7 @@ lazy val root = project
   .in(file("."))
   .enablePlugins(ScalaNativePlugin)
   .settings(
-    scalaVersion := "3.7.4", 
+    scalaVersion := "3.8.1", 
     sbtVersion := "1.12.0", 
     name := "romanesco",
     Compile / scalaSource := baseDirectory.value / "scala",

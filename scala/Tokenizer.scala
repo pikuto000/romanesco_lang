@@ -8,18 +8,22 @@ final class Tokenizer(rules:Map[String,Regex])extends RegexParsers {
   override val skipWhitespace = false
   type TokenType = Regex
   type Content = String
-  type Row = Int
-  type Col = Int
+  type Row = UInt
+  type Col = UInt
   type Token = Tuple4[Row,Col,TokenType,Content]
   type TokenTree = Tree[Token]
 
+  // 共通のパターンインスタンス（マージ時の等価性判定のため）
+  private val SOFPattern = "SOF".r
+  private val EOFPattern = "EOF".r
+
   // 木の構造自体をキャッシュする (offset, isEOF) -> 結果
-  private val cache = mutable.Map[(Int, Boolean), Vector[TokenTree]]()
+  private val cache = mutable.Map[(UInt, Boolean), Vector[TokenTree]]()
   
   // 正規表現のマッチング結果をキャッシュする (startOffset, endOffset) -> マッチしたルールのリスト
-  private val matchCache = mutable.Map[(Int, Int), Vector[Regex]]()
+  private val matchCache = mutable.Map[(UInt, UInt), Vector[Regex]]()
 
-  private def getMatches(s: String, start: Int, len: Int): Vector[Regex] = {
+  private def getMatches(s: String, start: UInt, len: UInt): Vector[Regex] = {
     matchCache.getOrElseUpdate((start, start + len), {
       val sub = s.substring(0, len)
       rules.values.filter(_.anchored.findFirstIn(sub).isDefined).toVector
@@ -29,32 +33,72 @@ final class Tokenizer(rules:Map[String,Regex])extends RegexParsers {
   // 統合トークナイズメソッド
   def toknize(s: String): TokenTree = {
     clearCache()
-    // 逆方向を先に走らせて matchCache を埋める（順序は任意）
-    toknizeFromEOF(s)(offset = s.length)
-    // 順方向の結果をメインのツリーとして採用
-    lazy val branches = toknizeFromSOF(s)()
-    Tree.V((0, 0, "SOF".r, "SOF"), branches)
+    // 逆方向を先に走らせて matchCache を埋める
+    val fromEOFbranches = toknizeFromEOF(s)(offset = s.length)
+    
+    // 逆方向の結果（木構造は逆向き）をフラット化して反転させ、順方向の木として再構築する
+    val reversedPaths = fromEOFbranches.flatMap(_.flatten).map(_.reverse)
+    
+    // パスの修正: 先頭のSOFを除去し、座標を再計算し、末尾にEOFを追加する
+    val correctedPaths = reversedPaths.map { path =>
+      // pathは [SOF, Token1, Token2, ..., TokenN] のはず
+      // 先頭がSOFなら除去する（構造上、トークンのみの列にする）
+      val tokens = if (path.headOption.exists(_._4 == "SOF")) path.tail else path
+      
+      var r:UInt = 0
+      var c:UInt = 0
+      
+      val fixedTokens = tokens.map { case (_, _, tokenType, content) =>
+        val currentToken = (r, c, tokenType, content)
+        // 座標更新
+        val newlines = content.count(_ == '\n')
+        if (newlines > 0) {
+          r += newlines
+          c = content.length - content.lastIndexOf('\n') - 1
+        } else {
+          c += content.length
+        }
+        currentToken
+      }
+      
+      val eofToken = (r, c, EOFPattern, "EOF")
+      fixedTokens :+ eofToken
+    }
+    
+    val fromEOFReversed = Tree.fromPaths(correctedPaths)
+
+    // 順方向の結果
+    val fromSOFbranches = toknizeFromSOF(s)()
+    
+    // 双方の結果を統合（マージ）する
+    val unifiedBranches = Tree.merge(fromSOFbranches ++ fromEOFReversed)
+    
+    Tree.V((0, 0, SOFPattern, "SOF"), unifiedBranches)
   }
 
   // 前方向全探索トークナイズ
-  def toknizeFromSOF(s:String)(row:Row=0,col:Col=0,offset:Int=0):Vector[TokenTree]={
+  def toknizeFromSOF(s:String)(row:Row=0,col:Col=0,offset:UInt=0):Vector[TokenTree]={
     if (cache.contains((offset, false))) {
       logger.log(s"SOF cache hit at offset $offset")
       return cache((offset, false))
     }
     
     lazy val result = if (s.isEmpty) {
-      Vector(Tree.V((row, col, "EOF".r, "EOF"), Vector.empty))
+      Vector(Tree.V((row, col, EOFPattern, "EOF"), Vector.empty))
     } else {
       val rawBranches = (1 to s.length).flatMap { len =>
-        lazy val matchedRules = getMatches(s, offset, len)
-        lazy val matchedText = s.substring(0, len)
-        lazy val new_row = row + matchedText.count(_ == '\n')
-        lazy val new_col = if (matchedText.contains("\n")) matchedText.length - matchedText.lastIndexOf("\n") - 1 else col + matchedText.length
-        
-        lazy val nextString = s.substring(len)
-        lazy val subTrees = toknizeFromSOF(nextString)(new_row, new_col, offset + len)
-        matchedRules.map(r => Tree.V((row, col, r, matchedText), subTrees))
+        if (cache.get((offset + len, true)).exists(_.nonEmpty)) {
+          lazy val matchedRules = getMatches(s, offset, len)
+          lazy val matchedText = s.substring(0, len)
+          lazy val new_row:UInt = row + matchedText.count(_ == '\n')
+          lazy val new_col:UInt = if (matchedText.contains("\n")) matchedText.length - matchedText.lastIndexOf("\n") - 1 else col + matchedText.length
+          
+          lazy val nextString = s.substring(len)
+          lazy val subTrees = toknizeFromSOF(nextString)(new_row, new_col, offset + len)
+          matchedRules.map(r => Tree.V((row, col, r, matchedText), subTrees))
+        } else {
+          Vector.empty
+        }
       }.toVector
       Tree.merge(rawBranches)
     }
@@ -63,17 +107,17 @@ final class Tokenizer(rules:Map[String,Regex])extends RegexParsers {
   }
   
   // 逆方向全探索トークナイズ
-  def toknizeFromEOF(s:String)(row:Row=0,col:Col=0,offset:Int=0):Vector[TokenTree]={
+  def toknizeFromEOF(s:String)(row:Row=0,col:Col=0,offset:UInt=0):Vector[TokenTree]={
     if (cache.contains((offset, true))) {
       logger.log(s"EOF cache hit at offset $offset")
       return cache((offset, true))
     }
     
     lazy val result = if (s.isEmpty) {
-      Vector(Tree.V((row, col, "SOF".r, "SOF"), Vector.empty))
+      Vector(Tree.V((row, col, SOFPattern, "SOF"), Vector.empty))
     } else {
       val rawBranches = (0 until s.length).flatMap { start =>
-        lazy val len = s.length - start
+        lazy val len:UInt = s.length - start
         lazy val sub = s.substring(start)
         lazy val matchedRules = getMatches(sub, start, len)
         lazy val matchedText = sub
