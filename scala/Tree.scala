@@ -3,6 +3,8 @@ enum Tree[T]{
   case E()//empty
   case V(value:T,branch:Vector[Tree[T]])
 
+  //def windows(n: UInt): Vector[Vector[Tree[T]]]= ???
+
   def flatten:Vector[Vector[T]]={
     this match {
       case E() => Vector.empty
@@ -69,5 +71,4 @@ object Uint{
   inline def apply(inline n:Int):UInt={
     inline if(n>=0)n else error("UInt cannot be negative")
   }
-  extension(u:UInt)inline def toInt:Int=u
 }

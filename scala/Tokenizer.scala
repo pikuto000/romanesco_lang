@@ -1,11 +1,9 @@
 package romanesco
 import scala.util.matching.Regex
-import scala.util.parsing.combinator.RegexParsers
 import scala.util.boundary
 import scala.collection.mutable
 import Debug.logger
-final class Tokenizer(rules:Map[String,Regex])extends RegexParsers {
-  override val skipWhitespace = false
+final class Tokenizer(rules:Map[String,Regex]){
   type TokenType = Regex
   type Content = String
   type Row = UInt
@@ -35,19 +33,15 @@ final class Tokenizer(rules:Map[String,Regex])extends RegexParsers {
     clearCache()
     // 逆方向を先に走らせて matchCache を埋める
     val fromEOFbranches = toknizeFromEOF(s)(offset = s.length)
-    
     // 逆方向の結果（木構造は逆向き）をフラット化して反転させ、順方向の木として再構築する
     val reversedPaths = fromEOFbranches.flatMap(_.flatten).map(_.reverse)
-    
     // パスの修正: 先頭のSOFを除去し、座標を再計算し、末尾にEOFを追加する
     val correctedPaths = reversedPaths.map { path =>
       // pathは [SOF, Token1, Token2, ..., TokenN] のはず
       // 先頭がSOFなら除去する（構造上、トークンのみの列にする）
       val tokens = if (path.headOption.exists(_._4 == "SOF")) path.tail else path
-      
       var r:UInt = 0
       var c:UInt = 0
-      
       val fixedTokens = tokens.map { case (_, _, tokenType, content) =>
         val currentToken = (r, c, tokenType, content)
         // 座標更新
@@ -60,19 +54,14 @@ final class Tokenizer(rules:Map[String,Regex])extends RegexParsers {
         }
         currentToken
       }
-      
       val eofToken = (r, c, EOFPattern, "EOF")
       fixedTokens :+ eofToken
     }
-    
     val fromEOFReversed = Tree.fromPaths(correctedPaths)
-
     // 順方向の結果
     val fromSOFbranches = toknizeFromSOF(s)()
-    
     // 双方の結果を統合（マージ）する
     val unifiedBranches = Tree.merge(fromSOFbranches ++ fromEOFReversed)
-    
     Tree.V((0, 0, SOFPattern, "SOF"), unifiedBranches)
   }
 
@@ -136,7 +125,7 @@ final class Tokenizer(rules:Map[String,Regex])extends RegexParsers {
     matchCache.clear()
   }
 }
-
+/*
 @main def testTokenizer(): Unit = {
   Debug.logger.switch(true) // 大量に出る場合は一旦オフ
   val rules = Map(
@@ -164,3 +153,4 @@ final class Tokenizer(rules:Map[String,Regex])extends RegexParsers {
   runTest("!test;")
   runTest("abc def")
 }
+*/
