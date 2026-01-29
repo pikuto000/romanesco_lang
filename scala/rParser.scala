@@ -1,52 +1,49 @@
 package romanesco
 import scala.collection.immutable
-import Predicates.Token
+import Predicates._
 import Debug.logger
 
-final class rParser[T](rules: immutable.Map[String, ParseRule[Any, Any]]) {
+final class rParser(rules: immutable.Map[String, ParseRule]) {
+  
+  type Token = Tokenizer#Token
+  type TokenTree = Tokenizer#TokenTree
+  type Operator = String
+  type Operand = Vector[String]
+  type Parseresult = Tuple2[Operator, Operand]
+  type ParseTree = Tree[Parseresult]
 
-  def parse(tokenTree: Tree[Token]): Tree[Any] = {
+  def parse(tokenTree: TokenTree): ParseTree = {
     logger.log("Starting parsing...")
     // Start parsing. tokenTree root is SOF.
-    val results = parseRecursive(tokenTree)
+    val results:Vector[ParseTree] = parseRecursive(tokenTree)
     
     // Merge results into a single tree structure
-    val merged = Tree.merge(results)
+    val merged:Vector[ParseTree] = Tree.merge(results)
     
     // Wrap in a Root node
-    Tree.V("ParseRoot", merged)
+    Tree.V(("ParseRoot", Vector.empty[String]), merged)
   }
 
-  private def parseRecursive(cursor: Tree[Token]): Vector[Tree[Any]] = {
+  private def parseRecursive(cursor: Tree[Token]): Vector[ParseTree] = {
     // 1. Try to match rules at the current position (looking at children of cursor)
     val ruleMatches = rules.values.toVector.flatMap { rule =>
       rule.apply(cursor)
     }
 
-    val ruleResults = if (ruleMatches.nonEmpty) {
-      ruleMatches.flatMap { case (node, nextBranches) =>
-        // Continue parsing from the branches where the rule ended
-        val tails = nextBranches.flatMap(parseRecursive)
-        
-        // Check if we reached a dead end
-        // If tails is empty, it means we couldn't parse further.
-        // But if nextBranches lead to EOF, tails should contain EOF nodes.
-        // If nextBranches was empty, it's also a dead end (premature end without EOF).
-        
-        if (tails.isEmpty && nextBranches.nonEmpty) {
-           Vector.empty
-        } else if (nextBranches.isEmpty) {
-           Vector.empty
-        } else {
-           // Attach tails to the node
-           node match {
-             case Tree.V(v, b) => Vector(Tree.V(v, b ++ tails))
-             case Tree.E() => tails
-           }
-        }
+    val ruleResults = ruleMatches.flatMap { case (node, nextBranches) =>
+      // Continue parsing from the branches where the rule ended
+      val tails = nextBranches.flatMap(parseRecursive)
+      
+      // Check if we reached a dead end
+      // If nextBranches is not empty but tails is empty, it means we couldn't parse further.
+      if (tails.isEmpty && nextBranches.nonEmpty) {
+         Vector.empty
+      } else {
+         // Attach tails to the node. node is (Operator, Operand)
+         // We also include operands as leaf nodes for visibility in the tree structure
+         val operandNodes = node._2.map(s => Tree.V((s, Vector.empty[String]), Vector.empty))
+         Vector(Tree.V(node, operandNodes ++ tails))
       }
-    } else {
-      Vector.empty
     }
 
     // 2. Shift / Skip (Standard traversal)
@@ -54,22 +51,16 @@ final class rParser[T](rules: immutable.Map[String, ParseRule[Any, Any]]) {
     // (or apply a rule at the next token).
     val shiftResults = cursor match {
       case Tree.V((_, _, _, "EOF"), _) =>
-        // Found EOF, return it to signal success of this path
-        Vector(Tree.V("EOF", Vector.empty))
+        // Found EOF, return it as a result to signal success of this path
+        Vector(Tree.V(("EOF", Vector.empty[String]), Vector.empty))
         
       case Tree.V((_, _, _, "SOF"), branches) =>
         // SOF is skipped, just parse children
         branches.flatMap(parseRecursive)
         
       case Tree.V(token, branches) =>
-        // Regular token. Consumed as a leaf (or node with children).
-        val tails = branches.flatMap(parseRecursive)
-        if (tails.isEmpty && branches.nonEmpty) {
-          Vector.empty
-        } else {
-          // Use token content as value
-          Vector(Tree.V(token._4, tails))
-        }
+        // Regular token. Skip and recurse to find rules deeper in the tree.
+        branches.flatMap(parseRecursive)
         
       case Tree.E() => Vector.empty
     }

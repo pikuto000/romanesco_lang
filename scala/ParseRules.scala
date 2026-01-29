@@ -2,24 +2,24 @@ package romanesco
 import scala.util.matching.Regex
 import Predicates.Predicate
 import Predicates.Token
+import romanesco.Predicates.TokenTree
 
-trait ParseRule[T, R] {
+trait ParseRule{
   def name: String
   // Returns Vector of (ResultNode, RemainingBranches)
   // RemainingBranches is Vector[Tree[Token]] (the next nodes to process)
-  def apply(cursor: Tree[Token]): Vector[(Tree[R], Vector[Tree[Token]])]
+  def apply(cursor: TokenTree): Vector[(Tuple2[String,Vector[String]], Vector[TokenTree])]
 }
 
-class StandardRule[T, R](
-  val name: String,
-  val pattern: Vector[Predicate],
-  val build: Vector[T] => Tree[R]
-) extends ParseRule[T, R] {
-
-  override def apply(cursor: Tree[Token]): Vector[(Tree[R], Vector[Tree[Token]])] = {
+class StandardRule(
+  val name: String,// Name of the rule for debugging purposes
+  val pattern: Vector[Predicate],// List of predicates to match
+  val build: Vector[Token] => Tuple2[String,Vector[String]]// Function to build the result node
+) extends ParseRule{
+  override def apply(cursor: Tree[Token]): Vector[(Tuple2[String,Vector[String]], Vector[TokenTree])] = {
     // Start matching from the children of the cursor
-    val startNodes = cursor match {
-      case Tree.V(_, branches) => branches
+    val startNodes: Vector[TokenTree] = cursor match {
+      case Tree.V(_, branches: Vector[TokenTree]) => branches
       case Tree.E() => Vector.empty
     }
 
@@ -27,15 +27,15 @@ class StandardRule[T, R](
   }
 
   private def matchSequence(
-    preds: List[Predicate],
-    candidates: Vector[Tree[Token]],
-    accum: Vector[Token]
-  ): Vector[(Tree[R], Vector[Tree[Token]])] = {
+    preds: List[Predicate],// List of predicates to match
+    candidates: Vector[TokenTree],// Vector of possible next nodes
+    accum: Vector[Token]//Vector of tokens matched so far
+  ): Vector[(Tuple2[String,Vector[String]], Vector[TokenTree])] = {
     preds match {
       case Nil =>
         // Pattern matched completely
         // Cast Token to T (Assuming T handles Token or the user knows what they are doing)
-        val inputs = accum.map(_.asInstanceOf[T])
+        val inputs = accum
         Vector((build(inputs), candidates))
       
       case p :: rest =>

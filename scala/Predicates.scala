@@ -4,7 +4,8 @@ import scala.util.matching.Regex
 object Predicates {
   // Assuming Token type matches Tokenizer's definition
   // Tuple4[Row, Col, TokenType, Content]
-  type Token = Tuple4[Int, Int, Regex, String]
+  type Token = Tokenizer#Token
+  type TokenTree = Tree[Token]
 
   trait Predicate {
     def check(t: Token): Boolean

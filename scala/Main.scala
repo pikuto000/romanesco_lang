@@ -22,7 +22,7 @@ object Main {
       )
       registory.pushParser(
         Map(
-          "Greeting" -> new StandardRule[Any, Any](
+          "Greeting" -> new StandardRule(
             name = "Greeting",
             pattern = Vector(
               Predicates.matches { case (_, _, _, content: String) => content == "hello" case _ => false },
@@ -30,7 +30,7 @@ object Main {
             ),
             build = { children =>
               // children(0) is hello, children(1) is world
-              Tree.V("GreetingMatched", Vector.empty) // New node
+              ("GreetingMatched", Vector(children(0)._4, children(1)._4)) // New node
             }
           )
         )

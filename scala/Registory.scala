@@ -12,7 +12,7 @@ final class Registory {
   private var tokenizerHistory: Vector[Tokenizer] =
   Vector.empty
   
-  private var parserHistory: Vector[rParser[Any]] =
+  private var parserHistory: Vector[rParser] =
   Vector.empty
   
   /* ========= current ========= */
@@ -20,7 +20,7 @@ final class Registory {
   def currentTokenizer: Tokenizer =
   tokenizerHistory.last
   
-  def currentParser: rParser[Any] =
+  def currentParser: rParser =
   parserHistory.last
   
   /* ========= random access ========= */
@@ -34,7 +34,7 @@ final class Registory {
     tokenizerHistory(address)
   }
   
-  def anyParser(fromLast: Int = 0): rParser[Any] = {
+  def anyParser(fromLast: Int = 0): rParser = {
     val address = parserHistory.size - 1 - fromLast
     if (address < 0 || address >= parserHistory.size)
     throw new RuntimeException(
@@ -50,20 +50,16 @@ final class Registory {
     tokenizerHistory :+ new Tokenizer(rules)
   }
   
-  def pushParser(rules: immutable.Map[String, ParseRule[Any, Any]]): Unit = {
+  def pushParser(rules: immutable.Map[String, ParseRule]): Unit = {
     parserHistory =
     parserHistory :+ new rParser(rules)
   }
   /* ========= dump ========= */
   
-  def dumpTokenizer: Vector[Tokenizer] =
-  tokenizerHistory
-  
-  
-  def dumpParser: Vector[rParser[Any]] =
-  parserHistory
-  
-  def run(input: String): Tree[Any] = {
+  def dumpTokenizer: Vector[Tokenizer] = tokenizerHistory
+  def dumpParser: Vector[rParser] = parserHistory
+
+  def run(input: String): rParser#ParseTree = {
     val tokenTree = currentTokenizer.toknize(input)
     logger.log(tokenTree.prettyPrint())
     val ParseTree=currentParser.parse(tokenTree)
