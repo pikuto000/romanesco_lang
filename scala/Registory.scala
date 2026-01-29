@@ -1,14 +1,18 @@
 package romanesco
 
 import scala.collection.mutable
+import scala.collection.immutable
 import scala.util.matching.Regex
-type Token = Tokenizer#Token
+import romanesco.Debug.logger
+import Debug.logger
 
 final class Registory {
+  private type Token=Tuple4[UInt,UInt,Regex,String]
+  private type TokenTree=Tree[Token]
   private var tokenizerHistory: Vector[Tokenizer] =
   Vector.empty
   
-  private var parserHistory: Vector[rParser[Any, Any]] =
+  private var parserHistory: Vector[rParser[Any]] =
   Vector.empty
   
   /* ========= current ========= */
@@ -16,7 +20,7 @@ final class Registory {
   def currentTokenizer: Tokenizer =
   tokenizerHistory.last
   
-  def currentParser: rParser[Any, Any] =
+  def currentParser: rParser[Any] =
   parserHistory.last
   
   /* ========= random access ========= */
@@ -30,7 +34,7 @@ final class Registory {
     tokenizerHistory(address)
   }
   
-  def anyParser(fromLast: Int = 0): rParser[Any, Any] = {
+  def anyParser(fromLast: Int = 0): rParser[Any] = {
     val address = parserHistory.size - 1 - fromLast
     if (address < 0 || address >= parserHistory.size)
     throw new RuntimeException(
@@ -41,29 +45,30 @@ final class Registory {
   
   /* ========= push ========= */
   
-  def pushTokenizer(rules: Map[String, Regex]): Unit = {
+  def pushTokenizer(rules: immutable.Map[String, Regex]): Unit = {
     tokenizerHistory =
     tokenizerHistory :+ new Tokenizer(rules)
   }
   
-  def pushParser(
-  rules: mutable.Map[String, ParseRule[Any, Any]]
-  ): Unit = {
+  def pushParser(rules: immutable.Map[String, ParseRule[Any, Any]]): Unit = {
     parserHistory =
     parserHistory :+ new rParser(rules)
   }
-  
   /* ========= dump ========= */
   
   def dumpTokenizer: Vector[Tokenizer] =
   tokenizerHistory
   
-  def dumpParser: Vector[rParser[Any, Any]] =
+  
+  def dumpParser: Vector[rParser[Any]] =
   parserHistory
   
   def run(input: String): Tree[Any] = {
     val tokenTree = currentTokenizer.toknize(input)
-    currentParser.parse(tokenTree.asInstanceOf[Tree[Any]])
+    logger.log(tokenTree.prettyPrint())
+    val ParseTree=currentParser.parse(tokenTree)
+    logger.log(ParseTree.prettyPrint())
+    ParseTree
   }
 }
 /*

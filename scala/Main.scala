@@ -1,19 +1,43 @@
 package romanesco
+import scala.util.matching.Regex
+import scala.util.boundary
+import Debug.logger
 
 object Main {
   def main(args: Array[String]): Unit = {
     println("this is the romanesco toolchain.")
-    if (args.isEmpty) {
-      println("Usage: sbt \"run <files and options...>\" ")
+    val fileContents=GetFile.importfile(args)._1
+    val options=GetFile.importfile(args)._2
+    if(options.contains("-debug"))Debug.logger.switch(true)
+    if (fileContents.isEmpty) {
+      println("Usage: \"<files and options...>\" ")
     } else {
-      println("this is a test. just print file contents.")
-      val len = args.length
-      // temporaly, test file system.
-      val files = GetFile.importfile(args)
-      println("file contents:")
-      files._1.foreach(println)
-      println("\noptions:")
-      files._2.foreach(println)
+      val registory=new Registory()
+      registory.pushTokenizer(
+        Map(
+          "hello" -> "hello".r,
+          "world" -> "world".r,
+          "space" -> "\\s+".r
+        )
+      )
+      registory.pushParser(
+        Map(
+          "Greeting" -> new StandardRule[Any, Any](
+            name = "Greeting",
+            pattern = Vector(
+              Predicates.matches { case (_, _, _, content: String) => content == "hello" case _ => false },
+              Predicates.matches { case (_, _, _, content: String) => content == "world" case _ => false }
+            ),
+            build = { children =>
+              // children(0) is hello, children(1) is world
+              Tree.V("GreetingMatched", Vector.empty) // New node
+            }
+          )
+        )
+      )
+      val results=fileContents.map(f=>
+        registory.run(f)
+      )
     }
     println("done.")
   }

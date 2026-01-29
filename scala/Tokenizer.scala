@@ -2,12 +2,13 @@ package romanesco
 import scala.util.matching.Regex
 import scala.util.boundary
 import scala.collection.mutable
+import scala.collection.immutable
 import Debug.logger
-final class Tokenizer(rules:Map[String,Regex]){
-  type TokenType = Regex
-  type Content = String
-  type Row = UInt
-  type Col = UInt
+final class Tokenizer(rules:immutable.Map[String,Regex]){
+  private type TokenType = Regex
+  private type Content = String
+  private type Row = UInt
+  private type Col = UInt
   type Token = Tuple4[Row,Col,TokenType,Content]
   type TokenTree = Tree[Token]
 
@@ -30,7 +31,9 @@ final class Tokenizer(rules:Map[String,Regex]){
 
   // 統合トークナイズメソッド
   def toknize(s: String): TokenTree = {
+    logger.log("starting tokenize. initializing cache...")
     clearCache()
+    logger.log("cache initialized")
     // 逆方向を先に走らせて matchCache を埋める
     val fromEOFbranches = toknizeFromEOF(s)(offset = s.length)
     // 逆方向の結果（木構造は逆向き）をフラット化して反転させ、順方向の木として再構築する
@@ -67,23 +70,24 @@ final class Tokenizer(rules:Map[String,Regex]){
 
   // 前方向全探索トークナイズ
   def toknizeFromSOF(s:String)(row:Row=0,col:Col=0,offset:UInt=0):Vector[TokenTree]={
+    logger.log(s"starting toknizeFromSOF. offset: $offset, s.length: ${s.length}")
     if (cache.contains((offset, false))) {
       logger.log(s"SOF cache hit at offset $offset")
       return cache((offset, false))
     }
     
-    lazy val result = if (s.isEmpty) {
+    val result = if (s.isEmpty) {
       Vector(Tree.V((row, col, EOFPattern, "EOF"), Vector.empty))
     } else {
       val rawBranches = (1 to s.length).flatMap { len =>
         if (cache.get((offset + len, true)).exists(_.nonEmpty)) {
-          lazy val matchedRules = getMatches(s, offset, len)
-          lazy val matchedText = s.substring(0, len)
-          lazy val new_row:UInt = row + matchedText.count(_ == '\n')
-          lazy val new_col:UInt = if (matchedText.contains("\n")) matchedText.length - matchedText.lastIndexOf("\n") - 1 else col + matchedText.length
+          val matchedRules = getMatches(s, offset, len)
+          val matchedText = s.substring(0, len)
+          val new_row:UInt = row + matchedText.count(_ == '\n')
+          val new_col:UInt = if (matchedText.contains("\n")) matchedText.length - matchedText.lastIndexOf("\n") - 1 else col + matchedText.length
           
-          lazy val nextString = s.substring(len)
-          lazy val subTrees = toknizeFromSOF(nextString)(new_row, new_col, offset + len)
+          val nextString = s.substring(len)
+          val subTrees = toknizeFromSOF(nextString)(new_row, new_col, offset + len)
           matchedRules.map(r => Tree.V((row, col, r, matchedText), subTrees))
         } else {
           Vector.empty
@@ -97,22 +101,23 @@ final class Tokenizer(rules:Map[String,Regex]){
   
   // 逆方向全探索トークナイズ
   def toknizeFromEOF(s:String)(row:Row=0,col:Col=0,offset:UInt=0):Vector[TokenTree]={
+    logger.log(s"starting toknizeFromEOF. offset: $offset, s.length: ${s.length}")
     if (cache.contains((offset, true))) {
       logger.log(s"EOF cache hit at offset $offset")
       return cache((offset, true))
     }
     
-    lazy val result = if (s.isEmpty) {
+    val result = if (s.isEmpty) {
       Vector(Tree.V((row, col, SOFPattern, "SOF"), Vector.empty))
     } else {
       val rawBranches = (0 until s.length).flatMap { start =>
-        lazy val len:UInt = s.length - start
-        lazy val sub = s.substring(start)
-        lazy val matchedRules = getMatches(sub, start, len)
-        lazy val matchedText = sub
-        lazy val remainingString = s.substring(0, start)
+        val len:UInt = s.length - start
+        val sub = s.substring(start)
+        val matchedRules = getMatches(sub, start, len)
+        val matchedText = sub
+        val remainingString = s.substring(0, start)
         
-        lazy val subTrees = toknizeFromEOF(remainingString)(row, col, start)
+        val subTrees = toknizeFromEOF(remainingString)(row, col, start)
         matchedRules.map(r => Tree.V((row, col, r, matchedText), subTrees))
       }.toVector
       Tree.merge(rawBranches)
@@ -138,13 +143,13 @@ final class Tokenizer(rules:Map[String,Regex]){
   def runTest(input: String): Unit = {
     println(s"\n" + "=" * 40)
     println(s"Testing input: '$input'")
-    lazy val tokenizer = new Tokenizer(rules)
+    val tokenizer = new Tokenizer(rules)
     val tree = tokenizer.toknize(input)
     
     println("\n--- TokenTree Structure ---")
     println(tree.prettyPrint())
     
-    lazy val paths = tree.flatten.map(_.map(_._4).mkString(" -> ")).toSet
+    val paths = tree.flatten.map(_.map(_._4).mkString(" -> ")).toSet
     println(s"--- Unique Interpretations (${paths.size} found) ---")
     paths.toSeq.sorted.foreach(p => println(s"  $p"))
   }

@@ -1,4 +1,4 @@
-lazy val root = project
+val root = project
   .in(file("."))
   .enablePlugins(ScalaNativePlugin)
   .settings(
@@ -9,6 +9,6 @@ lazy val root = project
     Compile / unmanagedSources / excludeFilter := HiddenFileFilter || ((f: File) => f.getAbsolutePath.contains(".scala-build")),
     libraryDependencies ++=Seq( 
       "tools.aqua" % "z3-turnkey" % "4.14.1",
-      "org.typelevel" %% "cats-core" % "2.13.0"
+      "org.scala-lang.modules" %%% "scala-parser-combinators" % "2.4.0"
     )
   )

@@ -1,92 +1,56 @@
 package romanesco
+import scala.util.matching.Regex
+import Predicates.Predicate
+import Predicates.Token
 
-import scala.collection.mutable
+trait ParseRule[T, R] {
+  def name: String
+  // Returns Vector of (ResultNode, RemainingBranches)
+  // RemainingBranches is Vector[Tree[Token]] (the next nodes to process)
+  def apply(cursor: Tree[Token]): Vector[(Tree[R], Vector[Tree[Token]])]
+}
 
-// =============================
-// Parse Rules Implementation
-// =============================
+class StandardRule[T, R](
+  val name: String,
+  val pattern: Vector[Predicate],
+  val build: Vector[T] => Tree[R]
+) extends ParseRule[T, R] {
 
-class StandardRule[A, B](
-    override val name: String,
-    override val pattern: Vector[Predicate[A]],
-    override val build: Vector[Tree[B]] => Tree[B]
-) extends ParseRule[A, B] {
-
-  override def apply(tree: Tree[A]): Vector[Tree[Any]] = {
-    // 1. Matches at root
-    val rootMatches = recurse(Vector(tree), pattern, Vector.empty)
-
-    // 2. Matches in children (deep traversal)
-    val childrenMatches = tree match {
-      case Tree.V(value, branches) =>
-        branches.zipWithIndex.flatMap { case (child, index) =>
-          // Try to apply this rule to the child
-          val childResults = this.apply(child)
-
-          // Reconstruct the parent tree with the modified child
-          childResults.map { newChild =>
-            // We cast to Tree[A] assuming A is Any or compatible, 
-            // or effectively creating a mixed tree which logic handles as Tree[Any]
-            Tree.V(value, branches.updated(index, newChild.asInstanceOf[Tree[A]]))
-          }
-        }
+  override def apply(cursor: Tree[Token]): Vector[(Tree[R], Vector[Tree[Token]])] = {
+    // Start matching from the children of the cursor
+    val startNodes = cursor match {
+      case Tree.V(_, branches) => branches
       case Tree.E() => Vector.empty
     }
 
-    rootMatches ++ childrenMatches.asInstanceOf[Vector[Tree[Any]]]
+    matchSequence(pattern.toList, startNodes, Vector.empty)
   }
 
-  private def recurse(
-      roots: Vector[Tree[A]],
-      preds: Vector[Predicate[A]],
-      acc: Vector[Tree[A]]
-  ): Vector[Tree[Any]] = {
-    if (preds.isEmpty) {
-      // Pattern matched completely
-      // roots contains the continuations (branches of the last matched node)
-      val result = build(acc.asInstanceOf[Vector[Tree[B]]])
-      val resultWithContinuation = result match {
-        case Tree.V(v, b) =>
-          // Append the continuations to the branches of the built node
-          Tree.V(v, b ++ roots.asInstanceOf[Vector[Tree[B]]])
-        case Tree.E() =>
-          // If the result is Empty, it remains Empty (or maybe we should attach? Unlikely)
-          Tree.E()
-      }
-      Vector(resultWithContinuation.asInstanceOf[Tree[Any]])
-    } else {
-      val p = preds.head
-      val nextPreds = preds.tail
-
-      roots.flatMap {
-        case node @ Tree.V(value, branches) =>
-          if (p(value)) {
-            recurse(branches, nextPreds, acc :+ node)
-          } else {
-            Vector.empty
+  private def matchSequence(
+    preds: List[Predicate],
+    candidates: Vector[Tree[Token]],
+    accum: Vector[Token]
+  ): Vector[(Tree[R], Vector[Tree[Token]])] = {
+    preds match {
+      case Nil =>
+        // Pattern matched completely
+        // Cast Token to T (Assuming T handles Token or the user knows what they are doing)
+        val inputs = accum.map(_.asInstanceOf[T])
+        Vector((build(inputs), candidates))
+      
+      case p :: rest =>
+        // Try to find a match among candidates
+        candidates.flatMap { node =>
+          node match {
+            case Tree.V(token, nextBranches) =>
+              if (p.check(token)) {
+                matchSequence(rest, nextBranches, accum :+ token)
+              } else {
+                Vector.empty
+              }
+            case Tree.E() => Vector.empty
           }
-        case Tree.E() =>
-          Vector.empty
-      }
+        }
     }
   }
-}
-
-object RuleFactory {
-  def create[A, B](
-      name: String,
-      pattern: Vector[Predicate[A]],
-      builder: Vector[Tree[B]] => Tree[B]
-  ): ParseRule[A, B] = {
-    new StandardRule(name, pattern, builder)
-  }
-}
-
-// Common Predicates
-object Predicates {
-  def any[A]: Predicate[A] = (_: A) => true
-  
-  def is[A](expected: A): Predicate[A] = (a: A) => a == expected
-  
-  def matches[A](f: A => Boolean): Predicate[A] = (a: A) => f(a)
 }
