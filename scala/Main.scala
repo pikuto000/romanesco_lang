@@ -15,6 +15,7 @@ object Main {
       val registory=new Registory()
       registory.pushTokenizer(
         Map(
+          //TODO:トークナイズルールを考える
           "hello" -> "hello".r,
           "world" -> "world".r,
           "space" -> "\\s+".r
@@ -22,11 +23,24 @@ object Main {
       )
       registory.pushParser(
         Map(
+          //TODO:パースルールを考える
           "Greeting" -> new StandardRule(
             name = "Greeting",
             pattern = Vector(
-              Predicates.matches { case (_, _, _, content: String) => content == "hello" case _ => false },
-              Predicates.matches { case (_, _, _, content: String) => content == "world" case _ => false }
+              Predicates.matches {
+                case (_, _, reg:Regex, content:String) => {
+                  logger.log(s"regex: result is ${content == "hello" && reg.toString == "hello"}; $reg, content: $content, content matched ${content == "hello"}, reg matched ${reg.toString == "hello"}")
+                  content == "hello" && reg.toString == "hello"
+                }
+                case _ => false
+              },
+              Predicates.matches {
+                case (_, _, reg:Regex, content:String) => {
+                  logger.log(s"regex: result is ${content == "world" && reg.toString == "world"}; $reg, content: $content, content matched ${content == "world"}, reg matched ${reg.toString == "world"}")
+                  content == "world" && reg.toString == "world"
+                }
+                case _ => false
+              }
             ),
             build = { children =>
               // children(0) is hello, children(1) is world

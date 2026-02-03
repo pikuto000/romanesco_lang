@@ -11,7 +11,7 @@ trait ParseRule{
   def apply(cursor: TokenTree): Vector[(Tuple2[String,Vector[String]], Vector[TokenTree])]
 }
 
-class StandardRule(
+final class StandardRule(
   val name: String,// Name of the rule for debugging purposes
   val pattern: Vector[Predicate],// List of predicates to match
   val build: Vector[Token] => Tuple2[String,Vector[String]]// Function to build the result node
