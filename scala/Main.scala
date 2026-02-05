@@ -3,7 +3,7 @@ import scala.util.matching.Regex
 import scala.util.boundary
 import Debug.logger
 
-/*object Main {
+object Main {
   def main(args: Array[String]): Unit = {
     println("this is the romanesco toolchain.")
     val fileContents=GetFile.importfile(args)._1
@@ -19,4 +19,4 @@ import Debug.logger
     }
     println("done.")
   }
-}*/
+}

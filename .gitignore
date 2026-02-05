@@ -84,4 +84,14 @@ var/
 *.egg/.lake
 
 #text folder
-text
+text/
+
+*.txt
+
+sbt_launch.jar
+
+texts.ps1
+
+test.txt
+
+null/
