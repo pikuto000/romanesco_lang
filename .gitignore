@@ -82,3 +82,6 @@ var/
 .installed.cfg
 
 *.egg/.lake
+
+#text folder
+text
