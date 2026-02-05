@@ -32,7 +32,7 @@ final class Macro[T,R](init:T, expander:(T,R)=>T,expandrule:R){
   }
 }
 
-//プリプロセッサを実装してテスト
+//超簡易的なプリプロセッサを実装してテスト
 @main def macrotest:Unit ={
   logger.switch(true)
   val testString="define X 100 X"
