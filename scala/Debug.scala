@@ -6,14 +6,14 @@ object Debug {
     def switch(b:Boolean)={
       enable=b
       if (enable){
-        println("logger enabled")
+        println("[DEBUG] logger enabled")
       }else{
-        println("logger disabled")
+        println("[DEBUG] logger disabled")
       }
     }
     def log(s: =>String)={
       if (enable){
-        println(s)
+        println(s"[DEBUG] $s")
       }
     }
   }

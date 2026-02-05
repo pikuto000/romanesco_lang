@@ -2,7 +2,7 @@ package romanesco
 import scala.util.matching.Regex
 import scala.util.boundary
 import Debug.logger
-
+/*
 object Main {
   def main(args: Array[String]): Unit = {
     println("this is the romanesco toolchain.")
@@ -20,3 +20,4 @@ object Main {
     println("done.")
   }
 }
+*/
