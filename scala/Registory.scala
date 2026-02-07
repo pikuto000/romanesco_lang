@@ -14,6 +14,9 @@ final class Registory {
   
   private var parserHistory: Vector[rParser] =
   Vector.empty
+
+  private var macroHistory: Vector[Macro[Any, Any]] =
+  Vector.empty
   
   /* ========= current ========= */
   
@@ -22,6 +25,9 @@ final class Registory {
   
   def currentParser: rParser =
   parserHistory.last
+
+  def currentMacro: Macro[Any, Any] = 
+  macroHistory.last
   
   /* ========= random access ========= */
   
@@ -42,6 +48,15 @@ final class Registory {
     )
     parserHistory(address)
   }
+
+  def anymacro(fromLast: Int = 0): Macro[Any, Any] = {
+    val address = macroHistory.size - 1 - fromLast
+    if (address < 0 || address >= macroHistory.size)
+    throw new RuntimeException(
+    s"Macro history address $address is out of range"
+    )
+    macroHistory(address)
+  }
   
   /* ========= push ========= */
   
@@ -54,16 +69,27 @@ final class Registory {
     parserHistory =
     parserHistory :+ new rParser(rules)
   }
+
+  def pushMacro(init: Any, expander: (Any, Any) => Any, expandrule: Any): Unit = {
+    macroHistory =
+    macroHistory :+ new Macro(init, expander, expandrule)
+  }
+  
+
   /* ========= dump ========= */
   
   def dumpTokenizer: Vector[Tokenizer] = tokenizerHistory
   def dumpParser: Vector[rParser] = parserHistory
+  def dumpMacro: Vector[Macro[Any, Any]] = macroHistory
+  
+  /* ========= run ========= */
 
   def run(input: String): rParser#ParseTree = {
     val tokenTree = currentTokenizer.toknize(input)
     logger.log(tokenTree.prettyPrint())
     val ParseTree=currentParser.parse(tokenTree)
     logger.log(ParseTree.prettyPrint())
+    //マクロはcurrentMacroかanyMacroを使って別途使用すること
     ParseTree
   }
 }

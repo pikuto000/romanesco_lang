@@ -56,11 +56,15 @@ object Tree {
     if (hasEmpty) merged :+ Tree.E() else merged
   }
 
+  //inverse of flatten method
   def fromPaths[T](paths: Vector[Vector[T]]): Vector[Tree[T]] = {
     paths.filter(_.nonEmpty).groupBy(_.head).map { case (value, subPaths) =>
       Tree.V(value, fromPaths(subPaths.map(_.tail)))
     }.toVector
   }
+
+  //just alias of fromPaths
+  def unflatten[T](vecs: Vector[Vector[T]]): Vector[Tree[T]] = fromPaths(vecs)
 }
 
 type UInt = Int
@@ -70,3 +74,6 @@ object Uint{
     inline if(n>=0)n else error("UInt cannot be negative")
   }
 }
+
+type OpTree=Tree[String]
+type Programs=Vector[OpTree]
