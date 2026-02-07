@@ -1,19 +1,11 @@
 # romanesco programming language
-romanesco progrmming language is a typeless constriant controlled language.
 
-romanescoは、型無しの、制約で制御されるプログラミング言語です。
-
-
-also this is included powerful macro systems.
+romanescoは、圏論と論理で制御されるプログラミング言語です。型なしです。動的型付けではありません。
 
 また、強力なマクロシステムを持つ言語でもあります。
 
-
-All toknized and parsed rules are can be added, edited, and deleted. 
-
 全ての構文ルール、字句規則は変更可能であり、追加はもちろん、編集したり、削除することもできます。
 
-
-In addition, ambiguous grammar, and toknize can be solved by using non-determinism.
-
 また、非決定性を用いることで、曖昧な文法、及び字句規則も解決できます。
+
+(カリー＝)ハワード＝ランベック同型対応により、定理証明を行うこともできます。

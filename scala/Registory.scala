@@ -7,89 +7,108 @@ import romanesco.Debug.logger
 import Debug.logger
 
 final class Registory {
-  private type Token=Tuple4[UInt,UInt,Regex,String]
-  private type TokenTree=Tree[Token]
+  private type Token = Tuple4[UInt, UInt, Regex, String]
+  private type TokenTree = Tree[Token]
   private var tokenizerHistory: Vector[Tokenizer] =
-  Vector.empty
-  
+    Vector()
+
   private var parserHistory: Vector[rParser] =
-  Vector.empty
+    Vector()
 
   private var macroHistory: Vector[Macro[Any, Any]] =
-  Vector.empty
-  
-  /* ========= current ========= */
-  
-  def currentTokenizer: Tokenizer =
-  tokenizerHistory.last
-  
-  def currentParser: rParser =
-  parserHistory.last
+    Vector()
 
-  def currentMacro: Macro[Any, Any] = 
-  macroHistory.last
-  
+  private var interpreterHistory: Vector[Interpreter] =
+    Vector()
+
+  /* ========= current ========= */
+
+  def currentTokenizer: Tokenizer =
+    tokenizerHistory.last
+
+  def currentParser: rParser =
+    parserHistory.last
+
+  def currentMacro: Macro[Any, Any] =
+    macroHistory.last
+
+  def currentInterpreter: Interpreter =
+    interpreterHistory.last
+
   /* ========= random access ========= */
-  
+
   def anyTokenizer(fromLast: Int = 0): Tokenizer = {
     val address = tokenizerHistory.size - 1 - fromLast
     if (address < 0 || address >= tokenizerHistory.size)
-    throw new RuntimeException(
-    s"Tokenizer history address $address is out of range"
-    )
+      throw new RuntimeException(
+        s"Tokenizer history address $address is out of range"
+      )
     tokenizerHistory(address)
   }
-  
+
   def anyParser(fromLast: Int = 0): rParser = {
     val address = parserHistory.size - 1 - fromLast
     if (address < 0 || address >= parserHistory.size)
-    throw new RuntimeException(
-    s"Parser history address $address is out of range"
-    )
+      throw new RuntimeException(
+        s"Parser history address $address is out of range"
+      )
     parserHistory(address)
   }
 
-  def anymacro(fromLast: Int = 0): Macro[Any, Any] = {
+  def anyMacro(fromLast: Int = 0): Macro[Any, Any] = {
     val address = macroHistory.size - 1 - fromLast
     if (address < 0 || address >= macroHistory.size)
-    throw new RuntimeException(
-    s"Macro history address $address is out of range"
-    )
+      throw new RuntimeException(
+        s"Macro history address $address is out of range"
+      )
     macroHistory(address)
   }
-  
-  /* ========= push ========= */
-  
-  def pushTokenizer(rules: immutable.Map[String, Regex]): Unit = {
-    tokenizerHistory =
-    tokenizerHistory :+ new Tokenizer(rules)
-  }
-  
-  def pushParser(rules: immutable.Map[String, ParseRule]): Unit = {
-    parserHistory =
-    parserHistory :+ new rParser(rules)
+
+  def anyInterpreter(fromLast: Int = 0): Interpreter = {
+    val address = interpreterHistory.size - 1 - fromLast
+    if (address < 0 || address >= interpreterHistory.size)
+      throw new RuntimeException(
+        s"Interpreter history address $address is out of range"
+      )
+    interpreterHistory(address)
   }
 
-  def pushMacro(init: Any, expander: (Any, Any) => Any, expandrule: Any): Unit = {
-    macroHistory =
-    macroHistory :+ new Macro(init, expander, expandrule)
+  /* ========= push ========= */
+
+  def pushTokenizer(rules: immutable.Map[String, Regex]): Unit = {
+    tokenizerHistory = tokenizerHistory :+ new Tokenizer(rules)
   }
-  
+
+  def pushParser(rules: immutable.Map[String, ParseRule]): Unit = {
+    parserHistory = parserHistory :+ new rParser(rules)
+  }
+
+  def pushMacro(
+      init: Any,
+      expander: (Any, Any) => Any,
+      expandrule: Any
+  ): Unit = {
+    macroHistory = macroHistory :+ new Macro(init, expander, expandrule)
+  }
+
+  def pushInterpreter(interpreter: Interpreter): Unit = {
+    interpreterHistory = interpreterHistory :+ interpreter
+  }
 
   /* ========= dump ========= */
-  
+
   def dumpTokenizer: Vector[Tokenizer] = tokenizerHistory
   def dumpParser: Vector[rParser] = parserHistory
   def dumpMacro: Vector[Macro[Any, Any]] = macroHistory
-  
+
   /* ========= run ========= */
 
   def run(input: String): rParser#ParseTree = {
     val tokenTree = currentTokenizer.toknize(input)
     logger.log(tokenTree.prettyPrint())
-    val ParseTree=currentParser.parse(tokenTree)
+    val ParseTree = currentParser.parse(tokenTree)
     logger.log(ParseTree.prettyPrint())
-    //マクロはcurrentMacroかanyMacroを使って別途使用すること
+    // マクロはcurrentMacroかanyMacroを使って別途使用すること
     ParseTree
   }
 }
@@ -123,10 +142,10 @@ final class Registory {
   )
   
   // Ignore spaces rule (optional, or just handle in pattern if tokens are adjacent)
-  // Since Tokenizer produces a graph of ALL tokens including spaces, 
+  // Since Tokenizer produces a graph of ALL tokens including spaces,
   // if we want to skip spaces, we need rules that consume spaces or a pre-filter.
   // For this simple test, I'll just use "helloworld" or input "hello world" but match space explicitly if needed.
-  // Let's try input "helloworld" to avoid space handling complexity for now, 
+  // Let's try input "helloworld" to avoid space handling complexity for now,
   // or add a space predicate.
   
   // Let's just test "helloworld" (two tokens adjacent)
@@ -144,4 +163,4 @@ final class Registory {
   println("--- Result ---")
   println(result.prettyPrint())
 }
-*/
+ */

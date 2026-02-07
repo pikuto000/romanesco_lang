@@ -1,14 +1,12 @@
 import scala.scalanative.build._
 lazy val root = (project in file("."))
-  //.enablePlugins(ScalaNativePlugin)
+  // .enablePlugins(ScalaNativePlugin)
   .settings(
-    scalaVersion := "3.8.1", 
-    sbtVersion := "1.12.2", 
+    scalaVersion := "3.8.1",
+    sbtVersion := "1.12.2",
     name := "romanesco",
     Compile / scalaSource := baseDirectory.value / "scala",
-    libraryDependencies ++=Seq( 
-      //"tools.aqua" % "z3-turnkey" % "4.14.1"
-    ),
+    libraryDependencies ++= Seq()
     /*nativeConfig ~= { c=>
       c.withLTO(LTO.none)
        .withMode(Mode.debug)
