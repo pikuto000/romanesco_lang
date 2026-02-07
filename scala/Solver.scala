@@ -142,7 +142,7 @@ object Unifier:
 
 object Prover:
   import Unifier._
-  
+
   type Context = List[(String, Prop)]
   var metaCounter = 0
 
@@ -308,8 +308,8 @@ object PropParser:
   class Scanner(val input: String):
     var pos = 0
     def peek: Char = if pos < input.length then input(pos) else 0.toChar
-    def advance(): Unit = if pos < input.length then pos += 1
-    def eatWhitespace(): Unit = while Character.isWhitespace(peek) do advance()
+    def advance: Unit = if pos < input.length then pos += 1
+    def eatWhitespace: Unit = while Character.isWhitespace(peek) do advance
 
   def parse(input: String): Prop =
     val s = new Scanner(input)
@@ -319,62 +319,101 @@ object PropParser:
 
   def parseArrow(s: Scanner): Prop =
     val left = parseOr(s)
-    s.eatWhitespace()
-    if s.peek == '-' then { s.advance(); consume(s, '>'); Prop.Arrow(left, parseArrow(s)) } else left
+    s.eatWhitespace
+    if s.peek == '-' then { s.advance; consume(s, '>'); Prop.Arrow(left, parseArrow(s)) } else left
 
   def parseOr(s: Scanner): Prop =
     var left = parseAnd(s)
-    while { s.eatWhitespace(); s.peek == '|' } do { s.advance(); left = Prop.Or(left, parseAnd(s)) }
+    while { s.eatWhitespace; s.peek == '|' } do { s.advance; left = Prop.Or(left, parseAnd(s)) }
     left
 
   def parseAnd(s: Scanner): Prop =
     var left = parseQuantifier(s)
-    while { s.eatWhitespace(); s.peek == '&' } do { s.advance(); left = Prop.And(left, parseQuantifier(s)) }
+    while { s.eatWhitespace; s.peek == '&' } do { s.advance; left = Prop.And(left, parseQuantifier(s)) }
     left
 
   def parseQuantifier(s: Scanner): Prop =
-    s.eatWhitespace()
-    if s.input.startsWith("forall", s.pos) then { s.pos += 6; val v = parseId(s); consume(s, '.'); Prop.Forall(v, parseArrow(s)) }
-    else if s.input.startsWith("exists", s.pos) then { s.pos += 6; val v = parseId(s); consume(s, '.'); Prop.Exists(v, parseArrow(s)) }
-    else parseEq(s)
+    s.eatWhitespace
+    if s.input.startsWith("forall", s.pos)then{
+      s.pos += 6
+      val v = parseId(s)
+      consume(s, '.')
+      Prop.Forall(v, parseArrow(s))
+    }
+    else if s.input.startsWith("exists", s.pos)then{
+      s.pos += 6
+      val v = parseId(s)
+      consume(s, '.')
+      Prop.Exists(v, parseArrow(s))
+    }
+    else
+      parseEq(s)
 
   def parseEq(s: Scanner): Prop =
     val left = parseAtom(s)
-    s.eatWhitespace()
-    if s.peek == '=' then { s.advance(); Prop.Eq(propToInd(left), propToInd(parseAtom(s))) } else left
+    s.eatWhitespace
+    if s.peek == '=' then
+      s.advance
+      Prop.Eq(propToInd(left), propToInd(parseAtom(s)))
+    else
+      left
 
   def propToInd(p: Prop): Ind = p match
     case Prop.Pred(n, args) if args.isEmpty => Ind.Const(n)
-    case _ => throw new Exception("Invalid term")
+    case _ => throw new RuntimeException("Invalid term:"+ p.toString)
 
   def parseAtom(s: Scanner): Prop =
-    s.eatWhitespace()
-    if s.peek == '(' then { s.advance(); val p = parseArrow(s); consume(s, ')'); p }
-    else if s.peek == 'T' && !Character.isLetter(peekNext(s)) then { s.advance(); Prop.True }
-    else if s.peek == 'F' && !Character.isLetter(peekNext(s)) then { s.advance(); Prop.False }
+    s.eatWhitespace
+    if s.peek == '(' then { s.advance; val p = parseArrow(s); consume(s, ')'); p }
+    else if s.peek == 'T' && !Character.isLetter(peekNext(s)) then { s.advance; Prop.True }
+    else if s.peek == 'F' && !Character.isLetter(peekNext(s)) then { s.advance; Prop.False }
     else
       val name = parseId(s)
-      s.eatWhitespace()
+      s.eatWhitespace
       if s.peek == '(' then
-        s.advance(); val args = mutable.ListBuffer[Ind]()
-        if s.peek != ')' then { args += parseInd(s); while s.peek == ',' do { s.advance(); args += parseInd(s) } }
+        s.advance
+        val args = mutable.ListBuffer[Ind]()
+        if s.peek != ')' then
+          args += parseInd(s)
+          while s.peek == ',' do
+            s.advance; args += parseInd(s)
         consume(s, ')'); Prop.Pred(name, args.toList)
       else Prop.Pred(name, Nil)
 
   def parseInd(s: Scanner): Ind = Ind.Const(parseId(s))
   def parseId(s: Scanner): String =
-    s.eatWhitespace(); val sb = new StringBuilder
-    while Character.isLetterOrDigit(s.peek) || s.peek == '_' do { sb.append(s.peek); s.advance() }
+    s.eatWhitespace; val sb = new StringBuilder
+    while Character.isLetterOrDigit(s.peek) || s.peek == '_' do { sb.append(s.peek); s.advance }
     if sb.isEmpty then throw new Exception("Expected ID"); sb.toString
-  def peekNext(s: Scanner): Char = if s.pos + 1 < s.input.length then s.input(s.pos + 1) else 0.toChar
-  def consume(s: Scanner, c: Char): Unit = { s.eatWhitespace(); if s.peek == c then s.advance() else throw new Exception(s"Expected $c") }
+  def peekNext(s: Scanner): Char =
+    if s.pos + 1 < s.input.length then
+      s.input(s.pos + 1)
+    else
+      0.toChar
+  def consume(s: Scanner, c: Char): Unit = {
+    s.eatWhitespace
+    if s.peek == c then
+      s.advance
+    else
+      throw new Exception(s"Expected $c")
+  }
 
 @main def runProver(args: String*): Unit =
   if args.nonEmpty then
-    val s = scala.io.Source.fromFile(args.head); try { for (l <- s.getLines() if l.trim.nonEmpty && !l.startsWith("//")) processInput(l) } finally s.close()
+    val s = scala.io.Source.fromFile(args.head)
+    try
+      for(
+        l <- s.getLines
+        if l.trim.nonEmpty && !l.startsWith("//")
+      )processInput(l)
+    finally
+      s.close
   else
     println("=== Curry-Howard-Lambek Prover v2.1 (Refined) ===")
-    while true do { print("> "); val i = StdIn.readLine(); if (i == null || i == "exit") return else processInput(i) }
+    while true do
+      print("> ")
+      val i = StdIn.readLine
+      if (i == null || i == "exit") return else processInput(i)
 
 def processInput(input: String): Unit =
   try
@@ -383,4 +422,5 @@ def processInput(input: String): Unit =
     Prover.prove(p) match
       case Some(t) => println(s"Proof: $t")
       case None => println("No proof found.")
-  catch case e: Exception => println(s"Error: ${e.getMessage}")
+  catch
+    case e: Exception => println(s"Error: ${e.getMessage}")

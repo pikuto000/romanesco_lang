@@ -6,7 +6,6 @@ lazy val root = (project in file("."))
     sbtVersion := "1.12.2", 
     name := "romanesco",
     Compile / scalaSource := baseDirectory.value / "scala",
-    Compile / unmanagedSources / excludeFilter := HiddenFileFilter || ((f: File) => f.getAbsolutePath.contains(".scala-build")),
     libraryDependencies ++=Seq( 
       //"tools.aqua" % "z3-turnkey" % "4.14.1"
     ),
