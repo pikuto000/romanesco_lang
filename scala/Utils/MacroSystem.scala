@@ -1,27 +1,31 @@
-package romanesco
+package romanesco.Utils
 import scala.util.matching.Regex
 import Debug.logger
 import scala.util.boundary
+import romanesco.Types._
+import romanesco.Utils.Debug
 
 //init is a data to be rewrited. expander is a function that rewrites init. expandrule is a rule that expands init and erase itself from init.
-final class Macro[T,R](init:T, expander:(T,R)=>T,expandrule:R){
-  private var material:T = init
-  def dump:T = material
-  def run(fuel:UInt = 1000,m:T=this.material):Unit = {
-    boundary{
+final class Macro[T, R](init: T, expander: (T, R) => T, expandrule: R) {
+  private var material: T = init
+  def dump: T = material
+  def run(fuel: UInt = 1000, m: T = this.material): Unit = {
+    boundary {
       logger.log("expander started")
-      for(i:UInt <- 0 to fuel){
-        logger.log(s"trying to expand. now ${val str:String=i.toString;
-                                                str match {
-                                                  case s if s.endsWith("1") && !s.endsWith("") => s+"st"
-                                                  case s if s.endsWith("2") && !s.endsWith("") => s+"nd"
-                                                  case s if s.endsWith("3") && !s.endsWith("") => s+"rd"
-                                                  case s => s+"th"
-                                                }} try.")
+      for (i: UInt <- 0 to fuel) {
+        logger.log(s"trying to expand. now ${
+            val str: String = i.toString;
+            str match {
+              case s if s.endsWith("1") && !s.endsWith("") => s + "st"
+              case s if s.endsWith("2") && !s.endsWith("") => s + "nd"
+              case s if s.endsWith("3") && !s.endsWith("") => s + "rd"
+              case s                                       => s + "th"
+            }
+          } try.")
         lazy val old = material
-        lazy val expanded = expander(material,expandrule)
+        lazy val expanded = expander(material, expandrule)
         logger.log("expand succseeded.")
-        if (old!=expanded) {
+        if (old != expanded) {
           logger.log("expand makes changes.")
           material = expanded
         } else {
@@ -58,4 +62,4 @@ final class Macro[T,R](init:T, expander:(T,R)=>T,expandrule:R){
   macrotester.run()
   println(s"result:${macrotester.dump}")
 }
-*/
+ */

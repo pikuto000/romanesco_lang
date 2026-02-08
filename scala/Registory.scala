@@ -3,8 +3,11 @@ package romanesco
 import scala.collection.mutable
 import scala.collection.immutable
 import scala.util.matching.Regex
-import romanesco.Debug.logger
-import Debug.logger
+import Utils.Debug.logger
+import Parser._
+import Types._
+import romanesco.Utils.Debug
+import romanesco.Utils.Macro
 
 final class Registory {
   private type Token = Tuple4[UInt, UInt, Regex, String]

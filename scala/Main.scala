@@ -1,7 +1,8 @@
 package romanesco
 import scala.util.matching.Regex
 import scala.util.boundary
-import Debug.logger
+import Utils.Debug.logger
+import romanesco.Utils.Debug
 /*object Main {
   def main(args: Array[String]): Unit = {
     println("this is the romanesco toolchain.")
