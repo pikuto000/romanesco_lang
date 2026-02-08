@@ -1,10 +1,11 @@
 // ==========================================
-// Main.scala
-// CLI・REPL
+// SolverTest.scala
+// CLI・REPL・テスト
 // ==========================================
 
 package romanesco
 
+import romanesco.Solver._
 import romanesco.Solver.core._
 import romanesco.Solver.sugar._
 import scala.io.StdIn
@@ -17,7 +18,6 @@ import romanesco.Utils.Debug.logger
   println()
 
   if args.nonEmpty then
-    // ファイルから読み込み
     val source = scala.io.Source.fromFile(args.head)
     try
       for
@@ -26,7 +26,6 @@ import romanesco.Utils.Debug.logger
     finally
       source.close
   else
-    // REPL
     while true do
       print("> ")
       val input = StdIn.readLine
@@ -61,7 +60,7 @@ Examples:
 
 def processInput(input: String, classical: Boolean = false): Unit =
   try
-    val expr = SimpleParser.parse(input)
+    val expr = TestParser.parse(input)
     println(s"Goal: $expr (Classical: $classical)")
 
     val prover = new Prover(classical = classical)
@@ -75,96 +74,8 @@ def processInput(input: String, classical: Boolean = false): Unit =
         println("✗ No proof found")
   catch case e: Exception => println(s"Error: ${e.getMessage}")
 
-// 簡易パーサー
-object SimpleParser:
-  import ExprBuilder._
-
-  def parse(input: String): Expr =
-    val tokens = tokenize(input)
-    parseExpr(tokens)._1
-
-  private def tokenize(s: String): List[String] =
-    s.replaceAll("([→∧∨∀∃=().⇒⊃×])", " $1 ")
-      .split("\\s+")
-      .filter(_.nonEmpty)
-      .toList
-
-  private def parseExpr(tokens: List[String]): (Expr, List[String]) =
-    parseImplication(tokens)
-
-  private def parseImplication(tokens: List[String]): (Expr, List[String]) =
-    val (left, rest1) = parseOr(tokens)
-    rest1 match
-      case ("→" | "⇒" | "⊃") :: rest2 =>
-        val (right, rest3) = parseImplication(rest2)
-        (left → right, rest3)
-      case _ => (left, rest1)
-
-  private def parseOr(tokens: List[String]): (Expr, List[String]) =
-    val (left, rest1) = parseAnd(tokens)
-    rest1 match
-      case "∨" :: rest2 =>
-        val (right, rest3) = parseOr(rest2)
-        (left ∨ right, rest3)
-      case _ => (left, rest1)
-
-  private def parseAnd(tokens: List[String]): (Expr, List[String]) =
-    val (left, rest1) = parseQuantifier(tokens)
-    rest1 match
-      case ("∧" | "×") :: rest2 =>
-        val (right, rest3) = parseAnd(rest2)
-        (left ∧ right, rest3)
-      case _ => (left, rest1)
-
-  private def parseQuantifier(tokens: List[String]): (Expr, List[String]) =
-    tokens match
-      case "∀" :: varName :: "." :: rest =>
-        val (body, rest2) = parseExpr(rest)
-        (sym("∀")(v(varName), body), rest2)
-      case "∃" :: varName :: "." :: rest =>
-        val (body, rest2) = parseExpr(rest)
-        (sym("∃")(v(varName), body), rest2)
-      case _ => parseEquality(tokens)
-
-  private def parseEquality(tokens: List[String]): (Expr, List[String]) =
-    val (left, rest1) = parseAtom(tokens)
-    rest1 match
-      case "=" :: rest2 =>
-        val (right, rest3) = parseAtom(rest2)
-        (left === right, rest3)
-      case _ => (left, rest1)
-
-  private def parseAtom(tokens: List[String]): (Expr, List[String]) =
-    tokens match
-      case "(" :: rest =>
-        val (expr, rest2) = parseExpr(rest)
-        rest2 match
-          case ")" :: rest3 => (expr, rest3)
-          case _            => throw new Exception("Unmatched parenthesis")
-      case "⊤" :: rest         => (⊤, rest)
-      case "⊥" :: rest         => (⊥, rest)
-      case name :: "(" :: rest =>
-        val (args, rest2) = parseArgs(rest)
-        (sym(name)(args*), rest2)
-      case name :: rest => (sym(name), rest)
-      case Nil          => throw new Exception("Unexpected end of input")
-
-  private def parseArgs(tokens: List[String]): (List[Expr], List[String]) =
-    tokens match
-      case ")" :: rest => (Nil, rest)
-      case _           =>
-        val (arg, rest1) = parseAtom(tokens)
-        rest1 match
-          case "," :: rest2 =>
-            val (args, rest3) = parseArgs(rest2)
-            (arg :: args, rest3)
-          case ")" :: rest2 => (List(arg), rest2)
-          case _            => throw new Exception("Expected ',' or ')'")
-
 @main def testSomeCases = {
   logger.switch(false)
-  val (intuitionProver, classicalProver) =
-    (new Prover(classical = false), new Prover(classical = true))
 
   val intuitionisticCases = List(
     "A → A",
@@ -177,33 +88,41 @@ object SimpleParser:
   )
 
   val classicalCases = List(
-    "A ∨ (A → ⊥)", // Law of Excluded Middle
-    "((A → ⊥) → ⊥) → A", // Double Negation Elimination
-    "((A → B) → A) → A", // Peirce's Law
-    "(A → B) → ((A → ⊥) ∨ B)" // Implication as Or
+    "A ∨ (A → ⊥)",                // Law of Excluded Middle
+    "((A → ⊥) → ⊥) → A",          // Double Negation Elimination
+    "((A → B) → A) → A",          // Peirce's Law
+    "(A → B) → ((A → ⊥) ∨ B)"     // Implication as Or
   )
 
   println("=== Intuitionistic Logic Tests ===")
   intuitionisticCases.foreach { input =>
     println(s"\n[Test Case] $input")
-    val expr = SimpleParser.parse(input)
-    val result = romanesco.Utils.times.watch { intuitionProver.prove(expr) }
-    result match
-      case Some(proof) => println(s"✓ Solved in ${proof.length} steps")
-      case None => println("✗ Failed to prove (as expected for intuitionistic)")
+    try {
+      val expr = TestParser.parse(input)
+      val prover = new Prover(classical = false)
+      val result = romanesco.Utils.times.watch { prover.prove(expr) }
+      result match
+        case Some(proof) => println(s"✓ Solved in ${proof.length} steps")
+        case None => println("✗ Failed to prove (as expected for intuitionistic)")
+    } catch {
+      case e: Exception => println(s"Error parsing/proving '$input': ${e.getMessage}")
+    }
   }
 
   println("\n=== Classical Logic Tests ===")
   classicalCases.foreach { input =>
     println(s"\n[Test Case] $input")
-    val expr = SimpleParser.parse(input)
-    val result = romanesco.Utils.times.watch { classicalProver.prove(expr) }
-    result match
-      case Some(proof) =>
-        println(s"✓ Solved in ${proof.length} steps")
-        proof.zipWithIndex.foreach { case (step, i) =>
-          println(s"  ${i + 1}. $step")
-        }
-      case None => println("✗ Failed to prove")
+    try {
+      val expr = TestParser.parse(input)
+      val prover = new Prover(classical = true)
+      val result = romanesco.Utils.times.watch { prover.prove(expr) }
+      result match
+        case Some(proof) => 
+          println(s"✓ Solved in ${proof.length} steps")
+          proof.zipWithIndex.foreach { case (step, i) => println(s"  ${i + 1}. $step") }
+        case None => println("✗ Failed to prove")
+    } catch {
+      case e: Exception => println(s"Error parsing/proving '$input': ${e.getMessage}")
+    }
   }
 }
