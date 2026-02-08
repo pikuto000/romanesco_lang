@@ -1,14 +1,18 @@
 // ==========================================
-// Core.scala (4種類版)
+// Core.scala
+// 基本的なデータ構造の定義
 // ==========================================
 
 package romanesco.Solver.core
 
+/**
+ * 論理式を表現する抽象構文木
+ */
 enum Expr:
-  case Var(name: String) // Var
-  case Meta(id: Int) // Meta Var
-  case Sym(name: String) // Symbol
-  case App(head: Expr, args: List[Expr])
+  case Var(name: String) // 束縛変数
+  case Meta(id: Int)     // メタ変数（未解決の穴）
+  case Sym(name: String) // 定数（∧, ∨, →, ⊤, ⊥, =, ...）
+  case App(f: Expr, args: List[Expr])
 
   def apply(args: Expr*): Expr = App(this, args.toList)
 
@@ -31,12 +35,9 @@ object Expr:
     case App(Sym("="), List(l, r)) => Some((l, r))
     case _                         => None
 
-enum ProofStep:
-  case Apply(rule: CatRule, subst: Map[Int, Expr])
-
-  override def toString: String = this match
-    case Apply(r, _) => s"apply[${r.name}]"
-
+/**
+ * 圏論的推論規則（Sequent Calculusの規則や圏の射に対応）
+ */
 case class CatRule(
     name: String,
     lhs: Expr,
@@ -49,4 +50,43 @@ case class CatRule(
       else s" where ${universals.mkString(", ")}"
     s"$name: $lhs ⟹ $rhs$cond"
 
+/**
+ * 証明の1ステップ
+ */
+enum ProofStep:
+  case Apply(rule: CatRule, subst: Map[Int, Expr])
+
+  override def toString: String = this match
+    case Apply(r, _) => s"apply[${r.name}]"
+
 type Proof = List[ProofStep]
+
+// --- タクティクスシステム用の定義 ---
+
+/**
+ * 解決すべき一つの証明課題（ゴール）
+ */
+case class Goal(
+    context: List[(String, Expr)], // 仮定のリスト
+    target: Expr                   // 導出したい結論
+):
+  override def toString: String =
+    val ctx = context.map((n, e) => s"  $n: $e").mkString("\n")
+    s"--------------------------------\n$ctx\n--------------------------------\n  Goal: $target"
+
+/**
+ * 現在の証明全体の進行状態
+ */
+case class ProofState(
+    goals: List[Goal],             // 未解決のゴールのリスト
+    completedProofs: List[Proof],  // （内部用）解決済みの証明ステップ
+    originalGoal: Expr             // 元々の証明目標
+):
+  def isSolved: Boolean = goals.isEmpty
+  
+  def currentGoal: Option[Goal] = goals.headOption
+
+/**
+ * タクティクスの適用結果
+ */
+type TacticResult = Either[String, ProofState]

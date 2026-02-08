@@ -97,14 +97,14 @@ final class Prover(val classical: Boolean = false) {
       // 全称量化
       case Expr.App(Expr.Sym(Forall), List(Expr.Var(v), body)) =>
         val freshVar = s"${v}_$depth"
-        val instantiated = substVar(body, v, Expr.Var(freshVar))
+        val instantiated = Prover.substVar(body, v, Expr.Var(freshVar))
         search(instantiated, rules, context, subst, depth + 1, maxDepth, visited, raaCount)
           .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.forallCounit, s), s) }
 
       // 存在量化
       case Expr.App(Expr.Sym(Exists), List(Expr.Var(v), body)) =>
         val witness = freshMeta
-        val instantiated = substVar(body, v, witness)
+        val instantiated = Prover.substVar(body, v, witness)
         search(instantiated, rules, context, subst, depth + 1, maxDepth, visited, raaCount)
           .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.existsUnit, s), s) }
 
@@ -132,7 +132,7 @@ final class Prover(val classical: Boolean = false) {
       // 存在量化の分解 (Witness抽出)
       case ((name, Expr.App(Expr.Sym(Exists), List(Expr.Var(v), body))), i) =>
         val witness = freshMeta
-        val instantiated = substVar(body, v, witness)
+        val instantiated = Prover.substVar(body, v, witness)
         val newCtx = context.patch(i, List((s"${name}.witness", instantiated)), 1)
         search(goal, rules, newCtx, subst, depth + 1, maxDepth, visited, raaCount)
       
@@ -167,12 +167,12 @@ final class Prover(val classical: Boolean = false) {
         // 等式による書き換え
         case Expr.App(Expr.Sym(Eq), List(l, r)) =>
           val cl = applySubst(l, subst); val cr = applySubst(r, subst)
-          val rw1 = rewriteExpr(goal, cl, cr)
+          val rw1 = Prover.rewriteExpr(goal, cl, cr)
           val res1 = if rw1 != goal then search(rw1, rules, context, subst, depth + 1, maxDepth, visited, raaCount).map {
             case (p, s) => (p :+ ProofStep.Apply(StandardRules.eqSubst, s), s)
           } else None
           res1.orElse {
-            val rw2 = rewriteExpr(goal, cr, cl)
+            val rw2 = Prover.rewriteExpr(goal, cr, cl)
             if rw2 != goal then search(rw2, rules, context, subst, depth + 1, maxDepth, visited, raaCount).map {
               case (p, s) => (p :+ ProofStep.Apply(StandardRules.eqSubst, s), s)
             } else None
@@ -209,7 +209,7 @@ final class Prover(val classical: Boolean = false) {
               }
             case Expr.App(Expr.Sym(Forall), List(Expr.Var(v), body)) =>
               val meta = freshMeta
-              val inst = substVar(body, v, meta)
+              val inst = Prover.substVar(body, v, meta)
               useHypothesis(name, inst, goal, rules, context, subst, depth, maxDepth, visited, raaCount).map { case (proof, s) =>
                 (proof :+ ProofStep.Apply(CatRule(name, currentHyp, inst), s), s)
               }
@@ -224,7 +224,7 @@ final class Prover(val classical: Boolean = false) {
       depth: Int, maxDepth: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
   ): Option[(Proof, Subst)] =
     rules.view.flatMap { rule =>
-      val (instRule, _) = instantiate(rule)
+      val (instRule, _) = Prover.instantiate(rule, () => freshMeta)
       unify(instRule.rhs, goal, subst).flatMap { s =>
         val universalsOk = instRule.universals.forall { cond =>
           search(cond, rules, context, s, depth + 1, maxDepth, visited, raaCount).isDefined
@@ -250,12 +250,29 @@ final class Prover(val classical: Boolean = false) {
           (p :+ raaStep, s)
         }
     else None
+}
 
-  // --- ユーティリティ ---
+object Prover {
+  import Unifier._
 
-  private def instantiate(rule: CatRule): (CatRule, Map[String, Expr]) =
+  /** 変数置換ユーティリティ */
+  def substVar(expr: Expr, varName: String, replacement: Expr): Expr =
+    expr match
+      case Expr.Var(n) if n == varName => replacement
+      case Expr.App(h, args)           => Expr.App(substVar(h, varName, replacement), args.map(substVar(_, varName, replacement)))
+      case _ => expr
+
+  /** 等式による書き換え */
+  def rewriteExpr(expr: Expr, from: Expr, to: Expr): Expr =
+    if expr == from then to
+    else expr match
+      case Expr.App(h, args) => Expr.App(rewriteExpr(h, from, to), args.map(rewriteExpr(_, from, to)))
+      case _ => expr
+
+  /** ルールのインスタンス化（メタ変数の割り当て） */
+  def instantiate(rule: CatRule, freshMeta: () => Expr): (CatRule, Map[String, Expr]) =
     val vars = collectVars(rule.lhs) ++ collectVars(rule.rhs) ++ rule.universals.flatMap(collectVars)
-    val substMap = vars.map(v => v -> freshMeta).toMap
+    val substMap = vars.map(v => v -> freshMeta()).toMap
     val instLhs = applyVarSubst(rule.lhs, substMap)
     val instRhs = applyVarSubst(rule.rhs, substMap)
     val instUniv = rule.universals.map(applyVarSubst(_, substMap))
@@ -270,16 +287,4 @@ final class Prover(val classical: Boolean = false) {
     case Expr.Var(n) if s.contains(n) => s(n)
     case Expr.App(h, args)            => Expr.App(applyVarSubst(h, s), args.map(applyVarSubst(_, s)))
     case _ => e
-
-  private def substVar(expr: Expr, varName: String, replacement: Expr): Expr =
-    expr match
-      case Expr.Var(n) if n == varName => replacement
-      case Expr.App(h, args)           => Expr.App(substVar(h, varName, replacement), args.map(substVar(_, varName, replacement)))
-      case _ => expr
-
-  private def rewriteExpr(expr: Expr, from: Expr, to: Expr): Expr =
-    if expr == from then to
-    else expr match
-      case Expr.App(h, args) => Expr.App(rewriteExpr(h, from, to), args.map(rewriteExpr(_, from, to)))
-      case _ => expr
 }
