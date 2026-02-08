@@ -8,6 +8,7 @@ package romanesco
 import romanesco.Solver.core._
 import romanesco.Solver.sugar._
 import scala.io.StdIn
+import romanesco.Utils.Debug.logger
 
 @main def runProver(args: String*): Unit =
   println("=== Romanesco Prover v3.0 (Category Theory Edition) ===")
@@ -31,6 +32,8 @@ import scala.io.StdIn
       val input = StdIn.readLine
       if input == null || input == "exit" then return
       else if input == "help" then showHelp
+      else if input == "enableDebug" then logger.switch(true)
+      else if input == "disableDebug" then logger.switch(false)
       else if input.trim.nonEmpty then processInput(input)
 
 def showHelp: Unit =
@@ -81,7 +84,7 @@ object SimpleParser:
     parseExpr(tokens)._1
 
   private def tokenize(s: String): List[String] =
-    s.replaceAll("([→∧∨∀∃=()])", " $1 ")
+    s.replaceAll("([→∧∨∀∃=().])", " $1 ")
       .split("\\s+")
       .filter(_.nonEmpty)
       .toList
@@ -157,3 +160,47 @@ object SimpleParser:
             (arg :: args, rest3)
           case ")" :: rest2 => (List(arg), rest2)
           case _            => throw new Exception("Expected ',' or ')'")
+
+@main def testSomeCases = {
+  logger.switch(false) // 大量のログで見づらくなるのを防ぐためデフォルトはオフ
+
+  val cases = List(
+    "A → A",
+    "A ∧ B → B ∧ A",
+    "A ∨ B → B ∨ A",
+    "(A ∧ B → C) → (A → (B → C))",
+    "(A → (B → C)) → (A ∧ B → C)",
+    "(A → B) ∧ (B → C) → (A → C)",
+    "(A → B) ∧ A → B",
+    "∀x. P(x) → ∃x. P(x)",
+    "∀x. (P(x) ∧ Q(x)) → (∀x. P(x)) ∧ (∀x. Q(x))",
+    "((∀x. P(x)) ∨ (∀x. Q(x))) → ∀x. (P(x) ∨ Q(x))",
+    "a = b → b = a",
+    "a = b ∧ b = c → a = c",
+    "⊤",
+    "A ∧ ⊥ → B",
+    "A → (A → B) → B"
+  )
+
+  cases.foreach { input =>
+    println(s"\n[Test Case] $input")
+    try {
+      val expr = SimpleParser.parse(input)
+      val result = romanesco.Utils.times.watch {
+        Prover.prove(expr)
+      }
+      result match {
+        case Some(proof) =>
+          println(s"✓ Solved in ${proof.length} steps")
+          proof.zipWithIndex.foreach { case (step, i) =>
+          // println(s"  ${i + 1}. $step")
+          }
+        case None =>
+          println("✗ Failed to prove")
+      }
+    } catch {
+      case e: Exception =>
+        println(s"Error parsing/proving '$input': ${e.getMessage}")
+    }
+  }
+}

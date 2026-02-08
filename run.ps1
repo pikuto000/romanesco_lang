@@ -1,1 +1,1 @@
-chcp 65001; sbt run
+chcp 65001; sbt "runMain romanesco.testSomeCases"
