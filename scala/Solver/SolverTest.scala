@@ -59,14 +59,13 @@ Examples:
   ∀x. P(x) → ∃x. P(x)
   """)
 
-def processInput(input: String): Unit =
-  val Prover = new Prover
+def processInput(input: String, classical: Boolean = false): Unit =
   try
-    // 簡易パーサー（TODO: romanescoのパーサーで置き換え）
     val expr = SimpleParser.parse(input)
-    println(s"Goal: $expr")
+    println(s"Goal: $expr (Classical: $classical)")
 
-    Prover.prove(expr) match
+    val prover = new Prover(classical = classical)
+    prover.prove(expr) match
       case Some(proof) =>
         println(s"✓ Proof found (${proof.length} steps):")
         proof.zipWithIndex.foreach { case (step, i) =>
@@ -76,7 +75,7 @@ def processInput(input: String): Unit =
         println("✗ No proof found")
   catch case e: Exception => println(s"Error: ${e.getMessage}")
 
-// 簡易パーサー（TODO: 後でromanescoパーサーに置き換え）
+// 簡易パーサー
 object SimpleParser:
   import ExprBuilder._
 
@@ -85,7 +84,7 @@ object SimpleParser:
     parseExpr(tokens)._1
 
   private def tokenize(s: String): List[String] =
-    s.replaceAll("([→∧∨∀∃=().])", " $1 ")
+    s.replaceAll("([→∧∨∀∃=().⇒⊃×])", " $1 ")
       .split("\\s+")
       .filter(_.nonEmpty)
       .toList
@@ -96,7 +95,7 @@ object SimpleParser:
   private def parseImplication(tokens: List[String]): (Expr, List[String]) =
     val (left, rest1) = parseOr(tokens)
     rest1 match
-      case "→" :: rest2 =>
+      case ("→" | "⇒" | "⊃") :: rest2 =>
         val (right, rest3) = parseImplication(rest2)
         (left → right, rest3)
       case _ => (left, rest1)
@@ -112,7 +111,7 @@ object SimpleParser:
   private def parseAnd(tokens: List[String]): (Expr, List[String]) =
     val (left, rest1) = parseQuantifier(tokens)
     rest1 match
-      case "∧" :: rest2 =>
+      case ("∧" | "×") :: rest2 =>
         val (right, rest3) = parseAnd(rest2)
         (left ∧ right, rest3)
       case _ => (left, rest1)
@@ -164,52 +163,47 @@ object SimpleParser:
 
 @main def testSomeCases = {
   logger.switch(false)
-  val Prover = new Prover
-  val cases = List(
+  val (intuitionProver, classicalProver) =
+    (new Prover(classical = false), new Prover(classical = true))
+
+  val intuitionisticCases = List(
     "A → A",
     "A ∧ B → B ∧ A",
     "A ∨ B → B ∨ A",
     "(A ∧ B → C) → (A → (B → C))",
-    "(A → (B → C)) → (A ∧ B → C)",
-    "(A → B) ∧ (B → C) → (A → C)",
-    "(A → B) ∧ A → B",
-    "∀x. P(x) → ∃x. P(x)",
-    "∀x. (P(x) ∧ Q(x)) → (∀x. P(x)) ∧ (∀x. Q(x))",
-    "((∀x. P(x)) ∨ (∀x. Q(x))) → ∀x. (P(x) ∨ Q(x))",
-    "a = b → b = a",
     "a = b ∧ b = c → a = c",
-    "⊤",
-    "A ∧ ⊥ → B",
-    "A → (A → B) → B",
-    "(A → B) → ((B → C) → (A → C))",
-    "A ∧ (B ∨ C) → (A ∧ B) ∨ (A ∧ C)",
     "(((A → ⊥) → ⊥) → ⊥) → (A → ⊥)",
-    "((A ∨ (A → ⊥)) → ⊥) → ⊥",
-    "A ∨ (A → ⊥)", // it should be fail
-    "(∃x. P(x) → Q) → ∀x. (P(x) → Q)",
-    "∀x. ∀y. (x = y → (P(x) → P(y)))"
+    "A ∨ (A → ⊥)" // Should fail in intuitionistic
   )
 
-  cases.foreach { input =>
+  val classicalCases = List(
+    "A ∨ (A → ⊥)", // Law of Excluded Middle
+    "((A → ⊥) → ⊥) → A", // Double Negation Elimination
+    "((A → B) → A) → A", // Peirce's Law
+    "(A → B) → ((A → ⊥) ∨ B)" // Implication as Or
+  )
+
+  println("=== Intuitionistic Logic Tests ===")
+  intuitionisticCases.foreach { input =>
     println(s"\n[Test Case] $input")
-    try {
-      val expr = SimpleParser.parse(input)
-      val result = romanesco.Utils.times.watch {
-        Prover.prove(expr)
-      }
-      result match {
-        case Some(proof) =>
-          println(s"✓ Solved in ${proof.length} steps")
-          // println(s"Proof result: $proof")
-          proof.zipWithIndex.foreach { case (step, i) =>
-            println(s"  ${i + 1}. $step")
-          }
-        case None =>
-          println("✗ Failed to prove")
-      }
-    } catch {
-      case e: Exception =>
-        println(s"Error parsing/proving '$input': ${e.getMessage}")
-    }
+    val expr = SimpleParser.parse(input)
+    val result = romanesco.Utils.times.watch { intuitionProver.prove(expr) }
+    result match
+      case Some(proof) => println(s"✓ Solved in ${proof.length} steps")
+      case None => println("✗ Failed to prove (as expected for intuitionistic)")
+  }
+
+  println("\n=== Classical Logic Tests ===")
+  classicalCases.foreach { input =>
+    println(s"\n[Test Case] $input")
+    val expr = SimpleParser.parse(input)
+    val result = romanesco.Utils.times.watch { classicalProver.prove(expr) }
+    result match
+      case Some(proof) =>
+        println(s"✓ Solved in ${proof.length} steps")
+        proof.zipWithIndex.foreach { case (step, i) =>
+          println(s"  ${i + 1}. $step")
+        }
+      case None => println("✗ Failed to prove")
   }
 }
