@@ -60,6 +60,7 @@ Examples:
   """)
 
 def processInput(input: String): Unit =
+  val Prover = new Prover
   try
     // 簡易パーサー（TODO: romanescoのパーサーで置き換え）
     val expr = SimpleParser.parse(input)
@@ -163,7 +164,7 @@ object SimpleParser:
 
 @main def testSomeCases = {
   logger.switch(false)
-
+  val Prover = new Prover
   val cases = List(
     "A → A",
     "A ∧ B → B ∧ A",

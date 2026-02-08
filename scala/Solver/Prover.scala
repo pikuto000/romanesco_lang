@@ -8,7 +8,7 @@ package romanesco.Solver.core
 import scala.collection.mutable
 import romanesco.Utils.Debug.logger
 
-object Prover {
+final class Prover {
   import Unifier._
 
   var metaCounter = 0
@@ -35,10 +35,8 @@ object Prover {
       visited: Set[(Expr, Context)]
   ): Option[(Proof, Subst)] =
     val currentGoal = applySubst(goal, subst)
-    if depth > maxDepth then
-      None
-    else if visited.contains((currentGoal, context)) then
-      None
+    if depth > maxDepth then None
+    else if visited.contains((currentGoal, context)) then None
     else
       logger.log(s"searching goal: $currentGoal (depth $depth)")
       val nextVisited = visited + ((currentGoal, context))
@@ -47,16 +45,48 @@ object Prover {
       searchAxiom(currentGoal, context, subst)
         .orElse(searchReflexivity(currentGoal, subst))
         .orElse(
-          searchDecompose(currentGoal, rules, context, subst, depth, maxDepth, nextVisited)
+          searchDecompose(
+            currentGoal,
+            rules,
+            context,
+            subst,
+            depth,
+            maxDepth,
+            nextVisited
+          )
         )
         .orElse(
-          decomposeContext(currentGoal, rules, context, subst, depth, maxDepth, nextVisited)
+          decomposeContext(
+            currentGoal,
+            rules,
+            context,
+            subst,
+            depth,
+            maxDepth,
+            nextVisited
+          )
         )
         .orElse(
-          searchContext(currentGoal, rules, context, subst, depth, maxDepth, nextVisited)
+          searchContext(
+            currentGoal,
+            rules,
+            context,
+            subst,
+            depth,
+            maxDepth,
+            nextVisited
+          )
         )
         .orElse(
-          searchRules(currentGoal, rules, context, subst, depth, maxDepth, nextVisited)
+          searchRules(
+            currentGoal,
+            rules,
+            context,
+            subst,
+            depth,
+            maxDepth,
+            nextVisited
+          )
         )
 
   // 1. アクシオム検索
@@ -66,7 +96,9 @@ object Prover {
       subst: Subst
   ): Option[(Proof, Subst)] =
     context.view.flatMap { case (name, hyp) =>
-      unify(hyp, goal, subst).map(s => (List(ProofStep.Apply(CatRule(name, hyp, hyp), s)), s))
+      unify(hyp, goal, subst).map(s =>
+        (List(ProofStep.Apply(CatRule(name, hyp, hyp), s)), s)
+      )
     }.headOption
 
   // 2. 反射性
@@ -94,16 +126,41 @@ object Prover {
     goal match
       case Expr.App(Expr.Sym(op), List(a, b)) if op == "×" || op == "∧" =>
         for
-          (proofA, s1) <- search(a, rules, context, subst, depth + 1, maxDepth, visited)
-          (proofB, s2) <- search(b, rules, context, s1, depth + 1, maxDepth, visited)
+          (proofA, s1) <- search(
+            a,
+            rules,
+            context,
+            subst,
+            depth + 1,
+            maxDepth,
+            visited
+          )
+          (proofB, s2) <- search(
+            b,
+            rules,
+            context,
+            s1,
+            depth + 1,
+            maxDepth,
+            visited
+          )
         yield
           val pairStep = ProofStep.Apply(StandardRules.productUniversal, s2)
           (proofA ++ proofB :+ pairStep, s2)
 
-      case Expr.App(Expr.Sym(op), List(a, b)) if op == "→" || op == "^" || op == "⊃" =>
+      case Expr.App(Expr.Sym(op), List(a, b))
+          if op == "→" || op == "^" || op == "⊃" =>
         val (ant, cons) = if (op == "→" || op == "⊃") (a, b) else (b, a)
         val hypName = s"h$depth"
-        search(cons, rules, (hypName, ant) :: context, subst, depth + 1, maxDepth, visited)
+        search(
+          cons,
+          rules,
+          (hypName, ant) :: context,
+          subst,
+          depth + 1,
+          maxDepth,
+          visited
+        )
           .map { case (proof, s) =>
             val lambdaStep = ProofStep.Apply(StandardRules.expUniversal, s)
             (proof :+ lambdaStep, s)
@@ -112,19 +169,33 @@ object Prover {
       case Expr.App(Expr.Sym("∀"), List(Expr.Var(v), body)) =>
         val freshVar = s"${v}_$depth"
         val instantiated = substVar(body, v, Expr.Var(freshVar))
-        search(instantiated, rules, context, subst, depth + 1, maxDepth, visited).map {
-          case (proof, s) =>
-            val forallStep = ProofStep.Apply(StandardRules.forallCounit, s)
-            (proof :+ forallStep, s)
+        search(
+          instantiated,
+          rules,
+          context,
+          subst,
+          depth + 1,
+          maxDepth,
+          visited
+        ).map { case (proof, s) =>
+          val forallStep = ProofStep.Apply(StandardRules.forallCounit, s)
+          (proof :+ forallStep, s)
         }
 
       case Expr.App(Expr.Sym("∃"), List(Expr.Var(v), body)) =>
         val witness = freshMeta
         val instantiated = substVar(body, v, witness)
-        search(instantiated, rules, context, subst, depth + 1, maxDepth, visited).map {
-          case (proof, s) =>
-            val existsStep = ProofStep.Apply(StandardRules.existsUnit, s)
-            (proof :+ existsStep, s)
+        search(
+          instantiated,
+          rules,
+          context,
+          subst,
+          depth + 1,
+          maxDepth,
+          visited
+        ).map { case (proof, s) =>
+          val existsStep = ProofStep.Apply(StandardRules.existsUnit, s)
+          (proof :+ existsStep, s)
         }
 
       case Expr.App(Expr.Sym(op), List(a, b)) if op == "+" || op == "∨" =>
@@ -142,7 +213,9 @@ object Prover {
           )
 
       case Expr.Sym(op) if op == "⊤" || op == "1" =>
-        Some((List(ProofStep.Apply(StandardRules.terminalUniversal, subst)), subst))
+        Some(
+          (List(ProofStep.Apply(StandardRules.terminalUniversal, subst)), subst)
+        )
 
       case _ => None
 
@@ -160,13 +233,21 @@ object Prover {
       val (instRule, _) = instantiate(rule)
       unify(instRule.rhs, goal, subst).flatMap { s =>
         val universalsOk = instRule.universals.forall { cond =>
-          search(cond, rules, context, s, depth + 1, maxDepth, visited).isDefined
+          search(
+            cond,
+            rules,
+            context,
+            s,
+            depth + 1,
+            maxDepth,
+            visited
+          ).isDefined
         }
         if universalsOk then
-          search(instRule.lhs, rules, context, s, depth + 1, maxDepth, visited).map {
-            case (proof, finalSubst) =>
+          search(instRule.lhs, rules, context, s, depth + 1, maxDepth, visited)
+            .map { case (proof, finalSubst) =>
               (proof :+ ProofStep.Apply(rule, finalSubst), finalSubst)
-          }
+            }
         else None
       }
     }.headOption
@@ -182,33 +263,71 @@ object Prover {
       visited: Set[(Expr, Context)]
   ): Option[(Proof, Subst)] =
     // 1. 矛盾・等式
-    context.view.flatMap {
-      case (name, hyp) =>
+    context.view
+      .flatMap { case (name, hyp) =>
         val ch = applySubst(hyp, subst)
         if ch == Expr.Sym("⊥") || ch == Expr.Sym("0") then
-          Some((List(ProofStep.Apply(StandardRules.initialUniversal, subst)), subst))
-        else ch match {
-          case Expr.App(Expr.Sym("="), List(l, r)) =>
-            val cl = applySubst(l, subst); val cr = applySubst(r, subst)
-            val rw1 = rewriteExpr(goal, cl, cr)
-            val res1 = if rw1 != goal then search(rw1, rules, context, subst, depth + 1, maxDepth, visited).map {
-              case (p, s) => (p :+ ProofStep.Apply(StandardRules.eqSubst, s), s)
-            } else None
-            res1.orElse {
-              val rw2 = rewriteExpr(goal, cr, cl)
-              if rw2 != goal then search(rw2, rules, context, subst, depth + 1, maxDepth, visited).map {
-                case (p, s) => (p :+ ProofStep.Apply(StandardRules.eqSubst, s), s)
-              } else None
-            }
-          case _ => None
-        }
-    }.headOption
-    // 2. 含意・全称量化
-    .orElse {
-      context.view.flatMap { case (name, hyp) =>
-        useHypothesis(name, hyp, goal, rules, context, subst, depth, maxDepth, visited)
-      }.headOption
-    }
+          Some(
+            (
+              List(ProofStep.Apply(StandardRules.initialUniversal, subst)),
+              subst
+            )
+          )
+        else
+          ch match {
+            case Expr.App(Expr.Sym("="), List(l, r)) =>
+              val cl = applySubst(l, subst); val cr = applySubst(r, subst)
+              val rw1 = rewriteExpr(goal, cl, cr)
+              val res1 =
+                if rw1 != goal then
+                  search(
+                    rw1,
+                    rules,
+                    context,
+                    subst,
+                    depth + 1,
+                    maxDepth,
+                    visited
+                  ).map { case (p, s) =>
+                    (p :+ ProofStep.Apply(StandardRules.eqSubst, s), s)
+                  }
+                else None
+              res1.orElse {
+                val rw2 = rewriteExpr(goal, cr, cl)
+                if rw2 != goal then
+                  search(
+                    rw2,
+                    rules,
+                    context,
+                    subst,
+                    depth + 1,
+                    maxDepth,
+                    visited
+                  ).map { case (p, s) =>
+                    (p :+ ProofStep.Apply(StandardRules.eqSubst, s), s)
+                  }
+                else None
+              }
+            case _ => None
+          }
+      }
+      .headOption
+      // 2. 含意・全称量化
+      .orElse {
+        context.view.flatMap { case (name, hyp) =>
+          useHypothesis(
+            name,
+            hyp,
+            goal,
+            rules,
+            context,
+            subst,
+            depth,
+            maxDepth,
+            visited
+          )
+        }.headOption
+      }
 
   private def useHypothesis(
       name: String,
@@ -223,30 +342,86 @@ object Prover {
   ): Option[(Proof, Subst)] = {
     val currentHyp = applySubst(hyp, subst)
     if (currentHyp == Expr.Sym("⊥") || currentHyp == Expr.Sym("0")) {
-      Some((List(ProofStep.Apply(StandardRules.initialUniversal, subst)), subst))
+      Some(
+        (List(ProofStep.Apply(StandardRules.initialUniversal, subst)), subst)
+      )
     } else {
-      unify(currentHyp, goal, subst).map(s => (List(ProofStep.Apply(CatRule(name, currentHyp, currentHyp), s)), s))
-      .orElse {
-        currentHyp match {
-          case Expr.App(Expr.Sym(op), List(a, b)) if op == "×" || op == "∧" =>
-            useHypothesis(s"$name.1", a, goal, rules, context, subst, depth, maxDepth, visited)
-            .orElse(useHypothesis(s"$name.2", b, goal, rules, context, subst, depth, maxDepth, visited))
-          case Expr.App(Expr.Sym("→") | Expr.Sym("⊃"), List(a, b)) =>
-            useHypothesis(name, b, goal, rules, context, subst, depth, maxDepth, visited).flatMap {
-              case (proofB, s1) =>
-                search(a, rules, context, s1, depth + 1, maxDepth, visited).map {
-                  case (proofA, s2) => (proofB ++ proofA :+ ProofStep.Apply(CatRule(name, a, b), s2), s2)
-                }
-            }
-          case Expr.App(Expr.Sym("∀"), List(Expr.Var(v), body)) =>
-            val meta = freshMeta
-            val inst = substVar(body, v, meta)
-            useHypothesis(name, inst, goal, rules, context, subst, depth, maxDepth, visited).map {
-              case (proof, s) => (proof :+ ProofStep.Apply(CatRule(name, currentHyp, inst), s), s)
-            }
-          case _ => None
+      unify(currentHyp, goal, subst)
+        .map(s =>
+          (List(ProofStep.Apply(CatRule(name, currentHyp, currentHyp), s)), s)
+        )
+        .orElse {
+          currentHyp match {
+            case Expr.App(Expr.Sym(op), List(a, b)) if op == "×" || op == "∧" =>
+              useHypothesis(
+                s"$name.1",
+                a,
+                goal,
+                rules,
+                context,
+                subst,
+                depth,
+                maxDepth,
+                visited
+              )
+                .orElse(
+                  useHypothesis(
+                    s"$name.2",
+                    b,
+                    goal,
+                    rules,
+                    context,
+                    subst,
+                    depth,
+                    maxDepth,
+                    visited
+                  )
+                )
+            case Expr.App(Expr.Sym("→") | Expr.Sym("⊃"), List(a, b)) =>
+              useHypothesis(
+                name,
+                b,
+                goal,
+                rules,
+                context,
+                subst,
+                depth,
+                maxDepth,
+                visited
+              ).flatMap { case (proofB, s1) =>
+                search(a, rules, context, s1, depth + 1, maxDepth, visited)
+                  .map { case (proofA, s2) =>
+                    (
+                      proofB ++ proofA :+ ProofStep.Apply(
+                        CatRule(name, a, b),
+                        s2
+                      ),
+                      s2
+                    )
+                  }
+              }
+            case Expr.App(Expr.Sym("∀"), List(Expr.Var(v), body)) =>
+              val meta = freshMeta
+              val inst = substVar(body, v, meta)
+              useHypothesis(
+                name,
+                inst,
+                goal,
+                rules,
+                context,
+                subst,
+                depth,
+                maxDepth,
+                visited
+              ).map { case (proof, s) =>
+                (
+                  proof :+ ProofStep.Apply(CatRule(name, currentHyp, inst), s),
+                  s
+                )
+              }
+            case _ => None
+          }
         }
-      }
     }
   }
 
@@ -263,24 +438,39 @@ object Prover {
       case ((name, Expr.App(Expr.Sym("∃"), List(Expr.Var(v), body))), i) =>
         val witness = freshMeta
         val instantiated = substVar(body, v, witness)
-        val newCtx = context.patch(i, List((s"${name}.witness", instantiated)), 1)
+        val newCtx =
+          context.patch(i, List((s"${name}.witness", instantiated)), 1)
         search(goal, rules, newCtx, subst, depth + 1, maxDepth, visited)
-      case ((name, Expr.App(Expr.Sym(op), List(a, b))), i) if op == "×" || op == "∧" =>
-        val newCtx = context.patch(i, List((s"${name}.1", a), (s"${name}.2", b)), 1)
+      case ((name, Expr.App(Expr.Sym(op), List(a, b))), i)
+          if op == "×" || op == "∧" =>
+        val newCtx =
+          context.patch(i, List((s"${name}.1", a), (s"${name}.2", b)), 1)
         search(goal, rules, newCtx, subst, depth + 1, maxDepth, visited)
-      case ((name, Expr.App(Expr.Sym(op), List(a, b))), i) if op == "+" || op == "∨" =>
+      case ((name, Expr.App(Expr.Sym(op), List(a, b))), i)
+          if op == "+" || op == "∨" =>
         val leftCtx = context.patch(i, List((s"${name}.left", a)), 1)
-        search(goal, rules, leftCtx, subst, depth + 1, maxDepth, visited).flatMap { case (lp, ls) =>
-          val rightCtx = context.patch(i, List((s"${name}.right", b)), 1)
-          search(goal, rules, rightCtx, ls, depth + 1, maxDepth, visited).map {
-            case (rp, rs) => (lp ++ rp :+ ProofStep.Apply(StandardRules.coproductUniversal, rs), rs)
+        search(goal, rules, leftCtx, subst, depth + 1, maxDepth, visited)
+          .flatMap { case (lp, ls) =>
+            val rightCtx = context.patch(i, List((s"${name}.right", b)), 1)
+            search(goal, rules, rightCtx, ls, depth + 1, maxDepth, visited)
+              .map { case (rp, rs) =>
+                (
+                  lp ++ rp :+ ProofStep.Apply(
+                    StandardRules.coproductUniversal,
+                    rs
+                  ),
+                  rs
+                )
+              }
           }
-        }
       case _ => None
     }.headOption
 
   private def instantiate(rule: CatRule): (CatRule, Map[String, Expr]) =
-    val vars = collectVars(rule.lhs) ++ collectVars(rule.rhs) ++ rule.universals.flatMap(collectVars)
+    val vars =
+      collectVars(rule.lhs) ++ collectVars(rule.rhs) ++ rule.universals.flatMap(
+        collectVars
+      )
     val substMap = vars.map(v => v -> freshMeta).toMap
     val instLhs = applyVarSubst(rule.lhs, substMap)
     val instRhs = applyVarSubst(rule.rhs, substMap)
@@ -294,18 +484,25 @@ object Prover {
 
   private def applyVarSubst(e: Expr, s: Map[String, Expr]): Expr = e match
     case Expr.Var(n) if s.contains(n) => s(n)
-    case Expr.App(h, args)            => Expr.App(applyVarSubst(h, s), args.map(applyVarSubst(_, s)))
+    case Expr.App(h, args)            =>
+      Expr.App(applyVarSubst(h, s), args.map(applyVarSubst(_, s)))
     case _ => e
 
   private def substVar(expr: Expr, varName: String, replacement: Expr): Expr =
     expr match
       case Expr.Var(n) if n == varName => replacement
-      case Expr.App(h, args)           => Expr.App(substVar(h, varName, replacement), args.map(substVar(_, varName, replacement)))
+      case Expr.App(h, args)           =>
+        Expr.App(
+          substVar(h, varName, replacement),
+          args.map(substVar(_, varName, replacement))
+        )
       case _ => expr
 
   private def rewriteExpr(expr: Expr, from: Expr, to: Expr): Expr =
     if expr == from then to
-    else expr match
-      case Expr.App(h, args) => Expr.App(rewriteExpr(h, from, to), args.map(rewriteExpr(_, from, to)))
-      case _ => expr
+    else
+      expr match
+        case Expr.App(h, args) =>
+          Expr.App(rewriteExpr(h, from, to), args.map(rewriteExpr(_, from, to)))
+        case _ => expr
 }

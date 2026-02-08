@@ -1,352 +1,2533 @@
+Active code page: 65001
 [info] welcome to sbt 1.12.1 (Oracle Corporation Java 25.0.2)
-[info] loading settings for project romanesco-build-build-build from metals.sbt...
 [info] loading project definition from C:\Users\Cocoa\romanesco\project\project\project
 [info] loading settings for project romanesco-build-build from metals.sbt...
 [info] loading project definition from C:\Users\Cocoa\romanesco\project\project
-[success] Generated .bloop\romanesco-build-build.json
-[success] Total time: 3 s, completed 2026/02/08 21:54:37
 [info] loading settings for project romanesco-build from metals.sbt, plugins.sbt...
 [info] loading project definition from C:\Users\Cocoa\romanesco\project
 [info] loading settings for project root from build.sbt...
 [info] set current project to romanesco (in build file:/C:/Users/Cocoa/romanesco/)
-[info] Executing in batch mode. For better performance use sbt's shell
-[info] compiling 6 Scala sources to C:\Users\Cocoa\romanesco\target\scala-3.8.1\classes ...
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:133:7 
-[error] 133 |    sym("refl")(v("a")),
-[error]     |    ^^^^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:33:7 
-[error] 33 |    sym("pair")(v("f"), v("g")),
-[error]    |    ^^^^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:36:12 
-[error] 36 |      Eq(sym("?")(sym("��?"), v("h")), v("f")),
-[error]    |         ^^^^^^^^
-[error]    |         method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:37:12 
-[error] 37 |      Eq(sym("?")(sym("��?"), v("h")), v("g"))
-[error]    |         ^^^^^^^^
-[error]    |         method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:85:7 
-[error] 85 |    sym("curry")(v("f")),
-[error]    |    ^^^^^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:89:11 
-[error] 89 |        sym("?")(sym("eval"), sym("�~")(v("g"), sym("id"))),
-[error]    |        ^^^^^^^^
-[error]    |        method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:89:33 
-[error] 89 |        sym("?")(sym("eval"), sym("�~")(v("g"), sym("id"))),
-[error]    |                              ^^^^^^^^
-[error]    |                 method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:176:7 
-[error] 176 |    sym("��")(v("x"), sym("subst")(v("P"), v("y"), v("x"))),
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:176:24 
-[error] 176 |    sym("��")(v("x"), sym("subst")(v("P"), v("y"), v("x"))),
-[error]     |                     ^^^^^^^^^^^^
-[error]     |               method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:159:7 
-[error] 159 |    sym("��")(v("x"), sym("subst")(v("P"), v("y"), v("x")))
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:159:24 
-[error] 159 |    sym("��")(v("x"), sym("subst")(v("P"), v("y"), v("x")))
-[error]     |                     ^^^^^^^^^^^^
-[error]     |               method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:110:7 
-[error] 110 |    sym("!")(v("A")),
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:125:7 
-[error] 125 |    sym("absurd")(v("f")),
-[error]     |    ^^^^^^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:151:7 
-[error] 151 |    sym("rewrite")(Eq(v("a"), v("b")), v("P")(v("a"))),
-[error]     |    ^^^^^^^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:151:40 
-[error] 151 |    sym("rewrite")(Eq(v("a"), v("b")), v("P")(v("a"))),
-[error]     |                                       ^^^^^^
-[error]     |                 method v in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:152:5 
-[error] 152 |    v("P")(v("b"))
-[error]     |    ^^^^^^
-[error]     |    method v in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:14:7 
-[error] 14 |    sym("?")(sym("id"), v("f")),
-[error]    |    ^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:20:7 
-[error] 20 |    sym("?")(v("f"), sym("id")),
-[error]    |    ^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:26:7 
-[error] 26 |    sym("?")(sym("?")(v("f"), v("g")), v("h")),
-[error]    |    ^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:26:16 
-[error] 26 |    sym("?")(sym("?")(v("f"), v("g")), v("h")),
-[error]    |             ^^^^^^^^
-[error]    |             method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:27:7 
-[error] 27 |    sym("?")(v("f"), sym("?")(v("g"), v("h")))
-[error]    |    ^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:27:24 
-[error] 27 |    sym("?")(v("f"), sym("?")(v("g"), v("h")))
-[error]    |                     ^^^^^^^^
-[error]    |                 method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:43:7 
-[error] 43 |    sym("��?")(sym("pair")(v("a"), v("b"))),
-[error]    |    ^^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:43:17 
-[error] 43 |    sym("��?")(sym("pair")(v("a"), v("b"))),
-[error]    |              ^^^^^^^^^^^
-[error]    |              method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:49:7 
-[error] 49 |    sym("��?")(sym("pair")(v("a"), v("b"))),
-[error]    |    ^^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:49:17 
-[error] 49 |    sym("��?")(sym("pair")(v("a"), v("b"))),
-[error]    |              ^^^^^^^^^^^
-[error]    |              method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:55:7 
-[error] 55 |    sym("pair")(sym("��?")(v("p")), sym("��?")(v("p"))),
-[error]    |    ^^^^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:55:19 
-[error] 55 |    sym("pair")(sym("��?")(v("p")), sym("��?")(v("p"))),
-[error]    |                ^^^^^^^^^
-[error]    |                method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:55:38 
-[error] 55 |    sym("pair")(sym("��?")(v("p")), sym("��?")(v("p"))),
-[error]    |                                   ^^^^^^^^^
-[error]    |                 method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:62:7 
-[error] 62 |    sym("case")(v("s"), v("f"), v("g")),
-[error]    |    ^^^^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:65:12 
-[error] 65 |      Eq(sym("?")(v("h"), sym("inl")), v("f")),
-[error]    |         ^^^^^^^^
-[error]    |         method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:66:12 
-[error] 66 |      Eq(sym("?")(v("h"), sym("inr")), v("g"))
-[error]    |         ^^^^^^^^
-[error]    |         method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:72:7 
-[error] 72 |    sym("case")(sym("inl")(v("x")), v("f"), v("g")),
-[error]    |    ^^^^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:72:19 
-[error] 72 |    sym("case")(sym("inl")(v("x")), v("f"), v("g")),
-[error]    |                ^^^^^^^^^^
-[error]    |                method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:73:5 
-[error] 73 |    v("f")(v("x"))
-[error]    |    ^^^^^^
-[error]    |    method v in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:78:7 
-[error] 78 |    sym("case")(sym("inr")(v("y")), v("f"), v("g")),
-[error]    |    ^^^^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:78:19 
-[error] 78 |    sym("case")(sym("inr")(v("y")), v("f"), v("g")),
-[error]    |                ^^^^^^^^^^
-[error]    |                method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:79:5 
-[error] 79 |    v("g")(v("y"))
-[error]    |    ^^^^^^
-[error]    |    method v in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:97:7 
-[error] 97 |    sym("eval")(sym("pair")(sym("��")(v("x"), v("body")), v("arg"))),
-[error]    |    ^^^^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:97:19 
-[error] 97 |    sym("eval")(sym("pair")(sym("��")(v("x"), v("body")), v("arg"))),
-[error]    |                ^^^^^^^^^^^
-[error]    |                method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:97:31 
-[error] 97 |    sym("eval")(sym("pair")(sym("��")(v("x"), v("body")), v("arg"))),
-[error]    |                            ^^^^^^^^
-[error]    |                 method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:98:7 
-[error] 98 |    sym("subst")(v("body"), v("x"), v("arg"))
-[error]    |    ^^^^^^^^^^^^
-[error]    |    method sym in object Expr does not take more parameters
-[error]    |
-[error]    | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:103:7 
-[error] 103 |    sym("��")(v("x"), v("f")(v("x"))),
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:103:22 
-[error] 103 |    sym("��")(v("x"), v("f")(v("x"))),
-[error]     |                     ^^^^^^
-[error]     |                 method v in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:118:7 
-[error] 118 |    sym("!")(v("A")),
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:145:7 
-[error] 145 |    sym("?")(Eq(v("a"), v("b")), Eq(v("b"), v("c"))),
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:164:7 
-[error] 164 |    sym("��")(v("x"), v("P")),
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:165:7 
-[error] 165 |    sym("subst")(v("P"), v("x"), v("witness"))
-[error]     |    ^^^^^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:170:7 
-[error] 170 |    sym("subst")(sym("��")(v("x"), v("P")), v("x"), v("t")),
-[error]     |    ^^^^^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:170:20 
-[error] 170 |    sym("subst")(sym("��")(v("x"), v("P")), v("x"), v("t")),
-[error]     |                 ^^^^^^^^
-[error]     |               method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:183:7 
-[error] 183 |    sym("��")(v("A"), v("B")),
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:184:7 
-[error] 184 |    sym("�~")(v("A"), v("B"))
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:189:7 
-[error] 189 |    sym("��")(v("A"), v("B")),
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:190:7 
-[error] 190 |    sym("+")(v("A"), v("B"))
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:195:7 
-[error] 195 |    sym("��")(v("A"), v("B")),
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] -- [E050] Type Error: C:\Users\Cocoa\romanesco\scala\Solver\StandardRules.scala:196:7 
-[error] 196 |    sym("^")(v("B"), v("A"))
-[error]     |    ^^^^^^^^
-[error]     |    method sym in object Expr does not take more parameters
-[error]     |
-[error]     | longer explanation available when compiling with `-explain`
-[error] 56 errors found
-[error] (Compile / compileIncremental) Compilation failed
-[error] Total time: 8 s, completed 2026/02/08 21:54:47
+[info] running romanesco.testSomeCases 
+[DEBUG] logger enabled
+
+[Test Case] A 竊・A
+[DEBUG] prove begin. goal: 竊・A,A)
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] searching goal: 竊・A,A) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 1)
+[DEBUG] unifying A with A
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 358.0727 ms
+笨・Solved in 2 steps
+Proof result: List(apply[h0], apply[exp-universal])
+  1. apply[h0]
+  2. apply[exp-universal]
+
+[Test Case] A 竏ｧ B 竊・B 竏ｧ A
+[DEBUG] prove begin. goal: 竊・竏ｧ(A,B),竏ｧ(B,A))
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] searching goal: 竊・竏ｧ(A,B),竏ｧ(B,A)) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] searching goal: 竏ｧ(B,A) (depth 1)
+[DEBUG] unifying 竏ｧ(A,B) with 竏ｧ(B,A)
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unifying 竏ｧ with 竏ｧ
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting 竏ｧ
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏ｧ intro
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 2)
+[DEBUG] unifying 竏ｧ(A,B) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0: 竏ｧ(A,B) for goal B
+[DEBUG] unifying 竏ｧ(A,B) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h0.1: A for goal B
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0.2: B for goal B
+[DEBUG] unifying B with B
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 2)
+[DEBUG] unifying 竏ｧ(A,B) with A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0: 竏ｧ(A,B) for goal A
+[DEBUG] unifying 竏ｧ(A,B) with A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h0.1: A for goal A
+[DEBUG] unifying A with A
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 167.2796 ms
+笨・Solved in 4 steps
+Proof result: List(apply[h0.2], apply[h0.1], apply[product-universal], apply[exp-universal])
+  1. apply[h0.2]
+  2. apply[h0.1]
+  3. apply[product-universal]
+  4. apply[exp-universal]
+
+[Test Case] A 竏ｨ B 竊・B 竏ｨ A
+[DEBUG] prove begin. goal: 竊・竏ｨ(A,B),竏ｨ(B,A))
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] searching goal: 竊・竏ｨ(A,B),竏ｨ(B,A)) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] searching goal: 竏ｨ(B,A) (depth 1)
+[DEBUG] unifying 竏ｨ(A,B) with 竏ｨ(B,A)
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unifying 竏ｨ with 竏ｨ
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting 竏ｨ
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏ｨ intro
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 2)
+[DEBUG] unifying 竏ｨ(A,B) with B
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: B
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0: 竏ｨ(A,B) for goal B
+[DEBUG] unifying 竏ｨ(A,B) with B
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: B, context size: 1
+[DEBUG] decomposing 竏ｨ in context: h0
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 3)
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: B
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h0.left: A for goal B
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: B, context size: 1
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 2)
+[DEBUG] unifying 竏ｨ(A,B) with A
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: A
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0: 竏ｨ(A,B) for goal A
+[DEBUG] unifying 竏ｨ(A,B) with A
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: A, context size: 1
+[DEBUG] decomposing 竏ｨ in context: h0
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 3)
+[DEBUG] unifying A with A
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 3)
+[DEBUG] unifying B with A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0.right: B for goal A
+[DEBUG] unifying B with A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: A, context size: 1
+[DEBUG] searching context for goal: 竏ｨ(B,A)
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0: 竏ｨ(A,B) for goal 竏ｨ(B,A)
+[DEBUG] unifying 竏ｨ(A,B) with 竏ｨ(B,A)
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unifying 竏ｨ with 竏ｨ
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting 竏ｨ
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: 竏ｨ(B,A), context size: 1
+[DEBUG] decomposing 竏ｨ in context: h0
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] searching goal: 竏ｨ(B,A) (depth 2)
+[DEBUG] unifying A with 竏ｨ(B,A)
+[DEBUG] not substituting A
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏ｨ intro
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 3)
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: B
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h0.left: A for goal B
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: B, context size: 1
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 3)
+[DEBUG] unifying A with A
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] searching goal: 竏ｨ(B,A) (depth 2)
+[DEBUG] unifying B with 竏ｨ(B,A)
+[DEBUG] not substituting B
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏ｨ intro
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 3)
+[DEBUG] unifying B with B
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 36.5651 ms
+笨・Solved in 6 steps
+Proof result: List(apply[h0.left], apply[inr], apply[h0.right], apply[inl], apply[coproduct-universal], apply[exp-universal])
+  1. apply[h0.left]
+  2. apply[inr]
+  3. apply[h0.right]
+  4. apply[inl]
+  5. apply[coproduct-universal]
+  6. apply[exp-universal]
+
+[Test Case] (A 竏ｧ B 竊・C) 竊・(A 竊・(B 竊・C))
+[DEBUG] prove begin. goal: 竊・竊・竏ｧ(A,B),C),竊・A,竊・B,C)))
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] searching goal: 竊・竊・竏ｧ(A,B),C),竊・A,竊・B,C))) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] searching goal: 竊・A,竊・B,C)) (depth 1)
+[DEBUG] unifying 竊・竏ｧ(A,B),C) with 竊・A,竊・B,C))
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unifying 竊・with 竊・
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting 竊・
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying 竏ｧ(A,B) with A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] searching goal: 竊・B,C) (depth 2)
+[DEBUG] unifying A with 竊・B,C)
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] unifying 竊・竏ｧ(A,B),C) with 竊・B,C)
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unifying 竊・with 竊・
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting 竊・
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying 竏ｧ(A,B) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竊・intro
+[DEBUG] not substituting C
+[DEBUG] searching goal: C (depth 3)
+[DEBUG] unifying B with C
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] unifying A with C
+[DEBUG] not substituting A
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] unifying 竊・竏ｧ(A,B),C) with C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: C
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h2: B for goal C
+[DEBUG] unifying B with C
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h1: A for goal C
+[DEBUG] unifying A with C
+[DEBUG] not substituting A
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] useHypothesis: trying h0: 竊・竏ｧ(A,B),C) for goal C
+[DEBUG] unifying 竊・竏ｧ(A,B),C) with C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting C
+[DEBUG] useHypothesis: trying h0: C for goal C
+[DEBUG] unifying C with C
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] searching goal: 竏ｧ(A,B) (depth 4)
+[DEBUG] unifying B with 竏ｧ(A,B)
+[DEBUG] not substituting B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] unifying A with 竏ｧ(A,B)
+[DEBUG] not substituting A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] unifying 竊・竏ｧ(A,B),C) with 竏ｧ(A,B)
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unifying 竊・with 竏ｧ
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting 竏ｧ
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏ｧ intro
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 5)
+[DEBUG] unifying B with A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] unifying A with A
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 5)
+[DEBUG] unifying B with B
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 84.7763 ms
+笨・Solved in 8 steps
+Proof result: List(apply[h0], apply[h1], apply[h2], apply[product-universal], apply[h0], apply[exp-universal], apply[exp-universal], apply[exp-universal])
+  1. apply[h0]
+  2. apply[h1]
+  3. apply[h2]
+  4. apply[product-universal]
+  5. apply[h0]
+  6. apply[exp-universal]
+  7. apply[exp-universal]
+  8. apply[exp-universal]
+
+[Test Case] (A 竊・(B 竊・C)) 竊・(A 竏ｧ B 竊・C)
+[DEBUG] prove begin. goal: 竊・竊・A,竊・B,C)),竊・竏ｧ(A,B),C))
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] searching goal: 竊・竊・A,竊・B,C)),竊・竏ｧ(A,B),C)) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] searching goal: 竊・竏ｧ(A,B),C) (depth 1)
+[DEBUG] unifying 竊・A,竊・B,C)) with 竊・竏ｧ(A,B),C)
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unifying 竊・with 竊・
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting 竊・
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying A with 竏ｧ(A,B)
+[DEBUG] not substituting A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竊・intro
+[DEBUG] not substituting C
+[DEBUG] searching goal: C (depth 2)
+[DEBUG] unifying 竏ｧ(A,B) with C
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] unifying 竊・A,竊・B,C)) with C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: C
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h1: 竏ｧ(A,B) for goal C
+[DEBUG] unifying 竏ｧ(A,B) with C
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h1.1: A for goal C
+[DEBUG] unifying A with C
+[DEBUG] not substituting A
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h1.2: B for goal C
+[DEBUG] unifying B with C
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] useHypothesis: trying h0: 竊・A,竊・B,C)) for goal C
+[DEBUG] unifying 竊・A,竊・B,C)) with C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] useHypothesis: trying h0: 竊・B,C) for goal C
+[DEBUG] unifying 竊・B,C) with C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting C
+[DEBUG] useHypothesis: trying h0: C for goal C
+[DEBUG] unifying C with C
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 3)
+[DEBUG] unifying 竏ｧ(A,B) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] unifying 竊・A,竊・B,C)) with B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h1: 竏ｧ(A,B) for goal B
+[DEBUG] unifying 竏ｧ(A,B) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h1.1: A for goal B
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h1.2: B for goal B
+[DEBUG] unifying B with B
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 3)
+[DEBUG] unifying 竏ｧ(A,B) with A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] unifying 竊・A,竊・B,C)) with A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h1: 竏ｧ(A,B) for goal A
+[DEBUG] unifying 竏ｧ(A,B) with A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h1.1: A for goal A
+[DEBUG] unifying A with A
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 90.1569 ms
+笨・Solved in 7 steps
+Proof result: List(apply[h0], apply[h1.2], apply[h0], apply[h1.1], apply[h0], apply[exp-universal], apply[exp-universal])
+  1. apply[h0]
+  2. apply[h1.2]
+  3. apply[h0]
+  4. apply[h1.1]
+  5. apply[h0]
+  6. apply[exp-universal]
+  7. apply[exp-universal]
+
+[Test Case] (A 竊・B) 竏ｧ (B 竊・C) 竊・(A 竊・C)
+[DEBUG] prove begin. goal: 竊・竏ｧ(竊・A,B),竊・B,C)),竊・A,C))
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting C
+[DEBUG] searching goal: 竊・竏ｧ(竊・A,B),竊・B,C)),竊・A,C)) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting C
+[DEBUG] searching goal: 竊・A,C) (depth 1)
+[DEBUG] unifying 竏ｧ(竊・A,B),竊・B,C)) with 竊・A,C)
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting C
+[DEBUG] unifying 竏ｧ with 竊・
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting 竊・
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竊・intro
+[DEBUG] not substituting C
+[DEBUG] searching goal: C (depth 2)
+[DEBUG] unifying A with C
+[DEBUG] not substituting A
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] unifying 竏ｧ(竊・A,B),竊・B,C)) with C
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: C
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h1: A for goal C
+[DEBUG] unifying A with C
+[DEBUG] not substituting A
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] useHypothesis: trying h0: 竏ｧ(竊・A,B),竊・B,C)) for goal C
+[DEBUG] unifying 竏ｧ(竊・A,B),竊・B,C)) with C
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0.1: 竊・A,B) for goal C
+[DEBUG] unifying 竊・A,B) with C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0.1: B for goal C
+[DEBUG] unifying B with C
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] useHypothesis: trying h0.2: 竊・B,C) for goal C
+[DEBUG] unifying 竊・B,C) with C
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting C
+[DEBUG] useHypothesis: trying h0.2: C for goal C
+[DEBUG] unifying C with C
+[DEBUG] not substituting C
+[DEBUG] not substituting C
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 3)
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] unifying 竏ｧ(竊・A,B),竊・B,C)) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: B
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h1: A for goal B
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] useHypothesis: trying h0: 竏ｧ(竊・A,B),竊・B,C)) for goal B
+[DEBUG] unifying 竏ｧ(竊・A,B),竊・B,C)) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting B
+[DEBUG] not substituting C
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0.1: 竊・A,B) for goal B
+[DEBUG] unifying 竊・A,B) with B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0.1: B for goal B
+[DEBUG] unifying B with B
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 4)
+[DEBUG] unifying A with A
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 115.9417 ms
+笨・Solved in 7 steps
+Proof result: List(apply[h0.2], apply[h0.1], apply[h1], apply[h0.1], apply[h0.2], apply[exp-universal], apply[exp-universal])
+  1. apply[h0.2]
+  2. apply[h0.1]
+  3. apply[h1]
+  4. apply[h0.1]
+  5. apply[h0.2]
+  6. apply[exp-universal]
+  7. apply[exp-universal]
+
+[Test Case] (A 竊・B) 竏ｧ A 竊・B
+[DEBUG] prove begin. goal: 竊・竏ｧ(竊・A,B),A),B)
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] searching goal: 竊・竏ｧ(竊・A,B),A),B) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 1)
+[DEBUG] unifying 竏ｧ(竊・A,B),A) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h0: 竏ｧ(竊・A,B),A) for goal B
+[DEBUG] unifying 竏ｧ(竊・A,B),A) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0.1: 竊・A,B) for goal B
+[DEBUG] unifying 竊・A,B) with B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0.1: B for goal B
+[DEBUG] unifying B with B
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 2)
+[DEBUG] unifying 竏ｧ(竊・A,B),A) with A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h0: 竏ｧ(竊・A,B),A) for goal A
+[DEBUG] unifying 竏ｧ(竊・A,B),A) with A
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0.1: 竊・A,B) for goal A
+[DEBUG] unifying 竊・A,B) with A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h0.1: B for goal A
+[DEBUG] unifying B with A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h0.2: A for goal A
+[DEBUG] unifying A with A
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 5.9408 ms
+笨・Solved in 4 steps
+Proof result: List(apply[h0.1], apply[h0.2], apply[h0.1], apply[exp-universal])
+  1. apply[h0.1]
+  2. apply[h0.2]
+  3. apply[h0.1]
+  4. apply[exp-universal]
+
+[Test Case] 竏x. P(x) 竊・竏ベ. P(x)
+[DEBUG] prove begin. goal: 竏(x,竊・P(x),竏・x,P(x))))
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏・with Map()
+[DEBUG] not substituting 竏・
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竏(x,竊・P(x),竏・x,P(x)))) (depth 0)
+[DEBUG] proccessing 竏 intro
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏・with Map()
+[DEBUG] not substituting 竏・
+[DEBUG] not substituting x_0
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竊・P(x),竏・x_0,P(x))) (depth 1)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting 竏・with Map()
+[DEBUG] not substituting 竏・
+[DEBUG] not substituting x_0
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竏・x_0,P(x)) (depth 2)
+[DEBUG] unifying P(x) with 竏・x_0,P(x))
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏・with Map()
+[DEBUG] not substituting 竏・
+[DEBUG] not substituting x_0
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏・intro
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: P(x) (depth 3)
+[DEBUG] unifying P(x) with P(x)
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 22.5675 ms
+笨・Solved in 4 steps
+Proof result: List(apply[h1], apply[竏・ﾎｷ], apply[exp-universal], apply[竏-ﾎｵ])
+  1. apply[h1]
+  2. apply[竏・ﾎｷ]
+  3. apply[exp-universal]
+  4. apply[竏-ﾎｵ]
+
+[Test Case] 竏x. (P(x) 竏ｧ Q(x)) 竊・(竏x. P(x)) 竏ｧ (竏x. Q(x))
+[DEBUG] prove begin. goal: 竏(x,竊・竏ｧ(P(x),Q(x)),竏ｧ(竏(x,P(x)),竏(x,Q(x)))))
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竏(x,竊・竏ｧ(P(x),Q(x)),竏ｧ(竏(x,P(x)),竏(x,Q(x))))) (depth 0)
+[DEBUG] proccessing 竏 intro
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竊・竏ｧ(P(x),Q(x)),竏ｧ(竏(x_0,P(x)),竏(x_0,Q(x)))) (depth 1)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竏ｧ(竏(x_0,P(x)),竏(x_0,Q(x))) (depth 2)
+[DEBUG] unifying 竏ｧ(P(x),Q(x)) with 竏ｧ(竏(x_0,P(x)),竏(x_0,Q(x)))
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unifying 竏ｧ with 竏ｧ
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting 竏ｧ
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying P(x) with 竏(x_0,P(x))
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏ｧ intro
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竏(x_0,P(x)) (depth 3)
+[DEBUG] unifying 竏ｧ(P(x),Q(x)) with 竏(x_0,P(x))
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unifying 竏ｧ with 竏
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting 竏
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏 intro
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: P(x) (depth 4)
+[DEBUG] unifying 竏ｧ(P(x),Q(x)) with P(x)
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: P(x)
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h1: 竏ｧ(P(x),Q(x)) for goal P(x)
+[DEBUG] unifying 竏ｧ(P(x),Q(x)) with P(x)
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h1.1: P(x) for goal P(x)
+[DEBUG] unifying P(x) with P(x)
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竏(x_0,Q(x)) (depth 3)
+[DEBUG] unifying 竏ｧ(P(x),Q(x)) with 竏(x_0,Q(x))
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x_0
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unifying 竏ｧ with 竏
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting 竏
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏 intro
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: Q(x) (depth 4)
+[DEBUG] unifying 竏ｧ(P(x),Q(x)) with Q(x)
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: Q(x)
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h1: 竏ｧ(P(x),Q(x)) for goal Q(x)
+[DEBUG] unifying 竏ｧ(P(x),Q(x)) with Q(x)
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h1.1: P(x) for goal Q(x)
+[DEBUG] unifying P(x) with Q(x)
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unifying P with Q
+[DEBUG] not substituting P
+[DEBUG] not substituting Q
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h1.2: Q(x) for goal Q(x)
+[DEBUG] unifying Q(x) with Q(x)
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 258.8803 ms
+笨・Solved in 7 steps
+Proof result: List(apply[h1.1], apply[竏-ﾎｵ], apply[h1.2], apply[竏-ﾎｵ], apply[product-universal], apply[exp-universal], apply[竏-ﾎｵ])
+  1. apply[h1.1]
+  2. apply[竏-ﾎｵ]
+  3. apply[h1.2]
+  4. apply[竏-ﾎｵ]
+  5. apply[product-universal]
+  6. apply[exp-universal]
+  7. apply[竏-ﾎｵ]
+
+[Test Case] ((竏x. P(x)) 竏ｨ (竏x. Q(x))) 竊・竏x. (P(x) 竏ｨ Q(x))
+[DEBUG] prove begin. goal: 竊・竏ｨ(竏(x,P(x)),竏(x,Q(x))),竏(x,竏ｨ(P(x),Q(x))))
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竊・竏ｨ(竏(x,P(x)),竏(x,Q(x))),竏(x,竏ｨ(P(x),Q(x)))) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竏(x,竏ｨ(P(x),Q(x))) (depth 1)
+[DEBUG] unifying 竏ｨ(竏(x,P(x)),竏(x,Q(x))) with 竏(x,竏ｨ(P(x),Q(x)))
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unifying 竏ｨ with 竏
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting 竏
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏 intro
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竏ｨ(P(x),Q(x)) (depth 2)
+[DEBUG] unifying 竏ｨ(竏(x,P(x)),竏(x,Q(x))) with 竏ｨ(P(x),Q(x))
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unifying 竏ｨ with 竏ｨ
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting 竏ｨ
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying 竏(x,P(x)) with P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏ｨ intro
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: P(x) (depth 3)
+[DEBUG] unifying 竏ｨ(竏(x,P(x)),竏(x,Q(x))) with P(x)
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: P(x)
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0: 竏ｨ(竏(x,P(x)),竏(x,Q(x))) for goal P(x)
+[DEBUG] unifying 竏ｨ(竏(x,P(x)),竏(x,Q(x))) with P(x)
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: P(x), context size: 1
+[DEBUG] decomposing 竏ｨ in context: h0
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: P(x) (depth 4)
+[DEBUG] unifying 竏(x,P(x)) with P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.left: 竏(x,P(x)) for goal P(x)
+[DEBUG] unifying 竏(x,P(x)) with P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.left: P(x) for goal P(x)
+[DEBUG] unifying P(x) with P(x)
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: P(x) (depth 4)
+[DEBUG] unifying 竏(x,Q(x)) with P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.right: 竏(x,Q(x)) for goal P(x)
+[DEBUG] unifying 竏(x,Q(x)) with P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.right: Q(x) for goal P(x)
+[DEBUG] unifying Q(x) with P(x)
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unifying Q with P
+[DEBUG] not substituting Q
+[DEBUG] not substituting P
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: P(x), context size: 1
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: Q(x) (depth 3)
+[DEBUG] unifying 竏ｨ(竏(x,P(x)),竏(x,Q(x))) with Q(x)
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: Q(x)
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0: 竏ｨ(竏(x,P(x)),竏(x,Q(x))) for goal Q(x)
+[DEBUG] unifying 竏ｨ(竏(x,P(x)),竏(x,Q(x))) with Q(x)
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: Q(x), context size: 1
+[DEBUG] decomposing 竏ｨ in context: h0
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: Q(x) (depth 4)
+[DEBUG] unifying 竏(x,P(x)) with Q(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: Q(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.left: 竏(x,P(x)) for goal Q(x)
+[DEBUG] unifying 竏(x,P(x)) with Q(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.left: P(x) for goal Q(x)
+[DEBUG] unifying P(x) with Q(x)
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unifying P with Q
+[DEBUG] not substituting P
+[DEBUG] not substituting Q
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: Q(x), context size: 1
+[DEBUG] searching context for goal: 竏ｨ(P(x),Q(x))
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0: 竏ｨ(竏(x,P(x)),竏(x,Q(x))) for goal 竏ｨ(P(x),Q(x))
+[DEBUG] unifying 竏ｨ(竏(x,P(x)),竏(x,Q(x))) with 竏ｨ(P(x),Q(x))
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unifying 竏ｨ with 竏ｨ
+[DEBUG] not substituting 竏ｨ
+[DEBUG] not substituting 竏ｨ
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying 竏(x,P(x)) with P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: 竏ｨ(P(x),Q(x)), context size: 1
+[DEBUG] decomposing 竏ｨ in context: h0
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竏ｨ(P(x),Q(x)) (depth 3)
+[DEBUG] unifying 竏(x,P(x)) with 竏ｨ(P(x),Q(x))
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unifying 竏 with 竏ｨ
+[DEBUG] not substituting 竏
+[DEBUG] not substituting 竏ｨ
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏ｨ intro
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: P(x) (depth 4)
+[DEBUG] unifying 竏(x,P(x)) with P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.left: 竏(x,P(x)) for goal P(x)
+[DEBUG] unifying 竏(x,P(x)) with P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.left: P(x) for goal P(x)
+[DEBUG] unifying P(x) with P(x)
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: 竏ｨ(P(x),Q(x)) (depth 3)
+[DEBUG] unifying 竏(x,Q(x)) with 竏ｨ(P(x),Q(x))
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting 竏ｨ with Map()
+[DEBUG] not substituting 竏ｨ
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unifying 竏 with 竏ｨ
+[DEBUG] not substituting 竏
+[DEBUG] not substituting 竏ｨ
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竏ｨ intro
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] searching goal: P(x) (depth 4)
+[DEBUG] unifying 竏(x,Q(x)) with P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.right: 竏(x,Q(x)) for goal P(x)
+[DEBUG] unifying 竏(x,Q(x)) with P(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.right: Q(x) for goal P(x)
+[DEBUG] unifying Q(x) with P(x)
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting P with Map()
+[DEBUG] not substituting P
+[DEBUG] not substituting x
+[DEBUG] unifying Q with P
+[DEBUG] not substituting Q
+[DEBUG] not substituting P
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: P(x), context size: 1
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] searching goal: Q(x) (depth 4)
+[DEBUG] unifying 竏(x,Q(x)) with Q(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: Q(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.right: 竏(x,Q(x)) for goal Q(x)
+[DEBUG] unifying 竏(x,Q(x)) with Q(x)
+[DEBUG] substituting 竏 with Map()
+[DEBUG] not substituting 竏
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unification failed. Map()
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] useHypothesis: trying h0.right: Q(x) for goal Q(x)
+[DEBUG] unifying Q(x) with Q(x)
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] substituting Q with Map()
+[DEBUG] not substituting Q
+[DEBUG] not substituting x
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 350.5431 ms
+笨・Solved in 9 steps
+Proof result: List(apply[h0.left], apply[h0.left[x/?]], apply[inl], apply[h0.right], apply[h0.right[x/?]], apply[inr], apply[coproduct-universal], apply[竏-ﾎｵ], apply[exp-universal])
+  1. apply[h0.left]
+  2. apply[h0.left[x/?]]
+  3. apply[inl]
+  4. apply[h0.right]
+  5. apply[h0.right[x/?]]
+  6. apply[inr]
+  7. apply[coproduct-universal]
+  8. apply[竏-ﾎｵ]
+  9. apply[exp-universal]
+
+[Test Case] a = b 竊・b = a
+[DEBUG] prove begin. goal: 竊・a = b,b = a)
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting a
+[DEBUG] searching goal: 竊・a = b,b = a) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting a
+[DEBUG] searching goal: b = a (depth 1)
+[DEBUG] unifying a = b with b = a
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting a
+[DEBUG] unifying = with =
+[DEBUG] not substituting =
+[DEBUG] not substituting =
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying a with b
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] unifying b with a
+[DEBUG] not substituting b
+[DEBUG] not substituting a
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: b = a
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] trying rewrite with a = b
+[DEBUG] rewrote b = a to b = b
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting b
+[DEBUG] searching goal: b = b (depth 2)
+[DEBUG] unifying a = b with b = b
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting b
+[DEBUG] unifying = with =
+[DEBUG] not substituting =
+[DEBUG] not substituting =
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying a with b
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] unifying b with b
+[DEBUG] not substituting b
+[DEBUG] not substituting b
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 25.2506 ms
+笨・Solved in 3 steps
+Proof result: List(apply[eq-refl], apply[eq-subst], apply[exp-universal])
+  1. apply[eq-refl]
+  2. apply[eq-subst]
+  3. apply[exp-universal]
+
+[Test Case] a = b 竏ｧ b = c 竊・a = c
+[DEBUG] prove begin. goal: 竊・竏ｧ(a = b,b = c),a = c)
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting c
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting c
+[DEBUG] searching goal: 竊・竏ｧ(a = b,b = c),a = c) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting c
+[DEBUG] searching goal: a = c (depth 1)
+[DEBUG] unifying 竏ｧ(a = b,b = c) with a = c
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting c
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting c
+[DEBUG] unifying 竏ｧ with =
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting =
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] unifying a with c
+[DEBUG] not substituting a
+[DEBUG] not substituting c
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: a = c
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting c
+[DEBUG] useHypothesis: trying h0: 竏ｧ(a = b,b = c) for goal a = c
+[DEBUG] unifying 竏ｧ(a = b,b = c) with a = c
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting c
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting c
+[DEBUG] unifying 竏ｧ with =
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting =
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] useHypothesis: trying h0.1: a = b for goal a = c
+[DEBUG] unifying a = b with a = c
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting b
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting c
+[DEBUG] unifying = with =
+[DEBUG] not substituting =
+[DEBUG] not substituting =
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying a with a
+[DEBUG] not substituting a
+[DEBUG] not substituting a
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying b with c
+[DEBUG] not substituting b
+[DEBUG] not substituting c
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting c
+[DEBUG] useHypothesis: trying h0.2: b = c for goal a = c
+[DEBUG] unifying b = c with a = c
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting b
+[DEBUG] not substituting c
+[DEBUG] substituting = with Map()
+[DEBUG] not substituting =
+[DEBUG] not substituting a
+[DEBUG] not substituting c
+[DEBUG] unifying = with =
+[DEBUG] not substituting =
+[DEBUG] not substituting =
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] unifying b with a
+[DEBUG] not substituting b
+[DEBUG] not substituting a
+[DEBUG] unification failed. Map()
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: a = c, context size: 1
+[DEBUG] searching context for goal: 竊・竏ｧ(a = b,b = c),a = c)
+[DEBUG] decomposeContext for goal: 竊・竏ｧ(a = b,b = c),a = c), context size: 0
+[DEBUG] elapsed time 52.2571 ms
+笨・Failed to prove
+
+[Test Case] 竓､
+[DEBUG] prove begin. goal: 竓､
+[DEBUG] not substituting 竓､
+[DEBUG] searching goal: 竓､ (depth 0)
+[DEBUG] elapsed time 1.2305 ms
+笨・Solved in 1 steps
+Proof result: List(apply[terminal-universal])
+  1. apply[terminal-universal]
+
+[Test Case] A 竏ｧ 竓･ 竊・B
+[DEBUG] prove begin. goal: 竊・竏ｧ(A,竓･),B)
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting 竓･
+[DEBUG] not substituting B
+[DEBUG] searching goal: 竊・竏ｧ(A,竓･),B) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 1)
+[DEBUG] unifying 竏ｧ(A,竓･) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting 竓･
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting 竓･
+[DEBUG] useHypothesis: trying h0: 竏ｧ(A,竓･) for goal B
+[DEBUG] unifying 竏ｧ(A,竓･) with B
+[DEBUG] substituting 竏ｧ with Map()
+[DEBUG] not substituting 竏ｧ
+[DEBUG] not substituting A
+[DEBUG] not substituting 竓･
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting A
+[DEBUG] useHypothesis: trying h0.1: A for goal B
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting 竓･
+[DEBUG] useHypothesis: trying h0.2: 竓･ for goal B
+[DEBUG] unifying 竓･ with B
+[DEBUG] not substituting 竓･
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] decomposeContext for goal: B, context size: 1
+[DEBUG] searching context for goal: 竊・竏ｧ(A,竓･),B)
+[DEBUG] decomposeContext for goal: 竊・竏ｧ(A,竓･),B), context size: 0
+[DEBUG] elapsed time 29.3865 ms
+笨・Failed to prove
+
+[Test Case] A 竊・(A 竊・B) 竊・B
+[DEBUG] prove begin. goal: 竊・A,竊・竊・A,B),B))
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] searching goal: 竊・A,竊・竊・A,B),B)) (depth 0)
+[DEBUG] proccessing 竊・intro
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] searching goal: 竊・竊・A,B),B) (depth 1)
+[DEBUG] unifying A with 竊・竊・A,B),B)
+[DEBUG] not substituting A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] proccessing 竊・intro
+[DEBUG] not substituting B
+[DEBUG] searching goal: B (depth 2)
+[DEBUG] unifying 竊・A,B) with B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] unifying A with B
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] searching context for goal: B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h1: 竊・A,B) for goal B
+[DEBUG] unifying 竊・A,B) with B
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification failed. Map()
+[DEBUG] not substituting B
+[DEBUG] useHypothesis: trying h1: B for goal B
+[DEBUG] unifying B with B
+[DEBUG] not substituting B
+[DEBUG] not substituting B
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] not substituting A
+[DEBUG] searching goal: A (depth 3)
+[DEBUG] unifying 竊・A,B) with A
+[DEBUG] substituting 竊・with Map()
+[DEBUG] not substituting 竊・
+[DEBUG] not substituting A
+[DEBUG] not substituting B
+[DEBUG] not substituting A
+[DEBUG] unification failed. Map()
+[DEBUG] unifying A with A
+[DEBUG] not substituting A
+[DEBUG] not substituting A
+[DEBUG] unification succeeded (identical). Map()
+[DEBUG] elapsed time 29.3787 ms
+笨・Solved in 5 steps
+Proof result: List(apply[h1], apply[h0], apply[h1], apply[exp-universal], apply[exp-universal])
+  1. apply[h1]
+  2. apply[h0]
+  3. apply[h1]
+  4. apply[exp-universal]
+  5. apply[exp-universal]
+[success] Total time: 8 s, completed 2026/02/09 6:33:22
