@@ -7,10 +7,10 @@ lazy val root = (project in file("."))
     name := "romanesco",
     Compile / scalaSource := baseDirectory.value / "scala",
     libraryDependencies ++= Seq()
-    /*nativeConfig ~= { c=>
+    /*nativeConfig ~= { c =>
       c.withLTO(LTO.none)
-       .withMode(Mode.debug)
-       .withGC(GC.commix)
-       .withMultithreading(true)
+        .withMode(Mode.debug)
+        .withGC(GC.commix)
+        .withMultithreading(true)
     }*/
   )

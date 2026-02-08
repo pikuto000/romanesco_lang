@@ -162,7 +162,7 @@ object SimpleParser:
           case _            => throw new Exception("Expected ',' or ')'")
 
 @main def testSomeCases = {
-  logger.switch(false) // 大量のログで見づらくなるのを防ぐためデフォルトはオフ
+  logger.switch(false)
 
   val cases = List(
     "A → A",
@@ -179,7 +179,14 @@ object SimpleParser:
     "a = b ∧ b = c → a = c",
     "⊤",
     "A ∧ ⊥ → B",
-    "A → (A → B) → B"
+    "A → (A → B) → B",
+    "(A → B) → ((B → C) → (A → C))",
+    "A ∧ (B ∨ C) → (A ∧ B) ∨ (A ∧ C)",
+    "(((A → ⊥) → ⊥) → ⊥) → (A → ⊥)",
+    "((A ∨ (A → ⊥)) → ⊥) → ⊥",
+    "A ∨ (A → ⊥)", // it should be fail
+    "(∃x. P(x) → Q) → ∀x. (P(x) → Q)",
+    "∀x. ∀y. (x = y → (P(x) → P(y)))"
   )
 
   cases.foreach { input =>
@@ -192,8 +199,9 @@ object SimpleParser:
       result match {
         case Some(proof) =>
           println(s"✓ Solved in ${proof.length} steps")
+          // println(s"Proof result: $proof")
           proof.zipWithIndex.foreach { case (step, i) =>
-          // println(s"  ${i + 1}. $step")
+            println(s"  ${i + 1}. $step")
           }
         case None =>
           println("✗ Failed to prove")

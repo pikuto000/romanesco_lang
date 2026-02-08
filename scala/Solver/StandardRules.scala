@@ -211,37 +211,9 @@ object StandardRules:
   )
 
   // 全ての標準規則
-  val all: List[CatRule] = List(
-    idLeft,
-    idRight,
-    compAssoc,
-    productUniversal,
-    fstBeta,
-    sndBeta,
-    productEta,
-    coproductUniversal,
-    caseInlBeta,
-    caseInrBeta,
-    expUniversal,
-    lambdaBeta,
-    lambdaEta,
-    terminalUniversal,
-    terminalUnique,
-    initialUniversal,
-    eqRefl,
-    eqSymm,
-    eqTrans,
-    eqSubst,
-    existsUnit,
-    existsCounit,
-    forallUnit,
-    forallCounit,
-    andIsProd,
-    orIsCoprod,
-    arrowIsExp,
-    trueIsTerminal,
-    falseIsInitial
-  )
+  // 基本的な論理・圏論的構造は Prover.scala にハードコードされているため、
+  // ここではデフォルトで適用する追加規則は空にする。
+  val all: List[CatRule] = Nil
 
   // カテゴリー別
   val products = List(productUniversal, fstBeta, sndBeta, productEta)
