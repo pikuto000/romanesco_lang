@@ -126,16 +126,11 @@ final class Prover(
           .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.expUniversal, s), s) }
 
       case Expr.App(Expr.Sym(Forall), List(Expr.Var(v), body)) =>
-        if (v.nonEmpty && v(0).isUpper) then
-          val m = freshMeta(depth)
-          val instantiated = Prover.substVar(body, v, m)
-          search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount)
-            .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.forallCounit, s), s) }
-        else
-          val freshVar = s"${v}_$depth"
-          val instantiated = Prover.substVar(body, v, Expr.Var(freshVar))
-          search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount)
-            .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.forallCounit, s), s) }
+        // 常にフレッシュな固定変数(Var)を導入する（ヒューリスティックの廃止）
+        val freshVar = s"${v}_$depth"
+        val instantiated = Prover.substVar(body, v, Expr.Var(freshVar))
+        search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount)
+          .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.forallCounit, s), s) }
 
       case Expr.App(Expr.Sym(Exists), List(Expr.Var(v), body)) =>
         val witness = freshMeta(depth)
