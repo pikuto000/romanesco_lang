@@ -24,6 +24,14 @@ object Rewriter {
   }
 
   private def rewriteRule(expr: Expr): Expr = expr match {
+    // --- ラムダ計算 (β簡約) ---
+    case Expr.App(Expr.App(Expr.Sym("λ"), List(Expr.Var(v), body)), args) if args.nonEmpty =>
+      val arg = args.head
+      val rest = args.tail
+      val substituted = Prover.substVar(body, v, arg)
+      if (rest.isEmpty) substituted
+      else Expr.App(substituted, rest)
+
     // --- 圏論的公理 ---
     case Expr.App(Expr.Sym(Compose), List(f, Expr.Sym(Id))) => f
     case Expr.App(Expr.Sym(Compose), List(Expr.Sym(Id), f)) => f
