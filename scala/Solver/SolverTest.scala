@@ -115,6 +115,10 @@ def processInput(input: String, classical: Boolean = false): Unit =
     "∀x. ∀y. ((∀P. (P(x) → P(y))) → (∀Q. (Q(y) → Q(x))))" // Leibniz Equality Symmetry
   )
 
+  val autoInductionCases = List(
+    "∀n. plus(n, 0) = n"
+  )
+
   println("=== Intuitionistic Logic Tests ===")
   intuitionisticCases.foreach { input =>
     println(s"\n[Test Case] $input")
@@ -152,6 +156,24 @@ def processInput(input: String, classical: Boolean = false): Unit =
 
   println("\n=== Higher-Order Logic Tests ===")
   higherOrderCases.foreach { input =>
+    println(s"\n[Test Case] $input")
+    try {
+      val expr = TestParser.parse(input)
+      val prover = new Prover(classical = false)
+      val result = prover.prove(expr)
+      result match
+        case Right(tree) =>
+          println(s"✓ Solved:\n${tree.format(1)}")
+        case Left(trace) =>
+          println("✗ Failed to prove")
+          println(trace.format(1))
+    } catch {
+      case e: Exception => println(s"Error: ${e.getMessage}")
+    }
+  }
+
+  println("\n=== Automatic Induction Tests ===")
+  autoInductionCases.foreach { input =>
     println(s"\n[Test Case] $input")
     try {
       val expr = TestParser.parse(input)
