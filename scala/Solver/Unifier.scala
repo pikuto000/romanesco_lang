@@ -46,15 +46,15 @@ object Unifier:
             sList.flatMap(unify(a1, a2, _))
           }
 
-        // --- 高階パターン単一化 ---
-        case (Expr.App(Expr.Meta(id), args), t) if isPattern(args) =>
+        // --- 高階パターン単一化 (一般化) ---
+        case (Expr.App(Expr.Meta(id), args), t) =>
           if (t == Expr.App(Expr.Meta(id), args)) LazyList(subst)
-          else if (!occursCheck(id, t)) solvePattern(id, args, t, subst)
+          else if (!occursCheck(id, t)) solveHigherOrder(id, args, t, subst)
           else LazyList.empty
 
-        case (t, Expr.App(Expr.Meta(id), args)) if isPattern(args) =>
+        case (t, Expr.App(Expr.Meta(id), args)) =>
           if (t == Expr.App(Expr.Meta(id), args)) LazyList(subst)
-          else if (!occursCheck(id, t)) solvePattern(id, args, t, subst)
+          else if (!occursCheck(id, t)) solveHigherOrder(id, args, t, subst)
           else LazyList.empty
 
         // --- 基本的なメタ変数の単一化 ---
@@ -66,7 +66,7 @@ object Unifier:
         case (Expr.Sym(n1), Expr.Sym(n2)) if n1 == n2 => LazyList(subst)
         case (Expr.Var(n1), Expr.Var(n2)) if n1 == n2 => LazyList(subst)
 
-        // --- アプリケーションの単一化 ---
+        // --- アプリケーションの単一化 (分解) ---
         case (Expr.App(h1, a1), Expr.App(h2, a2)) if a1.length == a2.length =>
           unify(h1, h2, subst).flatMap { s =>
             a1.zip(a2).foldLeft(LazyList(s)) { case (sList, (arg1, arg2)) =>
@@ -79,16 +79,40 @@ object Unifier:
       if (res.nonEmpty) logger.log(s"Unify Success: $r1 = $r2 with ${res.head}")
       res
 
-  private def isPattern(args: List[Expr]): Boolean = {
-    val vars = args.collect { case Expr.Var(name) => name }
-    vars.length == args.length && vars.distinct.length == vars.length
+  // 項tの中にあるtermToReplaceをreplacementに置き換える
+  private def substTerm(t: Expr, termToReplace: Expr, replacement: Expr): Expr = {
+    if (t == termToReplace) replacement
+    else t match
+      case Expr.App(f, args) =>
+        Expr.App(substTerm(f, termToReplace, replacement), args.map(substTerm(_, termToReplace, replacement)))
+      case Expr.Lam(v, b) =>
+        // termToReplaceの中にvが含まれている場合は置換しない（キャプチャ回避）？
+        // 今回の用途ではargsは現在のスコープの項なので、ラムダ内部の変数は別物とみなす
+        // ただし構造的一致を見るので、偶発的に同じ変数名だとマッチしてしまうリスクはある
+        // ここでは単純な構造置換を行う
+        Expr.App(Expr.Sym("λ"), List(Expr.Var(v), substTerm(b, termToReplace, replacement)))
+      case _ => t
   }
 
-  private def solvePattern(id: MetaId, args: List[Expr], target: Expr, subst: Subst): LazyList[Subst] = {
-    val varNames = args.collect { case Expr.Var(name) => name }
-    val lambda = varNames.foldRight(target) { (name, body) =>
+  private def solveHigherOrder(id: MetaId, args: List[Expr], target: Expr, subst: Subst): LazyList[Subst] = {
+    // 引数を抽象化するための変数名を生成
+    val vars = args.indices.map(i => s"v_$i").toList
+    
+    // target内のargs[i]をvars[i]に置換する
+    // 置換順序は引数の順序通りとする (前から順に置換)
+    // 注意: args同士が重複する場合、前の引数が優先して置換される
+    
+    var currentBody = target
+    args.zip(vars).foreach { case (arg, v) =>
+      currentBody = substTerm(currentBody, arg, Expr.Var(v))
+    }
+
+    val lambda = vars.foldRight(currentBody) { (name, body) =>
       Expr.App(Expr.Sym("λ"), List(Expr.Var(name), body))
     }
+    
+    // 生成された解を追加
+    // 注意: 厳密なHOUでは複数の解がありうるが、ここでは「最大抽象化」の1つのみを返す
     LazyList(subst + (id -> lambda))
   }
 
