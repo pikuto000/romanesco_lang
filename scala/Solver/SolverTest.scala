@@ -68,11 +68,9 @@ def processInput(input: String, classical: Boolean = false): Unit =
 
     val prover = new Prover(classical = classical)
     prover.prove(expr) match
-      case Right(proof) =>
-        println(s"✓ Proof found (${proof.length} steps):")
-        proof.zipWithIndex.foreach { case (step, i) =>
-          println(s"  ${i + 1}. $step")
-        }
+      case Right(tree) =>
+        println(s"✓ Proof found:")
+        println(tree.format(1))
       case Left(trace) =>
         println("✗ No proof found. Failure trace:")
         println(trace.format())
@@ -123,7 +121,7 @@ def processInput(input: String, classical: Boolean = false): Unit =
     val expr = TestParser.parse(input)
     val prover = new Prover(classical = false)
     prover.prove(expr) match
-      case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
+      case Right(tree) => println(s"✓ Solved:\n${tree.format(1)}")
       case Left(trace)  =>
         println("✗ Failed to prove")
         if (input == "A ∨ B → A" || input == "A ∨ (A → ⊥)") {
@@ -138,7 +136,7 @@ def processInput(input: String, classical: Boolean = false): Unit =
     val expr = TestParser.parse(input)
     val prover = new Prover(classical = true)
     prover.prove(expr) match
-      case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
+      case Right(tree) => println(s"✓ Solved:\n${tree.format(1)}")
       case Left(trace)  => println("✗ Failed to prove")
   }
 
@@ -148,7 +146,7 @@ def processInput(input: String, classical: Boolean = false): Unit =
     val expr = TestParser.parse(input)
     val prover = new Prover(classical = false)
     prover.prove(expr) match
-      case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
+      case Right(tree) => println(s"✓ Solved:\n${tree.format(1)}")
       case Left(trace)  => println("✗ Failed to prove")
   }
 
@@ -160,11 +158,8 @@ def processInput(input: String, classical: Boolean = false): Unit =
       val prover = new Prover(classical = false)
       val result = prover.prove(expr)
       result match
-        case Right(proof) =>
-          println(s"✓ Solved in ${proof.length} steps")
-          proof.zipWithIndex.foreach { case (step, i) =>
-            println(s"  ${i + 1}. $step")
-          }
+        case Right(tree) =>
+          println(s"✓ Solved:\n${tree.format(1)}")
         case Left(trace) =>
           println("✗ Failed to prove")
           println(trace.format(1))

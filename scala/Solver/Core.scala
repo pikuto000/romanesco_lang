@@ -77,15 +77,21 @@ case class CatRule(
     s"$name: $lhs ⟹ $rhs$cond"
 
 /**
- * 証明の1ステップ
+ * 証明のツリー構造
  */
-enum ProofStep:
-  case Apply(rule: CatRule, subst: Map[MetaId, Expr])
+enum ProofTree:
+  case Node(goal: Expr, ruleName: String, children: List[ProofTree])
+  case Leaf(goal: Expr, ruleName: String)
 
-  override def toString: String = this match
-    case Apply(r, _) => s"apply[${r.name}]"
+  def format(indent: Int = 0): String =
+    val sp = "  " * indent
+    this match
+      case Leaf(g, r) => s"$sp[ $r ]  ⟹  $g"
+      case Node(g, r, cs) =>
+        val childrenStr = cs.map(_.format(indent + 1)).mkString("\n")
+        s"$childrenStr\n$sp-------------------- ($r)\n$sp  ⟹  $g"
 
-type Proof = List[ProofStep]
+type Proof = ProofTree
 
 /**
  * 証明の失敗トレース
