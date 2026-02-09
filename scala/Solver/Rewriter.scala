@@ -1,6 +1,6 @@
 // ==========================================
 // Rewriter.scala
-// 圏論的項書き換えエンジン（Appラムダ対応）
+// 圏論的項書き換えエンジン（リスト・自然数対応）
 // ==========================================
 
 package romanesco.Solver.core
@@ -44,6 +44,13 @@ object Rewriter {
     // plus(S(n), m) -> S(plus(n, m))
     case Expr.App(Expr.Sym("plus"), List(Expr.App(Expr.Sym(Succ), List(n)), m)) =>
       Expr.App(Expr.Sym(Succ), List(Expr.App(Expr.Sym("plus"), List(n, m))))
+
+    // --- リストの演算 (Lists) ---
+    // append(nil, ys) -> ys
+    case Expr.App(Expr.Sym("append"), List(Expr.Sym("nil"), ys)) => ys
+    // append(cons(x, xs), ys) -> cons(x, append(xs, ys))
+    case Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("cons"), List(x, xs)), ys)) =>
+      Expr.App(Expr.Sym("cons"), List(x, Expr.App(Expr.Sym("append"), List(xs, ys))))
 
     case _ => expr
   }

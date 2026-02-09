@@ -77,8 +77,8 @@ def processInput(input: String, classical: Boolean = false): Unit =
   catch case e: Exception => println(s"Error: ${e.getMessage}")
 
 @main def testSomeCases = {
-  logger.switch(false)
-
+  logger.switch(true)
+  /*
   val intuitionisticCases = List(
     "A → A",
     "A ∧ B → B ∧ A",
@@ -114,11 +114,12 @@ def processInput(input: String, classical: Boolean = false): Unit =
     "∀P. ∀Q. ((∀x. (P(x) → Q(x))) → ((∃x. P(x)) → (∃x. Q(x))))",
     "∀x. ∀y. ((∀P. (P(x) → P(y))) → (∀Q. (Q(y) → Q(x))))" // Leibniz Equality Symmetry
   )
-
+   */
   val autoInductionCases = List(
-    "∀n. plus(n, 0) = n"
+    "∀n. plus(n, 0) = n",
+    "∀xs. append(xs, nil) = xs"
   )
-
+  /*
   println("=== Intuitionistic Logic Tests ===")
   intuitionisticCases.foreach { input =>
     println(s"\n[Test Case] $input")
@@ -126,7 +127,7 @@ def processInput(input: String, classical: Boolean = false): Unit =
     val prover = new Prover(classical = false)
     prover.prove(expr) match
       case Right(tree) => println(s"✓ Solved:\n${tree.format(1)}")
-      case Left(trace)  =>
+      case Left(trace) =>
         println("✗ Failed to prove")
         if (input == "A ∨ B → A" || input == "A ∨ (A → ⊥)") {
           println("Failure Reason:")
@@ -141,7 +142,7 @@ def processInput(input: String, classical: Boolean = false): Unit =
     val prover = new Prover(classical = true)
     prover.prove(expr) match
       case Right(tree) => println(s"✓ Solved:\n${tree.format(1)}")
-      case Left(trace)  => println("✗ Failed to prove")
+      case Left(trace) => println("✗ Failed to prove")
   }
 
   println("\n=== Categorical Equational Tests ===")
@@ -151,7 +152,7 @@ def processInput(input: String, classical: Boolean = false): Unit =
     val prover = new Prover(classical = false)
     prover.prove(expr) match
       case Right(tree) => println(s"✓ Solved:\n${tree.format(1)}")
-      case Left(trace)  => println("✗ Failed to prove")
+      case Left(trace) => println("✗ Failed to prove")
   }
 
   println("\n=== Higher-Order Logic Tests ===")
@@ -171,7 +172,7 @@ def processInput(input: String, classical: Boolean = false): Unit =
       case e: Exception => println(s"Error: ${e.getMessage}")
     }
   }
-
+   */
   println("\n=== Automatic Induction Tests ===")
   autoInductionCases.foreach { input =>
     println(s"\n[Test Case] $input")
