@@ -1,6 +1,6 @@
 // ==========================================
 // Rewriter.scala
-// 圏論的項書き換えエンジン（リスト・自然数対応）
+// 圏論的項書き換えエンジン（シンボル柔軟版）
 // ==========================================
 
 package romanesco.Solver.core
@@ -34,21 +34,13 @@ object Rewriter {
     case Expr.App(Expr.Sym(Compose), List(Expr.App(Expr.Sym(Case), List(f, g)), Expr.Sym(Inl))) => f
     case Expr.App(Expr.Sym(Compose), List(Expr.App(Expr.Sym(Case), List(f, g)), Expr.Sym(Inr))) => g
 
-    // --- β-簡約 (Appベース版) ---
-    case Expr.App(Expr.Lam(x, body), List(arg)) =>
-      Prover.substVar(body, x, arg)
-
-    // --- 自然数の演算 (Arithmetic) ---
-    // plus(0, m) -> m
-    case Expr.App(Expr.Sym("plus"), List(Expr.Sym(Zero), m)) => m
-    // plus(S(n), m) -> S(plus(n, m))
+    // --- 自然数の演算 ---
+    case Expr.App(Expr.Sym("plus"), List(Expr.Sym(Zero | Initial), m)) => m
     case Expr.App(Expr.Sym("plus"), List(Expr.App(Expr.Sym(Succ), List(n)), m)) =>
       Expr.App(Expr.Sym(Succ), List(Expr.App(Expr.Sym("plus"), List(n, m))))
 
-    // --- リストの演算 (Lists) ---
-    // append(nil, ys) -> ys
-    case Expr.App(Expr.Sym("append"), List(Expr.Sym("nil"), ys)) => ys
-    // append(cons(x, xs), ys) -> cons(x, append(xs, ys))
+    // --- リストの演算 ---
+    case Expr.App(Expr.Sym("append"), List(Expr.Sym("nil" | Initial | Zero), ys)) => ys
     case Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("cons"), List(x, xs)), ys)) =>
       Expr.App(Expr.Sym("cons"), List(x, Expr.App(Expr.Sym("append"), List(xs, ys))))
 

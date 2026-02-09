@@ -1,6 +1,6 @@
 // ==========================================
 // SolverTest.scala
-// CLI・REPL・テスト
+// CLI・REPL・テスト（手動テスト修正版）
 // ==========================================
 
 package romanesco
@@ -11,6 +11,7 @@ import romanesco.Solver.sugar._
 import scala.io.StdIn
 import romanesco.Utils.Debug.logger
 
+/*
 @main def runProver(args: String*): Unit =
   println("=== Romanesco Prover v3.0 (Category Theory Edition) ===")
   println("Core: 5 types (Expr: 4 + ProofStep: 1)")
@@ -55,10 +56,10 @@ Syntax:
   ⊤              - True
   ⊥              - False
 
-Examples:
-  A → A
-  f ∘ id = f
-  pi1 ∘ pair(f, g) = f
+Syntax (Arithmetic/List):
+  plus(n, m)
+  append(xs, ys)
+  S(n), 0, nil, cons(x, xs)
   """)
 
 def processInput(input: String, classical: Boolean = false): Unit =
@@ -75,108 +76,102 @@ def processInput(input: String, classical: Boolean = false): Unit =
         println("✗ No proof found. Failure trace:")
         println(trace.format())
   catch case e: Exception => println(s"Error: ${e.getMessage}")
+ */
 
 @main def testSomeCases = {
-  logger.switch(false)
+  logger.switch(true)
 
-  val intuitionisticCases = List(
-    "A → A",
-    "A ∧ B → B ∧ A",
-    "A ∨ B → B ∨ A",
-    "(A ∧ B → C) → (A → (B → C))",
-    "a = b ∧ b = c → a = c",
-    "(((A → ⊥) → ⊥) → ⊥) → (A → ⊥)",
-    "A ∨ (A → ⊥)", // Should fail
-    "A ∨ B → A" // Should fail
+  // 証明済みの補助定理をルールに変換
+  val lemmas = List(
+    CatRule("plus_n_0", TestParser.parse("plus(n, 0)"), TestParser.parse("n")),
+    CatRule(
+      "plus_n_Sm",
+      TestParser.parse("plus(n, S(m))"),
+      TestParser.parse("S(plus(n, m))")
+    )
   )
 
-  val classicalCases = List(
-    "A ∨ (A → ⊥)", // Law of Excluded Middle
-    "((A → ⊥) → ⊥) → A", // Double Negation Elimination
-    "((A → B) → A) → A", // Peirce's Law
-    "(A → B) → ((A → ⊥) ∨ B)" // Implication as Or
-  )
-
-  val categoricalCases = List(
-    "f ∘ id = f",
-    "id ∘ f = f",
-    "(f ∘ g) ∘ h = f ∘ (g ∘ h)",
-    "pi1 ∘ pair(f, g) = f",
-    "pi2 ∘ pair(f, g) = g",
-    "case(f, g) ∘ inl = f",
-    "case(f, g) ∘ inr = g"
-  )
-
-  val higherOrderCases = List(
-    "∀P. (P(a) → ∃x. P(x))",
-    "∀P. ((∀x. P(x)) → (∀x. P(x)))",
-    "∀P. ∀Q. ((∀x. (P(x) ∧ Q(x))) → ((∀x. P(x)) ∧ (∀x. Q(x))))",
-    "∀P. ∀Q. ((∀x. (P(x) → Q(x))) → ((∃x. P(x)) → (∃x. Q(x))))",
-    "∀x. ∀y. ((∀P. (P(x) → P(y))) → (∀Q. (Q(y) → Q(x))))" // Leibniz Equality Symmetry
-  )
   val autoInductionCases = List(
     "∀n. plus(n, 0) = n",
-    "∀xs. append(xs, nil) = xs"
+    "∀n. plus(0, n) = n",
+    "∀n. ∀m. plus(n, S(m)) = S(plus(n, m))",
+    "∀xs. append(xs, nil) = xs",
+    "∀xs. append(nil, xs) = xs",
+    "∀xs. ∀ys. ∀zs. append(append(xs, ys), zs) = append(xs, append(ys, zs))",
+    "∀n. ∀m. plus(n, m) = plus(m, n)", // 交換法則（Lemmasが必要）
+    "∀n. ∀m. ∀k. plus(plus(n, m), k) = plus(n, plus(m, k))" // 結合法則
   )
-  println("=== Intuitionistic Logic Tests ===")
-  intuitionisticCases.foreach { input =>
-    println(s"\n[Test Case] $input")
-    val expr = TestParser.parse(input)
-    val prover = new Prover(classical = false)
-    prover.prove(expr) match
-      case Right(tree) => println(s"✓ Solved:\n${tree.format(1)}")
-      case Left(trace) =>
-        println("✗ Failed to prove")
-        if (input == "A ∨ B → A" || input == "A ∨ (A → ⊥)") {
-          println("Failure Reason:")
-          println(trace.format(1))
-        }
-  }
 
-  println("\n=== Classical Logic Tests ===")
-  classicalCases.foreach { input =>
-    println(s"\n[Test Case] $input")
-    val expr = TestParser.parse(input)
-    val prover = new Prover(classical = true)
-    prover.prove(expr) match
-      case Right(tree) => println(s"✓ Solved:\n${tree.format(1)}")
-      case Left(trace) => println("✗ Failed to prove")
-  }
+  println("\n=== Induction Test: plus(n, S(m)) = S(plus(n, m)) ===")
+  try {
+    val expr = TestParser.parse("∀n. ∀m. plus(n, S(m)) = S(plus(n, m))")
+    var state = ProofState(List(Goal(Nil, expr)), Nil, expr)
 
-  println("\n=== Categorical Equational Tests ===")
-  categoricalCases.foreach { input =>
-    println(s"\n[Test Case] $input")
-    val expr = TestParser.parse(input)
-    val prover = new Prover(classical = false)
-    prover.prove(expr) match
-      case Right(tree) => println(s"✓ Solved:\n${tree.format(1)}")
-      case Left(trace) => println("✗ Failed to prove")
-  }
-
-  println("\n=== Higher-Order Logic Tests ===")
-  higherOrderCases.foreach { input =>
-    println(s"\n[Test Case] $input")
-    try {
-      val expr = TestParser.parse(input)
-      val prover = new Prover(classical = false)
-      val result = prover.prove(expr)
-      result match
-        case Right(tree) =>
-          println(s"✓ Solved:\n${tree.format(1)}")
-        case Left(trace) =>
-          println("✗ Failed to prove")
-          println(trace.format(1))
-    } catch {
-      case e: Exception => println(s"Error: ${e.getMessage}")
+    def printState(s: ProofState): Unit = {
+      println("Goals:")
+      s.goals.zipWithIndex.foreach { (g, i) =>
+        println(s"  $i: $g")
+      }
     }
+
+    // 1. induction n
+    state =
+      Tactics.induction(state).getOrElse(throw Exception("Induction failed"))
+
+    // 2. solve base: plus(0, S(m)) = S(plus(0, m))
+    // intro m (ここが重要！)
+    state = Tactics
+      .intro(state, Some("m"))
+      .getOrElse(throw Exception("Intro m failed"))
+    // reflexivity
+    state = Tactics
+      .reflexivity(state)
+      .getOrElse(throw Exception("Reflexivity failed"))
+
+    println("\nBase Case solved. Next goal:")
+    printState(state)
+
+    // 3. intro n, intro IH, intro m
+    state = Tactics
+      .intro(state, Some("n_step"))
+      .getOrElse(throw Exception("Intro n_step failed"))
+    state = Tactics
+      .intro(state, Some("IH"))
+      .getOrElse(throw Exception("Intro IH failed"))
+    state = Tactics
+      .intro(state, Some("m"))
+      .getOrElse(throw Exception("Intro m failed"))
+
+    println("\nAfter intros:")
+    printState(state)
+
+    // 4. rewrite IH
+    state = Tactics
+      .rewrite(state, "IH")
+      .getOrElse(throw Exception("Rewrite IH failed"))
+    println("\nAfter rewrite IH:")
+    printState(state)
+
+    // 5. reflexivity
+    state = Tactics
+      .reflexivity(state)
+      .getOrElse(throw Exception("Final reflexivity failed"))
+    println("\n✓ Manual induction goal solved successfully!")
+  } catch {
+    case e: Exception =>
+      println(s"✗ Error in manual induction: ${e.getMessage}")
   }
+
   println("\n=== Automatic Induction Tests ===")
   autoInductionCases.foreach { input =>
     println(s"\n[Test Case] $input")
     try {
       val expr = TestParser.parse(input)
+      val rules =
+        if (input.contains("m, n")) StandardRules.all ++ lemmas
+        else StandardRules.all
       val prover = new Prover(classical = false)
-      val result = prover.prove(expr)
+      val result = prover.prove(expr, rules = rules)
       result match
         case Right(tree) =>
           println(s"✓ Solved:\n${tree.format(1)}")

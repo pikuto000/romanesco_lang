@@ -93,10 +93,10 @@ enum ProofTree:
   def format(indent: Int = 0): String =
     val sp = "  " * indent
     this match
-      case Leaf(g, r) => s"$sp[ $r ]  ⟹  $g"
+      case Leaf(g, r) => s"$sp✓ $g  {$r}"
       case Node(g, r, cs) =>
         val childrenStr = cs.map(_.format(indent + 1)).mkString("\n")
-        s"$childrenStr\n$sp-------------------- ($r)\n$sp  ⟹  $g"
+        s"$childrenStr\n$sp└─ $g  {$r}"
 
 type Proof = ProofTree
 
@@ -112,8 +112,8 @@ case class FailTrace(
 ):
   def format(indent: Int = 0): String =
     val sp = "  " * indent
-    val typeMark = if failureType == "Normal" then "-" else s"[$failureType]"
-    val base = s"$sp$typeMark [Depth $depth] Goal: ${goal.target}\n$sp  Reason: $reason"
+    val typeMark = if failureType == "Normal" then "✗" else s"[$failureType]"
+    val base = s"$sp$typeMark (Depth $depth) Goal: ${goal.target}\n$sp  Reason: $reason"
     if children.isEmpty then base
     else s"$base\n${children.map(_.format(indent + 1)).mkString("\n")}"
 

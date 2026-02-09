@@ -1,6 +1,6 @@
 // ==========================================
 // Prover.scala
-// 証明探索エンジン（詳細失敗トレース対応）
+// 証明探索エンジン（安全性重視・ループ防止修正版）
 // ==========================================
 
 package romanesco.Solver.core
@@ -16,12 +16,13 @@ enum ArgType:
 
 /** 代数の構造定義 */
 case class ConstructorDef(symbol: String, argTypes: List[ArgType])
-case class InitialAlgebra(name: String, constructors: List[ConstructorDef])
+case class InitialAlgebra(name: String, constructors: List[ConstructorDef], varPrefix: String)
 
 final class Prover(
     val classical: Boolean = false,
     rules: List[CatRule] = StandardRules.all,
-    val maxRaa: Int = 2
+    val maxRaa: Int = 2,
+    val maxInduction: Int = 2
 ) {
   import Unifier._
 
@@ -30,8 +31,8 @@ final class Prover(
   private val failureCache = mutable.Map[(Expr, Set[Expr], Int), FailTrace]()
 
   private val algebras = List(
-    InitialAlgebra("Nat", List(ConstructorDef(Zero, Nil), ConstructorDef(Succ, List(ArgType.Recursive)))),
-    InitialAlgebra("List", List(ConstructorDef("nil", Nil), ConstructorDef("cons", List(ArgType.Constant, ArgType.Recursive))))
+    InitialAlgebra("Nat", List(ConstructorDef(Zero, Nil), ConstructorDef(Succ, List(ArgType.Recursive))), "n"),
+    InitialAlgebra("List", List(ConstructorDef("nil", Nil), ConstructorDef("cons", List(ArgType.Constant, ArgType.Recursive))), "xs")
   )
 
   private val ruleIndex: Map[String, List[CatRule]] = {
@@ -44,7 +45,7 @@ final class Prover(
     Expr.Meta(MetaId(List(depth, metaCounter)))
   }
 
-  private def updateBestFail(trace: FailTrace): Unit = {
+  private def recordFail(trace: FailTrace): Unit = {
     if (bestFail.isEmpty || trace.depth > bestFail.get.depth) {
       bestFail = Some(trace)
     }
@@ -64,12 +65,12 @@ final class Prover(
       logger.log(s"--- Iterative Deepening: current limit = $d ---")
       metaCounter = 0
       failureCache.clear()
-      search(goal, rules, Nil, emptySubst, 0, d, Set.empty, 0).map(_._1)
+      search(goal, rules, Nil, emptySubst, 0, d, Set.empty, 0, 0).map(_._1)
     }.headOption
 
     result match {
       case Some(tree) => Right(tree)
-      case None       => Left(bestFail.getOrElse(FailTrace(Goal(Nil, goal), "No proof found within limits", 0)))
+      case None       => Left(bestFail.getOrElse(FailTrace(Goal(Nil, goal), "No proof found", 0)))
     }
 
   private def search(
@@ -80,8 +81,9 @@ final class Prover(
       depth: Int,
       limit: Int,
       visited: Set[(Expr, Set[Expr])],
-      raaCount: Int
-  ): LazyList[(ProofTree, Subst)] =
+      raaCount: Int,
+      inductionCount: Int
+  ): LazyList[(ProofTree, Subst)] = {
     val currentGoal = applySubst(goal, subst)
     val contextExprs = context.map(h => applySubst(h._2, subst)).toSet
     val currentGoalObj = Goal(context, currentGoal)
@@ -92,31 +94,32 @@ final class Prover(
     }
 
     if depth > limit then
-      updateBestFail(FailTrace(currentGoalObj, s"Depth limit reached ($limit)", depth))
+      recordFail(FailTrace(currentGoalObj, s"Depth limit reached", depth))
       LazyList.empty
     else if visited.contains((currentGoal, contextExprs)) then
-      updateBestFail(FailTrace(currentGoalObj, "Cycle detected", depth))
+      recordFail(FailTrace(currentGoalObj, "Cycle detected", depth))
       LazyList.empty
     else
       val nextVisited = visited + ((currentGoal, contextExprs))
 
-      // 各フェーズの探索を実行
+      // 優先順位: 自明な解決 -> 構造分解 -> レンマ適用 -> 論理規則
       val results =
         searchAxiom(currentGoal, context, subst, depth) #:::
         searchReflexivity(currentGoal, subst, depth) #:::
-        searchDecomposeGoal(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount) #:::
-        searchInduction(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount) #:::
-        searchDecomposeContext(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount) #:::
-        searchContext(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount) #:::
-        searchRules(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount) #:::
-        searchClassical(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount)
+        searchInduction(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount, inductionCount) #:::
+        searchDecomposeGoal(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount, inductionCount) #:::
+        searchDecomposeContext(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount, inductionCount) #:::
+        searchRules(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount, inductionCount) #:::
+        searchContext(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount, inductionCount) #:::
+        searchClassical(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount, inductionCount)
 
       if (results.isEmpty) {
-        val fail = FailTrace(currentGoalObj, "All applicable rules failed", depth)
+        val fail = FailTrace(currentGoalObj, "Goal unresolvable in this branch", depth)
         failureCache((currentGoal, contextExprs, remainingDepth)) = fail
-        updateBestFail(fail)
+        recordFail(fail)
       }
       results
+  }
 
   private def searchAxiom(goal: Expr, context: Context, subst: Subst, depth: Int): LazyList[(ProofTree, Subst)] =
     context.view.to(LazyList).flatMap { case (name, hyp) =>
@@ -133,37 +136,37 @@ final class Prover(
 
   private def searchDecomposeGoal(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int, inductionCount: Int
   ): LazyList[(ProofTree, Subst)] =
     goal match
       case Expr.App(Expr.Sym(And | Product), List(a, b)) =>
         for
-          (treeA, s1) <- search(a, rules, context, subst, depth + 1, limit, visited, raaCount)
-          (treeB, s2) <- search(b, rules, context, s1, depth + 1, limit, visited, raaCount)
+          (treeA, s1) <- search(a, rules, context, subst, depth + 1, limit, visited, raaCount, inductionCount)
+          (treeB, s2) <- search(b, rules, context, s1, depth + 1, limit, visited, raaCount, inductionCount)
         yield (ProofTree.Node(applySubst(goal, s2), "product-universal", List(treeA, treeB)), s2)
 
       case Expr.App(Expr.Sym(op), List(a, b)) if op == Implies || op == Exp || op == ImpliesAlt1 || op == ImpliesAlt2 =>
         val (ant, cons) = if (op == Exp) (b, a) else (a, b)
         val hypName = s"h$depth"
-        search(cons, rules, (hypName, ant) :: context, subst, depth + 1, limit, visited, raaCount)
+        search(cons, rules, (hypName, ant) :: context, subst, depth, limit, visited, raaCount, inductionCount)
           .map { case (tree, s) => (ProofTree.Node(applySubst(goal, s), "exp-universal", List(tree)), s) }
 
       case Expr.App(Expr.Sym(Forall), List(Expr.Var(v), body)) =>
         val freshVar = s"${v}_$depth"
         val instantiated = Prover.substVar(body, v, Expr.Var(freshVar))
-        search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount)
+        search(instantiated, rules, context, subst, depth, limit, visited, raaCount, inductionCount)
           .map { case (proof, s) => (ProofTree.Node(applySubst(goal, s), "forall-intro", List(proof)), s) }
 
       case Expr.App(Expr.Sym(Exists), List(Expr.Var(v), body)) =>
         val witness = freshMeta(depth)
         val instantiated = Prover.substVar(body, v, witness)
-        search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount)
+        search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount, inductionCount)
           .map { case (proof, s) => (ProofTree.Node(applySubst(goal, s), "exists-intro", List(proof)), s) }
 
       case Expr.App(Expr.Sym(Or | Coproduct), List(a, b)) =>
-        search(a, rules, context, subst, depth + 1, limit, visited, raaCount)
+        search(a, rules, context, subst, depth + 1, limit, visited, raaCount, inductionCount)
           .map { case (p, s) => (ProofTree.Node(applySubst(goal, s), "inl", List(p)), s) } #:::
-        search(b, rules, context, subst, depth + 1, limit, visited, raaCount)
+        search(b, rules, context, subst, depth + 1, limit, visited, raaCount, inductionCount)
           .map { case (p, s) => (ProofTree.Node(applySubst(goal, s), "inr", List(p)), s) }
 
       case Expr.Sym(True | Terminal) =>
@@ -173,11 +176,15 @@ final class Prover(
 
   private def searchInduction(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int, inductionCount: Int
   ): LazyList[(ProofTree, Subst)] =
-    goal match {
+    if (inductionCount >= maxInduction) LazyList.empty
+    else goal match {
       case Expr.App(Expr.Sym(Forall), List(Expr.Var(v), body)) =>
-        algebras.to(LazyList).flatMap { algebra =>
+        val targetAlgebras = algebras.filter(a => v.startsWith(a.varPrefix))
+        val candidateAlgebras = if (targetAlgebras.nonEmpty) targetAlgebras else algebras
+
+        candidateAlgebras.to(LazyList).flatMap { algebra =>
           def solveConstructors(cs: List[ConstructorDef], currentSubst: Subst, solved: List[ProofTree]): LazyList[(List[ProofTree], Subst)] = cs match {
             case Nil => LazyList((solved, currentSubst))
             case c :: tail =>
@@ -197,7 +204,7 @@ final class Prover(
                   }
                 case _ => Nil
               }
-              search(instanceGoal, rules, ihs ++ context, currentSubst, depth + 1, limit, visited, raaCount).flatMap { case (tree, nextSubst) =>
+              search(instanceGoal, rules, ihs ++ context, currentSubst, depth + 1, limit, visited, raaCount, inductionCount + 1).flatMap { case (tree, nextSubst) =>
                 solveConstructors(tail, nextSubst, solved :+ tree)
               }
           }
@@ -210,27 +217,27 @@ final class Prover(
 
   private def searchDecomposeContext(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int, inductionCount: Int
   ): LazyList[(ProofTree, Subst)] =
     context.zipWithIndex.view.to(LazyList).flatMap {
       case ((name, Expr.App(Expr.Sym(Exists), List(Expr.Var(v), body))), i) =>
         val freshVar = s"${v}_${depth}_sk"
         val instantiated = Prover.substVar(body, v, Expr.Var(freshVar))
         val newCtx = context.patch(i, List((s"${name}.witness", instantiated)), 1)
-        search(goal, rules, newCtx, subst, depth + 1, limit, visited, raaCount)
+        search(goal, rules, newCtx, subst, depth, limit, visited, raaCount, inductionCount)
           .map { case (tree, s) => (ProofTree.Node(applySubst(goal, s), s"destruct[$name]", List(tree)), s) }
 
       case ((name, Expr.App(Expr.Sym(And | Product), List(a, b))), i) =>
         val newCtx = context.patch(i, List((s"${name}.1", a), (s"${name}.2", b)), 1)
-        search(goal, rules, newCtx, subst, depth + 1, limit, visited, raaCount)
+        search(goal, rules, newCtx, subst, depth, limit, visited, raaCount, inductionCount)
           .map { case (tree, s) => (ProofTree.Node(applySubst(goal, s), s"destruct[$name]", List(tree)), s) }
 
       case ((name, Expr.App(Expr.Sym(Or | Coproduct), List(a, b))), i) =>
         val leftCtx = context.patch(i, List((s"${name}.left", a)), 1)
-        search(goal, rules, leftCtx, subst, depth + 1, limit, visited, raaCount)
+        search(goal, rules, leftCtx, subst, depth + 1, limit, visited, raaCount, inductionCount)
           .flatMap { case (treeL, ls) =>
             val rightCtx = context.patch(i, List((s"${name}.right", b)), 1)
-            search(goal, rules, rightCtx, ls, depth + 1, limit, visited, raaCount).map { case (treeR, rs) =>
+            search(goal, rules, rightCtx, ls, depth + 1, limit, visited, raaCount, inductionCount).map { case (treeR, rs) =>
               (ProofTree.Node(applySubst(goal, rs), s"destruct[$name]", List(treeL, treeR)), rs)
             }
           }
@@ -239,42 +246,62 @@ final class Prover(
 
   private def searchContext(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int, inductionCount: Int
   ): LazyList[(ProofTree, Subst)] =
     context.view.to(LazyList).flatMap { case (name, hyp) =>
       val ch = applySubst(hyp, subst)
       if (ch == Expr.Sym(False) || ch == Expr.Sym(Initial)) {
         LazyList((ProofTree.Leaf(goal, s"absurd[$name]"), subst))
       } else {
-        ch match {
+        def instantiateHyp(expr: Expr): Expr = expr match {
+          case Expr.App(Expr.Sym(Forall), List(Expr.Var(v), body)) =>
+            instantiateHyp(Prover.substVar(body, v, freshMeta(depth)))
+          case _ => expr
+        }
+
+        val instHyp = instantiateHyp(ch)
+        
+        instHyp match {
           case Expr.App(Expr.Sym(Eq), List(l, r)) =>
             val normalizedGoal = Rewriter.normalize(goal)
-            val rw1 = Prover.rewriteExpr(normalizedGoal, l, r)
-            val res1 = if (rw1 != normalizedGoal)
-              search(rw1, rules, context, subst, depth + 1, limit, visited, raaCount).map { case (tree, s) =>
-                (ProofTree.Node(applySubst(goal, s), s"rewrite[$name]", List(tree)), s)
+            
+            def findAndReplace(expr: Expr, currentS: Subst): LazyList[(Expr, Subst)] = {
+              unify(expr, applySubst(l, currentS), currentS).map(s => (applySubst(r, s), s)) #::: {
+                expr match {
+                  case Expr.App(f, args) =>
+                    args.indices.to(LazyList).flatMap { idx =>
+                      findAndReplace(args(idx), currentS).map { case (newArg, nextS) =>
+                        val nextF = applySubst(f, nextS)
+                        val nextArgs = args.patch(idx, List(newArg), 1).map(applySubst(_, nextS))
+                        (Expr.App(nextF, nextArgs), nextS)
+                      }
+                    }
+                  case _ => LazyList.empty
+                }
               }
-            else LazyList.empty
-            res1 #::: {
-              val rw2 = Prover.rewriteExpr(normalizedGoal, r, l)
-              if (rw2 != normalizedGoal)
-                search(rw2, rules, context, subst, depth + 1, limit, visited, raaCount).map { case (tree, s) =>
+            }
+
+            findAndReplace(normalizedGoal, subst).flatMap { case (rewritten, finalS) =>
+              val finalGoal = Rewriter.normalize(rewritten)
+              if (finalGoal != normalizedGoal) {
+                // 安全のため必ず深さを進める
+                search(finalGoal, rules, context, finalS, depth + 1, limit, visited, raaCount, inductionCount).map { case (tree, s) =>
                   (ProofTree.Node(applySubst(goal, s), s"rewrite[$name]", List(tree)), s)
                 }
-              else LazyList.empty
+              } else LazyList.empty
             }
           case _ => LazyList.empty
         }
       }
     } #::: {
       context.view.to(LazyList).flatMap { case (name, hyp) =>
-        useHypothesis(name, hyp, goal, rules, context, subst, depth, limit, visited, raaCount)
+        useHypothesis(name, hyp, goal, rules, context, subst, depth, limit, visited, raaCount, inductionCount)
       }
     }
 
   private def useHypothesis(
       name: String, hyp: Expr, goal: Expr, rules: List[CatRule], context: Context,
-      subst: Subst, depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+      subst: Subst, depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int, inductionCount: Int
   ): LazyList[(ProofTree, Subst)] = {
     val currentHyp = applySubst(hyp, subst)
     if (currentHyp == Expr.Sym(False) || currentHyp == Expr.Sym(Initial)) {
@@ -284,18 +311,12 @@ final class Prover(
         .map(s => (ProofTree.Leaf(applySubst(goal, s), name), s)) #::: {
         currentHyp match {
           case Expr.App(Expr.Sym(And | Product), List(a, b)) =>
-            useHypothesis(s"$name.1", a, goal, rules, context, subst, depth, limit, visited, raaCount) #:::
-            useHypothesis(s"$name.2", b, goal, rules, context, subst, depth, limit, visited, raaCount)
+            useHypothesis(s"$name.1", a, goal, rules, context, subst, depth, limit, visited, raaCount, inductionCount) #:::
+            useHypothesis(s"$name.2", b, goal, rules, context, subst, depth, limit, visited, raaCount, inductionCount)
           case Expr.App(Expr.Sym(Implies | ImpliesAlt1 | ImpliesAlt2), List(a, b)) =>
-            useHypothesis(name, b, goal, rules, context, subst, depth, limit, visited, raaCount).flatMap { case (treeB, s1) =>
-              search(a, rules, context, s1, depth + 1, limit, visited, raaCount)
+            useHypothesis(name, b, goal, rules, context, subst, depth, limit, visited, raaCount, inductionCount).flatMap { case (treeB, s1) =>
+              search(a, rules, context, s1, depth + 1, limit, visited, raaCount, inductionCount)
                 .map { case (treeA, s2) => (ProofTree.Node(applySubst(goal, s2), s"apply[$name]", List(treeB, treeA)), s2) }
-            }
-          case Expr.App(Expr.Sym(Forall), List(Expr.Var(v), body)) =>
-            val meta = freshMeta(depth)
-            val inst = Prover.substVar(body, v, meta)
-            useHypothesis(name, inst, goal, rules, context, subst, depth, limit, visited, raaCount).map { case (tree, s) =>
-              (ProofTree.Node(applySubst(goal, s), s"instantiate[$name]", List(tree)), s)
             }
           case _ => LazyList.empty
         }
@@ -305,35 +326,47 @@ final class Prover(
 
   private def searchRules(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
-  ): LazyList[(ProofTree, Subst)] =
-    val head = goal.headSymbol
-    val candidates = ruleIndex.getOrElse(head, Nil) ++ ruleIndex.getOrElse("_VAR_", Nil) ++ ruleIndex.getOrElse("_META_", Nil)
-    candidates.to(LazyList).flatMap { rule =>
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int, inductionCount: Int
+  ): LazyList[(ProofTree, Subst)] = {
+    val normGoal = Rewriter.normalize(goal)
+    
+    rules.to(LazyList).flatMap { rule =>
       val (instRule, _) = Prover.instantiate(rule, () => freshMeta(depth))
-      unify(instRule.rhs, goal, subst).flatMap { s =>
-        def solveUniversals(conds: List[Expr], currentSubst: Subst, solved: List[ProofTree]): LazyList[(List[ProofTree], Subst)] = conds match {
-          case Nil => LazyList((solved, currentSubst))
-          case head :: tail =>
-            search(head, rules, context, currentSubst, depth + 1, limit, visited, raaCount).flatMap { case (tree, nextSubst) =>
-              solveUniversals(tail, nextSubst, solved :+ tree)
-            }
-        }
-        solveUniversals(instRule.universals, s, Nil).flatMap { case (univTrees, s2) =>
-          search(instRule.lhs, rules, context, s2, depth + 1, limit, visited, raaCount).map { case (mainTree, s3) =>
-            (ProofTree.Node(applySubst(goal, s3), rule.name, univTrees :+ mainTree), s3)
+      
+      def findAndReplaceWithRule(expr: Expr, currentS: Subst): LazyList[(Expr, Subst)] = {
+        unify(expr, instRule.lhs, currentS).map(s => (applySubst(instRule.rhs, s), s)) #::: {
+          expr match {
+            case Expr.App(f, args) =>
+              args.indices.to(LazyList).flatMap { idx =>
+                findAndReplaceWithRule(args(idx), currentS).map { case (newArg, nextS) =>
+                  val nextF = applySubst(f, nextS)
+                  val nextArgs = args.patch(idx, List(newArg), 1).map(applySubst(_, nextS))
+                  (Expr.App(nextF, nextArgs), nextS)
+                }
+              }
+            case _ => LazyList.empty
           }
         }
       }
+
+      findAndReplaceWithRule(normGoal, subst).flatMap { case (rewritten, nextS) =>
+        val finalGoal = Rewriter.normalize(rewritten)
+        if (finalGoal != normGoal) {
+          search(finalGoal, rules, context, nextS, depth + 1, limit, visited, raaCount, inductionCount).map { case (tree, s) =>
+            (ProofTree.Node(applySubst(goal, s), rule.name, List(tree)), s)
+          }
+        } else LazyList.empty
+      }
     }
+  }
 
   private def searchClassical(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int, inductionCount: Int
   ): LazyList[(ProofTree, Subst)] =
     if (classical && raaCount < maxRaa && goal != Expr.Sym(False) && goal != Expr.Sym(Initial)) {
       val negation = Expr.App(Expr.Sym(Implies), List(goal, Expr.Sym(False)))
-      search(Expr.Sym(False), rules, (s"raa$depth", negation) :: context, subst, depth + 1, limit, visited, raaCount + 1)
+      search(Expr.Sym(False), rules, (s"raa$depth", negation) :: context, subst, depth + 1, limit, visited, raaCount + 1, inductionCount)
         .map { case (tree, s) => (ProofTree.Node(applySubst(goal, s), "RAA", List(tree)), s) }
     } else LazyList.empty
 }
