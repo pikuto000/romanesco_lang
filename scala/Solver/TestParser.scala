@@ -1,12 +1,14 @@
 // ==========================================
 // TestParser.scala
-// テスト用の簡易パーサー
+// テスト用の簡易パーサー（数字の扱いを修正）
 // ==========================================
 
 package romanesco.Solver
 
 import romanesco.Solver.core._
 import romanesco.Solver.sugar._
+import romanesco.Solver.core.LogicSymbols._
+import scala.collection.mutable
 
 object TestParser:
   import ExprBuilder._
@@ -16,10 +18,35 @@ object TestParser:
     parseExpr(tokens)._1
 
   private def tokenize(s: String): List[String] =
-    s.replaceAll("([→∧∨∀∃=().⇒⊃×⊥⊤01])", " $1 ")
-      .split("\\s+")
-      .filter(_.nonEmpty)
-      .toList
+    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', '⇒', '⊃', '×', '⊥', '⊤', '∘')
+    // 0 と 1 は単独なら記号、名前に含まれるなら名前の一部とする
+    val terminalSymbols = Set('0', '1')
+    
+    val sb = new StringBuilder
+    val tokens = mutable.ListBuffer.empty[String]
+    
+    def flush(): Unit = if (sb.nonEmpty) { tokens += sb.toString; sb.clear() }
+
+    for (c <- s) {
+      if (symbols.contains(c)) {
+        flush(); tokens += c.toString
+      } else if (terminalSymbols.contains(c)) {
+        // 前に文字があれば名前の一部、なければ単独の記号（とりあえず名前の一部としてsbに入れ、後で判断する）
+        sb.append(c)
+      } else if (c.isWhitespace) {
+        flush()
+      } else {
+        sb.append(c)
+      }
+    }
+    flush()
+    
+    // 単独の "0", "1" を記号に変換
+    tokens.toList.map {
+      case "0" => Initial
+      case "1" => Terminal
+      case other => other
+    }
 
   private def parseExpr(tokens: List[String]): (Expr, List[String]) =
     parseImplication(tokens)
@@ -27,7 +54,7 @@ object TestParser:
   private def parseImplication(tokens: List[String]): (Expr, List[String]) =
     val (left, rest1) = parseOr(tokens)
     rest1 match
-      case ("→" | "⇒" | "⊃") :: rest2 =>
+      case (Implies | ImpliesAlt1 | ImpliesAlt2) :: rest2 =>
         val (right, rest3) = parseImplication(rest2)
         (left → right, rest3)
       case _ => (left, rest1)
@@ -35,36 +62,44 @@ object TestParser:
   private def parseOr(tokens: List[String]): (Expr, List[String]) =
     val (left, rest1) = parseAnd(tokens)
     rest1 match
-      case "∨" :: rest2 =>
+      case Or :: rest2 =>
         val (right, rest3) = parseOr(rest2)
         (left ∨ right, rest3)
       case _ => (left, rest1)
 
   private def parseAnd(tokens: List[String]): (Expr, List[String]) =
-    val (left, rest1) = parseQuantifier(tokens)
+    val (left, rest1) = parseEquality(tokens)
     rest1 match
-      case ("∧" | "×") :: rest2 =>
+      case (And | Product | "×") :: rest2 =>
         val (right, rest3) = parseAnd(rest2)
         (left ∧ right, rest3)
       case _ => (left, rest1)
 
-  private def parseQuantifier(tokens: List[String]): (Expr, List[String]) =
-    tokens match
-      case "∀" :: varName :: "." :: rest =>
-        val (body, rest2) = parseExpr(rest)
-        (sym("∀")(v(varName), body), rest2)
-      case "∃" :: varName :: "." :: rest =>
-        val (body, rest2) = parseExpr(rest)
-        (sym("∃")(v(varName), body), rest2)
-      case _ => parseEquality(tokens)
-
   private def parseEquality(tokens: List[String]): (Expr, List[String]) =
-    val (left, rest1) = parseAtom(tokens)
+    val (left, rest1) = parseComposition(tokens)
     rest1 match
-      case "=" :: rest2 =>
-        val (right, rest3) = parseAtom(rest2)
+      case Eq :: rest2 =>
+        val (right, rest3) = parseComposition(rest2)
         (left === right, rest3)
       case _ => (left, rest1)
+
+  private def parseComposition(tokens: List[String]): (Expr, List[String]) =
+    val (left, rest1) = parseQuantifier(tokens)
+    rest1 match
+      case Compose :: rest2 =>
+        val (right, rest3) = parseComposition(rest2)
+        (sym(Compose)(left, right), rest3)
+      case _ => (left, rest1)
+
+  private def parseQuantifier(tokens: List[String]): (Expr, List[String]) =
+    tokens match
+      case Forall :: varName :: "." :: rest =>
+        val (body, rest2) = parseExpr(rest)
+        (sym(Forall)(v(varName), body), rest2)
+      case Exists :: varName :: "." :: rest =>
+        val (body, rest2) = parseExpr(rest)
+        (sym(Exists)(v(varName), body), rest2)
+      case _ => parseAtom(tokens)
 
   private def parseAtom(tokens: List[String]): (Expr, List[String]) =
     tokens match
@@ -72,9 +107,9 @@ object TestParser:
         val (expr, rest2) = parseExpr(rest)
         rest2 match
           case ")" :: rest3 => (expr, rest3)
-          case _            => throw new Exception("Unmatched parenthesis")
-      case ("⊤" | "1") :: rest => (⊤, rest)
-      case ("⊥" | "0") :: rest => (⊥, rest)
+          case _            => throw new Exception(s"Unmatched parenthesis at ${rest2.take(5).mkString(" ")}")
+      case (True | Terminal | "⊤" | "1") :: rest => (⊤, rest)
+      case (False | Initial | "⊥" | "0") :: rest => (⊥, rest)
       case name :: "(" :: rest =>
         val (args, rest2) = parseArgs(rest)
         (sym(name)(args*), rest2)
@@ -91,4 +126,4 @@ object TestParser:
             val (args, rest3) = parseArgs(rest2)
             (arg :: args, rest3)
           case ")" :: rest2 => (List(arg), rest2)
-          case _            => throw new Exception("Expected ',' or ')'")
+          case _            => throw new Exception(s"Expected ',' or ')' but found '${rest1.headOption.getOrElse("EOF")}'")

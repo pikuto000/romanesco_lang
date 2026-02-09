@@ -32,8 +32,8 @@ object Unifier:
    * 2つの式 e1 と e2 を単一化します。
    */
   def unify(e1: Expr, e2: Expr, subst: Subst): LazyList[Subst] =
-    val r1 = applySubst(e1, subst)
-    val r2 = applySubst(e2, subst)
+    val r1 = applySubst(Rewriter.normalize(e1), subst)
+    val r2 = applySubst(Rewriter.normalize(e2), subst)
 
     if r1 == r2 then
       LazyList(subst)

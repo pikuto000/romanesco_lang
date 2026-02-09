@@ -21,6 +21,16 @@ object LogicSymbols {
   val Exp = "^"
   val Terminal = "1"
   val Initial = "0"
+
+  // 圏論的演算子
+  val Compose = "∘"
+  val Id = "id"
+  val Pair = "pair"   // <f, g>
+  val Proj1 = "pi1"   // π1
+  val Proj2 = "pi2"   // π2
+  val Case = "case"   // [f, g]
+  val Inl = "inl"
+  val Inr = "inr"
   
   // その他の表記揺れ
   val ImpliesAlt1 = "⊃"

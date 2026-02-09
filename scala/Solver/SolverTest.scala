@@ -49,13 +49,16 @@ Syntax:
   ∀x. P          - Universal quantification
   ∃x. P          - Existential quantification
   a = b          - Equality
+  f ∘ g          - Composition
+  pair(f, g)     - Product pairing <f, g>
+  case(f, g)     - Coproduct pairing [f, g]
   ⊤              - True
   ⊥              - False
 
 Examples:
   A → A
-  A ∧ B → B ∧ A
-  ∀x. P(x) → ∃x. P(x)
+  f ∘ id = f
+  pi1 ∘ pair(f, g) = f
   """)
 
 def processInput(input: String, classical: Boolean = false): Unit =
@@ -96,6 +99,16 @@ def processInput(input: String, classical: Boolean = false): Unit =
     "(A → B) → ((A → ⊥) ∨ B)"     // Implication as Or
   )
 
+  val categoricalCases = List(
+    "f ∘ id = f",
+    "id ∘ f = f",
+    "(f ∘ g) ∘ h = f ∘ (g ∘ h)",
+    "pi1 ∘ pair(f, g) = f",
+    "pi2 ∘ pair(f, g) = g",
+    "case(f, g) ∘ inl = f",
+    "case(f, g) ∘ inr = g"
+  )
+
   println("=== Intuitionistic Logic Tests ===")
   intuitionisticCases.foreach { input =>
     println(s"\n[Test Case] $input")
@@ -124,12 +137,25 @@ def processInput(input: String, classical: Boolean = false): Unit =
       val prover = new Prover(classical = true)
       val result = romanesco.Utils.times.watch { prover.prove(expr) }
       result match
-        case Right(proof) => 
-          println(s"✓ Solved in ${proof.length} steps")
-          // proof.zipWithIndex.foreach { case (step, i) => println(s"  ${i + 1}. $step") }
+        case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
+        case Left(trace) => println("✗ Failed to prove")
+    } catch {
+      case e: Exception => println(s"Error parsing/proving '$input': ${e.getMessage}")
+    }
+  }
+
+  println("\n=== Categorical Equational Tests ===")
+  categoricalCases.foreach { input =>
+    println(s"\n[Test Case] $input")
+    try {
+      val expr = TestParser.parse(input)
+      val prover = new Prover(classical = false)
+      val result = romanesco.Utils.times.watch { prover.prove(expr) }
+      result match
+        case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
         case Left(trace) => 
           println("✗ Failed to prove")
-          println(trace.format())
+          println(trace.format(1))
     } catch {
       case e: Exception => println(s"Error parsing/proving '$input': ${e.getMessage}")
     }
