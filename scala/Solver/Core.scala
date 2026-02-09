@@ -45,6 +45,13 @@ enum Expr:
       if args.isEmpty then h.toString
       else s"$h(${args.mkString(",")})"
 
+  /** 式の複雑さ（ヒューリスティック用スコア） */
+  def complexity: Int = this match
+    case Var(_)    => 1
+    case Meta(_)   => 1
+    case Sym(_)    => 1
+    case App(f, as) => f.complexity + as.map(_.complexity).sum + 1
+
 object Expr:
   def sym(name: String): Expr = Sym(name)
   def v(name: String): Expr = Var(name)
@@ -100,11 +107,13 @@ case class FailTrace(
     goal: Goal,
     reason: String,
     depth: Int,
-    children: List[FailTrace] = Nil
+    children: List[FailTrace] = Nil,
+    failureType: String = "Normal" // "Unify", "Depth", "Cycle", etc.
 ):
   def format(indent: Int = 0): String =
     val sp = "  " * indent
-    val base = s"$sp- [Depth $depth] Goal: ${goal.target}\n$sp  Reason: $reason"
+    val typeMark = if failureType == "Normal" then "-" else s"[$failureType]"
+    val base = s"$sp$typeMark [Depth $depth] Goal: ${goal.target}\n$sp  Reason: $reason"
     if children.isEmpty then base
     else s"$base\n${children.map(_.format(indent + 1)).mkString("\n")}"
 

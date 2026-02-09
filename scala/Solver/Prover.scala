@@ -19,6 +19,9 @@ final class Prover(
   private var metaCounter = 0
   private var bestFail: Option[FailTrace] = None
 
+  // 失敗のキャッシュ: (目標, コンテキスト) -> 失敗した際の残り探索深さ
+  private val failureCache = mutable.Map[(Expr, Set[Expr]), Int]()
+
   private val ruleIndex: Map[String, List[CatRule]] = {
     val allRules = if classical then rules ++ StandardRules.classical else rules
     allRules.groupBy(_.rhs.headSymbol)
@@ -29,8 +32,8 @@ final class Prover(
     Expr.Meta(MetaId(List(depth, metaCounter)))
   }
 
-  private def recordFail(goal: Goal, reason: String, depth: Int, children: List[FailTrace] = Nil): Unit = {
-    val trace = FailTrace(goal, reason, depth, children)
+  private def recordFail(goal: Goal, reason: String, depth: Int, children: List[FailTrace] = Nil, failureType: String = "Normal"): Unit = {
+    val trace = FailTrace(goal, reason, depth, children, failureType)
     if (bestFail.isEmpty || depth >= bestFail.get.depth) {
       bestFail = Some(trace)
     }
@@ -45,6 +48,7 @@ final class Prover(
   ): Either[FailTrace, ProofTree] =
     logger.log(s"prove begin. goal: $goal (classical: $classical, maxDepth: $maxDepth)")
     bestFail = None
+    failureCache.clear() // セッションごとにキャッシュをクリア
     
     val result = (1 to maxDepth).view.flatMap { d =>
       logger.log(s"--- Iterative Deepening: current limit = $d ---")
@@ -71,6 +75,13 @@ final class Prover(
     val contextExprs = context.map(h => applySubst(h._2, subst)).toSet
     val currentGoalObj = Goal(context, currentGoal)
 
+    // --- 1. メモ化チェック ---
+    // もし過去に同じ目標・コンテキストで、現在以上の残り深さで失敗していたらスキップ
+    val remainingDepth = limit - depth
+    if (failureCache.get((currentGoal, contextExprs)).exists(_ >= remainingDepth)) {
+      return LazyList.empty
+    }
+
     if depth > limit then 
       recordFail(currentGoalObj, s"Depth limit reached ($limit)", depth)
       LazyList.empty
@@ -89,20 +100,29 @@ final class Prover(
         searchRules(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount) #:::
         searchClassical(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount)
 
+      // --- 2. 失敗の記録 ---
       if (results.isEmpty) {
         recordFail(currentGoalObj, "No rules applicable", depth)
+        failureCache((currentGoal, contextExprs)) = remainingDepth
       }
       results
 
   private def searchAxiom(goal: Expr, context: Context, subst: Subst, depth: Int): LazyList[(ProofTree, Subst)] =
-    context.view.to(LazyList).flatMap { case (name, hyp) =>
+    // ヒューリスティック: 複雑度の低い（簡単な）仮定から試す
+    val results = context.sortBy(_._2.complexity).view.to(LazyList).flatMap { case (name, hyp) =>
       unify(hyp, goal, subst).map(s => (ProofTree.Leaf(applySubst(goal, s), name), s))
     }
+    if (results.isEmpty && context.nonEmpty) {
+      recordFail(Goal(context, goal), "No hypothesis matches the current goal", depth, failureType = "UnifyHyp")
+    }
+    results
 
   private def searchReflexivity(goal: Expr, subst: Subst, depth: Int): LazyList[(ProofTree, Subst)] =
     goal match
       case Expr.App(Expr.Sym(Eq), List(l, r)) =>
-        unify(l, r, subst).map { s => (ProofTree.Leaf(applySubst(goal, s), StandardRules.eqRefl.name), s) }
+        val res = unify(l, r, subst).map { s => (ProofTree.Leaf(applySubst(goal, s), StandardRules.eqRefl.name), s) }
+        if (res.isEmpty) recordFail(Goal(Nil, goal), s"Terms $l and $r are not unifiable", depth, failureType = "UnifyRefl")
+        res
       case _ => LazyList.empty
 
   private def searchDecomposeGoal(
@@ -243,7 +263,13 @@ final class Prover(
 
     candidates.to(LazyList).flatMap { rule =>
       val (instRule, _) = Prover.instantiate(rule, () => freshMeta(depth))
-      unify(instRule.rhs, goal, subst).flatMap { s =>
+      val resUnify = unify(instRule.rhs, goal, subst)
+      
+      if (resUnify.isEmpty) {
+        recordFail(Goal(context, goal), s"Rule '${rule.name}' RHS ${instRule.rhs} does not unify", depth, failureType = s"UnifyRule[${rule.name}]")
+      }
+
+      resUnify.flatMap { s =>
         val universes = instRule.universals
         def solveUniversals(conds: List[Expr], currentSubst: Subst, solved: List[ProofTree]): LazyList[(List[ProofTree], Subst)] = conds match {
           case Nil => LazyList((solved, currentSubst))
