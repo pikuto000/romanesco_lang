@@ -84,9 +84,6 @@ var/
 *.egg/.lake
 
 #text folder
-text/
-
-*.txt
 
 sbt_launch.jar
 

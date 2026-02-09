@@ -1,6 +1,6 @@
 // ==========================================
 // TestParser.scala
-// テスト用の簡易パーサー（Appラムダ対応）
+// テスト用の簡易パーサー（数字の自動変換を抑制）
 // ==========================================
 
 package romanesco.Solver
@@ -18,31 +18,27 @@ object TestParser:
     parseExpr(tokens)._1
 
   private def tokenize(s: String): List[String] =
-    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', '⇒', '⊃', '×', '⊥', '⊤', '∘', 'λ')
-    val terminalSymbols = Set('0', '1')
+    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', '⇒', '⊃', '×', '⊥', '⊤', '∘')
+    
     val sb = new StringBuilder
     val tokens = mutable.ListBuffer.empty[String]
+    
     def flush(): Unit = if (sb.nonEmpty) { tokens += sb.toString; sb.clear() }
+
     for (c <- s) {
-      if (symbols.contains(c)) { flush(); tokens += c.toString }
-      else if (terminalSymbols.contains(c)) { sb.append(c) }
-      else if (c.isWhitespace) { flush() }
-      else { sb.append(c) }
+      if (symbols.contains(c)) {
+        flush(); tokens += c.toString
+      } else if (c.isWhitespace) {
+        flush()
+      } else {
+        sb.append(c)
+      }
     }
     flush()
-    tokens.toList.map {
-      case "0" => Initial; case "1" => Terminal; case other => other
-    }
+    tokens.toList
 
   private def parseExpr(tokens: List[String]): (Expr, List[String]) =
-    parseLambda(tokens)
-
-  private def parseLambda(tokens: List[String]): (Expr, List[String]) =
-    tokens match
-      case ("λ" | "lambda") :: varName :: "." :: rest =>
-        val (body, rest2) = parseLambda(rest)
-        (Expr.App(Expr.Sym("λ"), List(Expr.Var(varName), body)), rest2)
-      case _ => parseImplication(tokens)
+    parseImplication(tokens)
 
   private def parseImplication(tokens: List[String]): (Expr, List[String]) =
     val (left, rest1) = parseOr(tokens)
@@ -101,8 +97,8 @@ object TestParser:
         rest2 match
           case ")" :: rest3 => (expr, rest3)
           case _            => throw new Exception(s"Unmatched parenthesis at ${rest2.take(5).mkString(" ")}")
-      case (True | Terminal | "⊤" | "1") :: rest => (⊤, rest)
-      case (False | Initial | "⊥" | "0") :: rest => (⊥, rest)
+      case (True | "⊤") :: rest => (sym(True), rest)
+      case (False | "⊥") :: rest => (sym(False), rest)
       case name :: "(" :: rest =>
         val (args, rest2) = parseArgs(rest)
         (sym(name)(args*), rest2)

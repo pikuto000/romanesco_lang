@@ -41,4 +41,38 @@ import romanesco.Solver.core.Tactics._
     case Left(error) =>
       println(s"\n✗ Tactic error: $error")
   }
+
+  println("\n=== Induction Test: plus(n, 0) = n ===")
+  val inductionGoal = TestParser.parse("∀n. plus(n, 0) = n")
+  val inductionState = ProofState(List(Goal(Nil, inductionGoal)), Nil, inductionGoal)
+  
+  val indResult = for {
+    s1 <- induction(inductionState)
+    _  = println(s"\nBase Case:\n${s1.goals.head}")
+    _  = println(s"\nInductive Step:\n${s1.goals.tail.head}")
+    
+    // Base Case を解決 (plus(0, 0) = 0)
+    s2 <- reflexivity(s1)
+    _  = println(s"\nBase Case solved! Next goal:\n${s2.currentGoal.get}")
+    
+    // Inductive Step を解決
+    s3 <- intro(s2) // n を導入
+    _  = println(s"\nAfter intro n:\n${s3.currentGoal.get}")
+    
+    s4 <- intro(s3, Some("IH")) // IH を導入
+    _  = println(s"\nAfter intro IH:\n${s4.currentGoal.get}")
+    
+    s5 <- rewrite(s4, "IH")
+    _  = println(s"\nAfter rewrite IH:\n${s5.currentGoal.get}")
+    
+    s6 <- reflexivity(s5)
+  } yield s6
+
+  indResult match {
+    case Right(finalState) =>
+      if (finalState.isSolved) println("\n✓ Induction goal solved successfully!")
+      else println(s"\nRemaining goals: ${finalState.goals.size}")
+    case Left(error) =>
+      println(s"\n✗ Tactic error: $error")
+  }
 }

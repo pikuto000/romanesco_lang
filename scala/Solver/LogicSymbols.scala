@@ -32,6 +32,10 @@ object LogicSymbols {
   val Case = "case"   // [f, g]
   val Inl = "inl"
   val Inr = "inr"
+
+  // 自然数 (Natural Numbers)
+  val Zero = "0"
+  val Succ = "S"
   
   // その他の表記揺れ
   val ImpliesAlt1 = "⊃"

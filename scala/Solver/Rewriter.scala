@@ -38,6 +38,13 @@ object Rewriter {
     case Expr.App(Expr.Lam(x, body), List(arg)) =>
       Prover.substVar(body, x, arg)
 
+    // --- 自然数の演算 (Arithmetic) ---
+    // plus(0, m) -> m
+    case Expr.App(Expr.Sym("plus"), List(Expr.Sym(Zero), m)) => m
+    // plus(S(n), m) -> S(plus(n, m))
+    case Expr.App(Expr.Sym("plus"), List(Expr.App(Expr.Sym(Succ), List(n)), m)) =>
+      Expr.App(Expr.Sym(Succ), List(Expr.App(Expr.Sym("plus"), List(n, m))))
+
     case _ => expr
   }
 }

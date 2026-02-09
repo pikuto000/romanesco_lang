@@ -71,6 +71,60 @@ object Tactics {
   }
 
   /**
+   * 自然数に関する帰納法。
+   * 目標が ∀n. P(n) のとき、P(0) と ∀n. (P(n) → P(S(n))) に分割する。
+   */
+  def induction(state: ProofState): TacticResult = {
+    state.currentGoal match {
+      case Some(Goal(ctx, App(Sym(Forall), List(Var(v), body)))) =>
+        // Base case: P(0)
+        val baseGoal = Goal(ctx, Prover.substVar(body, v, Sym(Zero)))
+        
+        // Inductive step: ∀n. (P(n) → P(S(n)))
+        val n = v // 再利用
+        val pn = Prover.substVar(body, v, Var(n))
+        val psn = Prover.substVar(body, v, App(Sym(Succ), List(Var(n))))
+        val stepGoal = Goal(ctx, App(Sym(Forall), List(Var(n), App(Sym(Implies), List(pn, psn)))))
+        
+        Right(state.copy(goals = baseGoal :: stepGoal :: state.goals.tail))
+      
+      case _ => Left("induction: Goal is not a universal quantification")
+    }
+  }
+
+  /**
+   * 等式の反射律。左右が一致（正規化後）していれば解決する。
+   */
+  def reflexivity(state: ProofState): TacticResult = {
+    state.currentGoal match {
+      case Some(Goal(ctx, App(Sym(Eq), List(l, r)))) =>
+        if (Rewriter.normalize(l) == Rewriter.normalize(r)) Right(state.copy(goals = state.goals.tail))
+        else Left(s"reflexivity: $l and $r are not equal even after normalization")
+      case _ => Left("reflexivity: Goal is not an equality")
+    }
+  }
+
+  /**
+   * 仮定にある等式を使って結論を書き換える。
+   */
+  def rewrite(state: ProofState, hypName: String): TacticResult = {
+    state.currentGoal match {
+      case Some(goal @ Goal(ctx, target)) =>
+        ctx.find(_._1 == hypName) match {
+          case Some((_, App(Sym(Eq), List(l, r)))) =>
+            // 目標を正規化してから書き換えを試みる
+            val normTarget = Rewriter.normalize(target)
+            val rewritten = Prover.rewriteExpr(normTarget, l, r)
+            if (rewritten != normTarget) Right(state.copy(goals = goal.copy(target = rewritten) :: state.goals.tail))
+            else Left(s"rewrite: Hypothesis '$hypName' ($l = $r) not applicable to goal ($normTarget)")
+          case Some((_, other)) => Left(s"rewrite: Hypothesis '$hypName' ($other) is not an equality")
+          case None => Left(s"rewrite: Hypothesis '$hypName' not found")
+        }
+      case None => Left("No current goal")
+    }
+  }
+
+  /**
    * 指定した仮定を使って直接ゴールを解決する。
    */
   def exact(state: ProofState, hypName: String): TacticResult = {

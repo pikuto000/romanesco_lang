@@ -1,0 +1,11 @@
+// 1. Leibniz's Law (Rewrite)
+a = b -> (P(a) -> P(b))
+
+// 2. Transitivity of Equality
+a = b -> (b = c -> a = c)
+
+// 3. Existential with Equality
+exists x. x = a
+
+// 4. Universal with Equality and Implication
+(forall x. (x = a -> P(x))) -> P(a)
