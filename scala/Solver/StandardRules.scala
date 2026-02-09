@@ -225,3 +225,18 @@ object StandardRules:
   val adjoints = List(existsUnit, existsCounit, forallUnit, forallCounit)
   val logicMapping =
     List(andIsProd, orIsCoprod, arrowIsExp, trueIsTerminal, falseIsInitial)
+
+  // --- 古典論理 ---
+  val em = CatRule(
+    "EM",
+    sym("⊤"),
+    sym("∨")(v("A"), sym("→")(v("A"), sym("⊥")))
+  )
+
+  val dne = CatRule(
+    "DNE",
+    sym("→")(sym("→")(v("A"), sym("⊥")), sym("⊥")),
+    v("A")
+  )
+
+  val classical = List(em, dne)

@@ -9,11 +9,21 @@ import scala.collection.mutable
 import romanesco.Utils.Debug.logger
 import LogicSymbols._
 
-final class Prover(val classical: Boolean = false) {
+final class Prover(
+    val classical: Boolean = false, 
+    rules: List[CatRule] = StandardRules.all,
+    val maxRaa: Int = 2 // RAAの適用回数上限を緩和
+) {
   import Unifier._
 
   private var metaCounter = 0
   private var bestFail: Option[FailTrace] = None
+
+  // 規則を先頭記号でインデックス化
+  private val ruleIndex: Map[String, List[CatRule]] = {
+    val allRules = if classical then rules ++ StandardRules.classical else rules
+    allRules.groupBy(_.rhs.headSymbol)
+  }
 
   private def freshMeta(depth: Int): Expr = {
     metaCounter += 1
@@ -232,7 +242,13 @@ final class Prover(val classical: Boolean = false) {
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
       depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
   ): LazyList[(Proof, Subst)] =
-    rules.view.to(LazyList).flatMap { rule =>
+    val head = goal.headSymbol
+    // 目標の先頭記号に一致する規則 + 変数/メタ変数の規則を候補とする
+    val candidates = ruleIndex.getOrElse(head, Nil) ++ 
+                     ruleIndex.getOrElse("_VAR_", Nil) ++ 
+                     ruleIndex.getOrElse("_META_", Nil)
+
+    candidates.to(LazyList).flatMap { rule =>
       val (instRule, _) = Prover.instantiate(rule, () => freshMeta(depth))
       unify(instRule.rhs, goal, subst).flatMap { s =>
         val universes = instRule.universals
@@ -256,7 +272,7 @@ final class Prover(val classical: Boolean = false) {
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
       depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
   ): LazyList[(Proof, Subst)] =
-    if classical && raaCount < 1 && goal != Expr.Sym(False) && goal != Expr.Sym(Initial) then
+    if classical && raaCount < maxRaa && goal != Expr.Sym(False) && goal != Expr.Sym(Initial) then
       val negation = Expr.App(Expr.Sym(Implies), List(goal, Expr.Sym(False)))
       search(Expr.Sym(False), rules, (s"raa$depth", negation) :: context, subst, depth + 1, limit, visited, raaCount + 1)
         .map { case (p, s) =>

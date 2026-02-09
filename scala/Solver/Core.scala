@@ -27,6 +27,14 @@ enum Expr:
 
   def apply(args: Expr*): Expr = App(this, args.toList)
 
+  /** 目標の先頭記号（インデックス用）を返します */
+  def headSymbol: String = this match
+    case App(Sym(n), _) => n
+    case Sym(n)         => n
+    case Var(_)         => "_VAR_"
+    case Meta(_)        => "_META_"
+    case App(h, _)      => h.headSymbol
+
   override def toString: String = this match
     case Var(n)                         => n
     case Meta(id)                       => s"?$id"
