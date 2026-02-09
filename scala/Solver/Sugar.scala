@@ -13,7 +13,8 @@ object ExprBuilder:
   // 基本構築
   def sym(name: String): Expr = Expr.Sym(name)
   def v(name: String): Expr = Expr.Var(name)
-  def meta(id: Int): Expr = Expr.Meta(id)
+  def meta(id: Int): Expr = Expr.Meta(MetaId(id))
+  def meta(ids: Int*): Expr = Expr.Meta(MetaId(ids.toList))
 
   // よく使う記号
   val ⊤ = sym("⊤")
@@ -43,19 +44,19 @@ object ProofBuilder:
   def identity: Proof = Nil
 
   // 規則適用
-  def apply(rule: CatRule, subst: Map[Int, Expr] = Map.empty): ProofStep =
+  def apply(rule: CatRule, subst: Map[MetaId, Expr] = Map.empty): ProofStep =
     ProofStep.Apply(rule, subst)
 
   // 随伴関連
   object Adjoint:
-    def unit(name: String, subst: Map[Int, Expr] = Map.empty): ProofStep =
+    def unit(name: String, subst: Map[MetaId, Expr] = Map.empty): ProofStep =
       val rule = name match
         case "∀" => forallUnit
         case "∃" => existsUnit
         case _   => throw new Exception(s"Unknown adjoint: $name")
       ProofStep.Apply(rule, subst)
 
-    def counit(name: String, subst: Map[Int, Expr] = Map.empty): ProofStep =
+    def counit(name: String, subst: Map[MetaId, Expr] = Map.empty): ProofStep =
       val rule = name match
         case "∀" => forallCounit
         case "∃" => existsCounit
@@ -64,7 +65,7 @@ object ProofBuilder:
 
   // よく使うパターン
   object Common:
-    def intro(name: String, subst: Map[Int, Expr] = Map.empty): ProofStep =
+    def intro(name: String, subst: Map[MetaId, Expr] = Map.empty): ProofStep =
       name match
         case "∧" | "×" => apply(productUniversal, subst)
         case "→" | "⇒" => apply(expUniversal, subst)
@@ -73,7 +74,7 @@ object ProofBuilder:
         case "⊤" | "1" => apply(terminalUniversal, subst)
         case _         => throw new Exception(s"Unknown intro: $name")
 
-    def elim(name: String, subst: Map[Int, Expr] = Map.empty): ProofStep =
+    def elim(name: String, subst: Map[MetaId, Expr] = Map.empty): ProofStep =
       name match
         case "∧" | "×" => apply(fstBeta, subst) // または sndBeta
         case "→"       => apply(lambdaBeta, subst)
@@ -85,10 +86,10 @@ object ProofBuilder:
     def refl(term: Expr): ProofStep =
       apply(eqRefl, Map.empty)
 
-    def symm(subst: Map[Int, Expr] = Map.empty): ProofStep =
+    def symm(subst: Map[MetaId, Expr] = Map.empty): ProofStep =
       apply(eqSymm, subst)
 
-    def trans(subst: Map[Int, Expr] = Map.empty): ProofStep =
+    def trans(subst: Map[MetaId, Expr] = Map.empty): ProofStep =
       apply(eqTrans, subst)
 
 // 可読な証明記述DSL
@@ -100,26 +101,26 @@ object ProofDSL:
     private var steps = List.empty[ProofStep]
 
     def intro(name: String)(using
-        subst: Map[Int, Expr] = Map.empty
+        subst: Map[MetaId, Expr] = Map.empty
     ): this.type =
       steps = steps :+ Common.intro(name, subst)
       this
 
-    def elim(name: String)(using subst: Map[Int, Expr] = Map.empty): this.type =
+    def elim(name: String)(using subst: Map[MetaId, Expr] = Map.empty): this.type =
       steps = steps :+ Common.elim(name, subst)
       this
 
     def rewrite(rule: CatRule)(using
-        subst: Map[Int, Expr] = Map.empty
+        subst: Map[MetaId, Expr] = Map.empty
     ): this.type =
       steps = steps :+ ProofBuilder.apply(rule, subst)
       this
 
-    def η(name: String)(using subst: Map[Int, Expr] = Map.empty): this.type =
+    def η(name: String)(using subst: Map[MetaId, Expr] = Map.empty): this.type =
       steps = steps :+ Adjoint.unit(name, subst)
       this
 
-    def ε(name: String)(using subst: Map[Int, Expr] = Map.empty): this.type =
+    def ε(name: String)(using subst: Map[MetaId, Expr] = Map.empty): this.type =
       steps = steps :+ Adjoint.counit(name, subst)
       this
 

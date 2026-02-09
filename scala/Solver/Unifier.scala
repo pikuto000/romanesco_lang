@@ -1,24 +1,24 @@
 // ==========================================
-// Unifier.scala (修正版)
+// Unifier.scala
+// 単一化アルゴリズム（MetaId対応）
 // ==========================================
 
 package romanesco.Solver.core
 import romanesco.Utils.Debug.logger
 
 object Unifier:
-  type Subst = Map[Int, Expr]
+  type Subst = Map[MetaId, Expr]
   def emptySubst: Subst = Map.empty
 
+  /**
+   * 式 e に代入 s を適用します。
+   */
   def applySubst(e: Expr, s: Subst): Expr = e match
     case Expr.Meta(id) if s.contains(id) =>
-      logger.log(s"substituting $id with ${s(id)}")
       applySubst(s(id), s)
     case Expr.App(h, args) =>
-      logger.log(s"substituting $h with $s")
       Expr.App(applySubst(h, s), args.map(applySubst(_, s)))
-    case _ =>
-      logger.log(s"not substituting $e")
-      e
+    case _ => e
 
   def applySubstToRule(rule: CatRule, s: Subst): CatRule =
     CatRule(
@@ -28,43 +28,38 @@ object Unifier:
       rule.universals.map(applySubst(_, s))
     )
 
-  def unify(e1: Expr, e2: Expr, subst: Subst): Option[Subst] =
-    logger.log(s"unifying $e1 with $e2")
+  /**
+   * 2つの式 e1 と e2 を単一化します。
+   */
+  def unify(e1: Expr, e2: Expr, subst: Subst): LazyList[Subst] =
     val r1 = applySubst(e1, subst)
     val r2 = applySubst(e2, subst)
 
     if r1 == r2 then
-      logger.log(s"unification succeeded (identical). $subst")
-      Some(subst)
+      LazyList(subst)
     else
-      val result = (r1, r2) match
+      (r1, r2) match
         case (Expr.Meta(id), t) if !occursCheck(id, t) =>
-          logger.log(s"unifying meta $id with $t")
-          Some(subst + (id -> t))
+          LazyList(subst + (id -> t))
         case (t, Expr.Meta(id)) if !occursCheck(id, t) =>
-          logger.log(s"unifying meta $id with $t")
-          Some(subst + (id -> t))
+          LazyList(subst + (id -> t))
 
         case (Expr.Sym(n1), Expr.Sym(n2)) if n1 == n2 =>
-          Some(subst)
+          LazyList(subst)
 
         case (Expr.Var(n1), Expr.Var(n2)) if n1 == n2 =>
-          Some(subst)
+          LazyList(subst)
 
         case (Expr.App(h1, a1), Expr.App(h2, a2)) if a1.length == a2.length =>
           unify(h1, h2, subst).flatMap { s =>
-            a1.zip(a2).foldLeft(Option(s)) { case (sOpt, (arg1, arg2)) =>
-              sOpt.flatMap(unify(arg1, arg2, _))
+            a1.zip(a2).foldLeft(LazyList(s)) { case (sList, (arg1, arg2)) =>
+              sList.flatMap(unify(arg1, arg2, _))
             }
           }
 
-        case _ => None
-      
-      if result.isDefined then logger.log(s"unification succeeded. ${result.get}")
-      else logger.log(s"unification failed. $subst")
-      result
+        case _ => LazyList.empty
 
-  private def occursCheck(metaId: Int, expr: Expr): Boolean = expr match
+  private def occursCheck(metaId: MetaId, expr: Expr): Boolean = expr match
     case Expr.Meta(id)     => id == metaId
     case Expr.App(h, args) =>
       occursCheck(metaId, h) || args.exists(occursCheck(metaId, _))

@@ -1,1 +1,1 @@
-chcp 65001; sbt "runMain romanesco.Solver.testTactics"
+chcp 65001; sbt "runMain romanesco.Solver.testTactics"; sbt "runMain romanesco.testSomeCases"

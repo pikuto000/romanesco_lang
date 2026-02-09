@@ -1,6 +1,6 @@
 // ==========================================
 // Prover.scala
-// 証明探索エンジン
+// 証明探索エンジン（階層的メタ変数対応）
 // ==========================================
 
 package romanesco.Solver.core
@@ -13,7 +13,14 @@ final class Prover(val classical: Boolean = false) {
   import Unifier._
 
   private var metaCounter = 0
-  private def freshMeta: Expr = { metaCounter += 1; Expr.Meta(metaCounter) }
+  
+  /**
+   * 現在の深さに紐付いた階層的なメタ変数を生成します。
+   */
+  private def freshMeta(depth: Int): Expr = {
+    metaCounter += 1
+    Expr.Meta(MetaId(List(depth, metaCounter)))
+  }
 
   type Context = List[(String, Expr)]
 
@@ -25,9 +32,13 @@ final class Prover(val classical: Boolean = false) {
       rules: List[CatRule] = StandardRules.all,
       maxDepth: Int = 30
   ): Option[Proof] =
-    logger.log(s"prove begin. goal: $goal (classical: $classical)")
-    metaCounter = 0
-    search(goal, rules, Nil, emptySubst, 0, maxDepth, Set.empty, 0).map(_._1)
+    logger.log(s"prove begin. goal: $goal (classical: $classical, maxDepth: $maxDepth)")
+    
+    (1 to maxDepth).view.flatMap { d =>
+      logger.log(s"--- Iterative Deepening: current limit = $d ---")
+      metaCounter = 0
+      search(goal, rules, Nil, emptySubst, 0, d, Set.empty, 0).map(_._1)
+    }.headOption
 
   private def search(
       goal: Expr,
@@ -35,221 +46,202 @@ final class Prover(val classical: Boolean = false) {
       context: Context,
       subst: Subst,
       depth: Int,
-      maxDepth: Int,
+      limit: Int,
       visited: Set[(Expr, Set[Expr])],
       raaCount: Int
-  ): Option[(Proof, Subst)] =
+  ): LazyList[(Proof, Subst)] =
     val currentGoal = applySubst(goal, subst)
     val contextExprs = context.map(h => applySubst(h._2, subst)).toSet
     
-    if depth > maxDepth then None
-    else if visited.contains((currentGoal, contextExprs)) then None
+    if depth > limit then LazyList.empty
+    else if visited.contains((currentGoal, contextExprs)) then LazyList.empty
     else
-      logger.log(s"searching goal: $currentGoal (depth $depth, raa: $raaCount)")
       val nextVisited = visited + ((currentGoal, contextExprs))
 
       // 探索の優先順位
-      searchAxiom(currentGoal, context, subst)
-        .orElse(searchReflexivity(currentGoal, subst))
-        .orElse(searchDecomposeGoal(currentGoal, rules, context, subst, depth, maxDepth, nextVisited, raaCount))
-        .orElse(searchDecomposeContext(currentGoal, rules, context, subst, depth, maxDepth, nextVisited, raaCount))
-        .orElse(searchContext(currentGoal, rules, context, subst, depth, maxDepth, nextVisited, raaCount))
-        .orElse(searchRules(currentGoal, rules, context, subst, depth, maxDepth, nextVisited, raaCount))
-        .orElse(searchClassical(currentGoal, rules, context, subst, depth, maxDepth, nextVisited, raaCount))
+      searchAxiom(currentGoal, context, subst) #:::
+      searchReflexivity(currentGoal, subst) #:::
+      searchDecomposeGoal(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount) #:::
+      searchDecomposeContext(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount) #:::
+      searchContext(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount) #:::
+      searchRules(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount) #:::
+      searchClassical(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount)
 
   // --- 各探索フェーズ ---
 
-  /** 1. コンテキストにゴールが直接存在するか確認 (Axiom) */
-  private def searchAxiom(goal: Expr, context: Context, subst: Subst): Option[(Proof, Subst)] =
-    context.view.flatMap { case (name, hyp) =>
+  private def searchAxiom(goal: Expr, context: Context, subst: Subst): LazyList[(Proof, Subst)] =
+    context.view.to(LazyList).flatMap { case (name, hyp) =>
       unify(hyp, goal, subst).map(s => (List(ProofStep.Apply(CatRule(name, hyp, hyp), s)), s))
-    }.headOption
+    }
 
-  /** 2. 等式の反射性を確認 (Reflexivity) */
-  private def searchReflexivity(goal: Expr, subst: Subst): Option[(Proof, Subst)] =
+  private def searchReflexivity(goal: Expr, subst: Subst): LazyList[(Proof, Subst)] =
     goal match
       case Expr.App(Expr.Sym(Eq), List(l, r)) =>
         unify(l, r, subst).map { s => (List(ProofStep.Apply(StandardRules.eqRefl, s)), s) }
-      case _ => None
+      case _ => LazyList.empty
 
-  /** 3. ゴールを分解 (Intro rules) */
   private def searchDecomposeGoal(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, maxDepth: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
-  ): Option[(Proof, Subst)] =
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+  ): LazyList[(Proof, Subst)] =
     goal match
-      // 連言 / 積
       case Expr.App(Expr.Sym(And | Product), List(a, b)) =>
         for
-          (proofA, s1) <- search(a, rules, context, subst, depth + 1, maxDepth, visited, raaCount)
-          (proofB, s2) <- search(b, rules, context, s1, depth + 1, maxDepth, visited, raaCount)
+          (proofA, s1) <- search(a, rules, context, subst, depth + 1, limit, visited, raaCount)
+          (proofB, s2) <- search(b, rules, context, s1, depth + 1, limit, visited, raaCount)
         yield
           (proofA ++ proofB :+ ProofStep.Apply(StandardRules.productUniversal, s2), s2)
 
-      // 含意 / 指数
       case Expr.App(Expr.Sym(op), List(a, b))
           if op == Implies || op == Exp || op == ImpliesAlt1 || op == ImpliesAlt2 =>
         val (ant, cons) = if (op == Exp) (b, a) else (a, b)
         val hypName = s"h$depth"
-        search(cons, rules, (hypName, ant) :: context, subst, depth + 1, maxDepth, visited, raaCount)
+        search(cons, rules, (hypName, ant) :: context, subst, depth + 1, limit, visited, raaCount)
           .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.expUniversal, s), s) }
 
-      // 全称量化
       case Expr.App(Expr.Sym(Forall), List(Expr.Var(v), body)) =>
         val freshVar = s"${v}_$depth"
         val instantiated = Prover.substVar(body, v, Expr.Var(freshVar))
-        search(instantiated, rules, context, subst, depth + 1, maxDepth, visited, raaCount)
+        search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount)
           .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.forallCounit, s), s) }
 
-      // 存在量化
       case Expr.App(Expr.Sym(Exists), List(Expr.Var(v), body)) =>
-        val witness = freshMeta
+        val witness = freshMeta(depth)
         val instantiated = Prover.substVar(body, v, witness)
-        search(instantiated, rules, context, subst, depth + 1, maxDepth, visited, raaCount)
+        search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount)
           .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.existsUnit, s), s) }
 
-      // 選言 / 和
       case Expr.App(Expr.Sym(Or | Coproduct), List(a, b)) =>
-        search(a, rules, context, subst, depth + 1, maxDepth, visited, raaCount)
-          .map { case (p, s) => (p :+ ProofStep.Apply(CatRule("inl", a, goal), s), s) }
-          .orElse(
-            search(b, rules, context, subst, depth + 1, maxDepth, visited, raaCount)
-              .map { case (p, s) => (p :+ ProofStep.Apply(CatRule("inr", b, goal), s), s) }
-          )
+        search(a, rules, context, subst, depth + 1, limit, visited, raaCount)
+          .map { case (p, s) => (p :+ ProofStep.Apply(CatRule("inl", a, goal), s), s) } #:::
+        search(b, rules, context, subst, depth + 1, limit, visited, raaCount)
+          .map { case (p, s) => (p :+ ProofStep.Apply(CatRule("inr", b, goal), s), s) }
 
-      // 真 / 終対象
       case Expr.Sym(True | Terminal) =>
-        Some((List(ProofStep.Apply(StandardRules.terminalUniversal, subst)), subst))
+        LazyList((List(ProofStep.Apply(StandardRules.terminalUniversal, subst)), subst))
 
-      case _ => None
+      case _ => LazyList.empty
 
-  /** 4. コンテキスト内の仮定を分解 (Elimination rules) */
   private def searchDecomposeContext(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, maxDepth: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
-  ): Option[(Proof, Subst)] =
-    context.zipWithIndex.view.flatMap {
-      // 存在量化の分解 (Witness抽出)
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+  ): LazyList[(Proof, Subst)] =
+    context.zipWithIndex.view.to(LazyList).flatMap {
       case ((name, Expr.App(Expr.Sym(Exists), List(Expr.Var(v), body))), i) =>
-        val witness = freshMeta
+        val witness = freshMeta(depth)
         val instantiated = Prover.substVar(body, v, witness)
         val newCtx = context.patch(i, List((s"${name}.witness", instantiated)), 1)
-        search(goal, rules, newCtx, subst, depth + 1, maxDepth, visited, raaCount)
+        search(goal, rules, newCtx, subst, depth + 1, limit, visited, raaCount)
       
-      // 連言の分解
       case ((name, Expr.App(Expr.Sym(And | Product), List(a, b))), i) =>
         val newCtx = context.patch(i, List((s"${name}.1", a), (s"${name}.2", b)), 1)
-        search(goal, rules, newCtx, subst, depth + 1, maxDepth, visited, raaCount)
+        search(goal, rules, newCtx, subst, depth + 1, limit, visited, raaCount)
       
-      // 選言の分解 (ケース分析)
       case ((name, Expr.App(Expr.Sym(Or | Coproduct), List(a, b))), i) =>
         val leftCtx = context.patch(i, List((s"${name}.left", a)), 1)
-        search(goal, rules, leftCtx, subst, depth + 1, maxDepth, visited, raaCount).flatMap { case (lp, ls) =>
+        search(goal, rules, leftCtx, subst, depth + 1, limit, visited, raaCount).flatMap { case (lp, ls) =>
           val rightCtx = context.patch(i, List((s"${name}.right", b)), 1)
-          search(goal, rules, rightCtx, ls, depth + 1, maxDepth, visited, raaCount).map {
+          search(goal, rules, rightCtx, ls, depth + 1, limit, visited, raaCount).map {
             case (rp, rs) => (lp ++ rp :+ ProofStep.Apply(StandardRules.coproductUniversal, rs), rs)
           }
         }
-      case _ => None
-    }.headOption
+      case _ => LazyList.empty
+    }
 
-  /** 5. コンテキスト内の仮定を利用 (Application / Rewriting) */
   private def searchContext(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, maxDepth: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
-  ): Option[(Proof, Subst)] =
-    context.view.flatMap { case (name, hyp) =>
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+  ): LazyList[(Proof, Subst)] =
+    context.view.to(LazyList).flatMap { case (name, hyp) =>
       val ch = applySubst(hyp, subst)
-      // 偽 / 始対象からの推論 (Ex Falso)
       if ch == Expr.Sym(False) || ch == Expr.Sym(Initial) then
-        Some((List(ProofStep.Apply(StandardRules.initialUniversal, subst)), subst))
+        LazyList((List(ProofStep.Apply(StandardRules.initialUniversal, subst)), subst))
       else ch match
-        // 等式による書き換え
         case Expr.App(Expr.Sym(Eq), List(l, r)) =>
           val cl = applySubst(l, subst); val cr = applySubst(r, subst)
           val rw1 = Prover.rewriteExpr(goal, cl, cr)
-          val res1 = if rw1 != goal then search(rw1, rules, context, subst, depth + 1, maxDepth, visited, raaCount).map {
+          val res1 = if rw1 != goal then search(rw1, rules, context, subst, depth + 1, limit, visited, raaCount).map {
             case (p, s) => (p :+ ProofStep.Apply(StandardRules.eqSubst, s), s)
-          } else None
-          res1.orElse {
+          } else LazyList.empty
+          res1 #::: {
             val rw2 = Prover.rewriteExpr(goal, cr, cl)
-            if rw2 != goal then search(rw2, rules, context, subst, depth + 1, maxDepth, visited, raaCount).map {
+            if rw2 != goal then search(rw2, rules, context, subst, depth + 1, limit, visited, raaCount).map {
               case (p, s) => (p :+ ProofStep.Apply(StandardRules.eqSubst, s), s)
-            } else None
+            } else LazyList.empty
           }
-        case _ => None
-    }.headOption
-    .orElse {
-      // 含意や全称量化の適用
-      context.view.flatMap { case (name, hyp) =>
-        useHypothesis(name, hyp, goal, rules, context, subst, depth, maxDepth, visited, raaCount)
-      }.headOption
+        case _ => LazyList.empty
+    } #::: {
+      context.view.to(LazyList).flatMap { case (name, hyp) =>
+        useHypothesis(name, hyp, goal, rules, context, subst, depth, limit, visited, raaCount)
+      }
     }
 
-  /** 仮定(hyp)を再帰的に適用してゴールを導けるか試みる */
   private def useHypothesis(
       name: String, hyp: Expr, goal: Expr, rules: List[CatRule], context: Context,
-      subst: Subst, depth: Int, maxDepth: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
-  ): Option[(Proof, Subst)] = {
+      subst: Subst, depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+  ): LazyList[(Proof, Subst)] = {
     val currentHyp = applySubst(hyp, subst)
     if (currentHyp == Expr.Sym(False) || currentHyp == Expr.Sym(Initial)) {
-      Some((List(ProofStep.Apply(StandardRules.initialUniversal, subst)), subst))
+      LazyList((List(ProofStep.Apply(StandardRules.initialUniversal, subst)), subst))
     } else {
       unify(currentHyp, goal, subst)
-        .map(s => (List(ProofStep.Apply(CatRule(name, currentHyp, currentHyp), s)), s))
-        .orElse {
+        .map(s => (List(ProofStep.Apply(CatRule(name, currentHyp, currentHyp), s)), s)) #::: {
           currentHyp match
             case Expr.App(Expr.Sym(And | Product), List(a, b)) =>
-              useHypothesis(s"$name.1", a, goal, rules, context, subst, depth, maxDepth, visited, raaCount)
-                .orElse(useHypothesis(s"$name.2", b, goal, rules, context, subst, depth, maxDepth, visited, raaCount))
+              useHypothesis(s"$name.1", a, goal, rules, context, subst, depth, limit, visited, raaCount) #:::
+              useHypothesis(s"$name.2", b, goal, rules, context, subst, depth, limit, visited, raaCount)
             case Expr.App(Expr.Sym(Implies | ImpliesAlt1 | ImpliesAlt2), List(a, b)) =>
-              useHypothesis(name, b, goal, rules, context, subst, depth, maxDepth, visited, raaCount).flatMap { case (proofB, s1) =>
-                search(a, rules, context, s1, depth + 1, maxDepth, visited, raaCount)
+              useHypothesis(name, b, goal, rules, context, subst, depth, limit, visited, raaCount).flatMap { case (proofB, s1) =>
+                search(a, rules, context, s1, depth + 1, limit, visited, raaCount)
                   .map { case (proofA, s2) => (proofB ++ proofA :+ ProofStep.Apply(CatRule(name, a, b), s2), s2) }
               }
             case Expr.App(Expr.Sym(Forall), List(Expr.Var(v), body)) =>
-              val meta = freshMeta
+              val meta = freshMeta(depth)
               val inst = Prover.substVar(body, v, meta)
-              useHypothesis(name, inst, goal, rules, context, subst, depth, maxDepth, visited, raaCount).map { case (proof, s) =>
+              useHypothesis(name, inst, goal, rules, context, subst, depth, limit, visited, raaCount).map { case (proof, s) =>
                 (proof :+ ProofStep.Apply(CatRule(name, currentHyp, inst), s), s)
               }
-            case _ => None
+            case _ => LazyList.empty
         }
     }
   }
 
-  /** 6. 追加ルール (外部定義ルール) */
   private def searchRules(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, maxDepth: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
-  ): Option[(Proof, Subst)] =
-    rules.view.flatMap { rule =>
-      val (instRule, _) = Prover.instantiate(rule, () => freshMeta)
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+  ): LazyList[(Proof, Subst)] =
+    rules.view.to(LazyList).flatMap { rule =>
+      val (instRule, _) = Prover.instantiate(rule, () => freshMeta(depth))
       unify(instRule.rhs, goal, subst).flatMap { s =>
-        val universalsOk = instRule.universals.forall { cond =>
-          search(cond, rules, context, s, depth + 1, maxDepth, visited, raaCount).isDefined
+        val universes = instRule.universals
+        def solveUniversals(conds: List[Expr], currentSubst: Subst): LazyList[Subst] = conds match {
+          case Nil => LazyList(currentSubst)
+          case head :: tail =>
+            search(head, rules, context, currentSubst, depth + 1, limit, visited, raaCount).flatMap {
+              case (_, nextSubst) => solveUniversals(tail, nextSubst)
+            }
         }
-        if universalsOk then
-          search(instRule.lhs, rules, context, s, depth + 1, maxDepth, visited, raaCount)
-            .map { case (proof, finalSubst) => (proof :+ ProofStep.Apply(rule, finalSubst), finalSubst) }
-        else None
-      }
-    }.headOption
 
-  /** 7. 古典論理ルール (RAA) */
+        solveUniversals(universes, s).flatMap { finalS =>
+          search(instRule.lhs, rules, context, finalS, depth + 1, limit, visited, raaCount).map {
+            case (proof, finalSubst) => (proof :+ ProofStep.Apply(rule, finalSubst), finalSubst)
+          }
+        }
+      }
+    }
+
   private def searchClassical(
       goal: Expr, rules: List[CatRule], context: Context, subst: Subst,
-      depth: Int, maxDepth: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
-  ): Option[(Proof, Subst)] =
+      depth: Int, limit: Int, visited: Set[(Expr, Set[Expr])], raaCount: Int
+  ): LazyList[(Proof, Subst)] =
     if classical && raaCount < 1 && goal != Expr.Sym(False) && goal != Expr.Sym(Initial) then
-      logger.log(s"trying RAA for goal: $goal")
       val negation = Expr.App(Expr.Sym(Implies), List(goal, Expr.Sym(False)))
-      search(Expr.Sym(False), rules, (s"raa$depth", negation) :: context, subst, depth + 1, maxDepth, visited, raaCount + 1)
+      search(Expr.Sym(False), rules, (s"raa$depth", negation) :: context, subst, depth + 1, limit, visited, raaCount + 1)
         .map { case (p, s) =>
           val raaStep = ProofStep.Apply(CatRule("RAA", Expr.App(Expr.Sym(Implies), List(negation, Expr.Sym(False))), goal), s)
           (p :+ raaStep, s)
         }
-    else None
+    else LazyList.empty
 }
 
 object Prover {
@@ -270,13 +262,20 @@ object Prover {
       case _ => expr
 
   /** ルールのインスタンス化（メタ変数の割り当て） */
-  def instantiate(rule: CatRule, freshMeta: () => Expr): (CatRule, Map[String, Expr]) =
+  def instantiate(rule: CatRule, freshMeta: () => Expr): (CatRule, Map[MetaId, Expr]) =
     val vars = collectVars(rule.lhs) ++ collectVars(rule.rhs) ++ rule.universals.flatMap(collectVars)
     val substMap = vars.map(v => v -> freshMeta()).toMap
+    
+    // 代入マップを Map[MetaId, Expr] に変換
+    val metaSubstMap: Subst = substMap.map { 
+      case (name, Expr.Meta(id)) => id -> Expr.Meta(id) 
+      case _ => throw new Exception("Unexpected expression in instantiate")
+    }
+
     val instLhs = applyVarSubst(rule.lhs, substMap)
     val instRhs = applyVarSubst(rule.rhs, substMap)
     val instUniv = rule.universals.map(applyVarSubst(_, substMap))
-    (CatRule(rule.name, instLhs, instRhs, instUniv), substMap)
+    (CatRule(rule.name, instLhs, instRhs, instUniv), metaSubstMap)
 
   private def collectVars(e: Expr): Set[String] = e match
     case Expr.Var(n)       => Set(n)

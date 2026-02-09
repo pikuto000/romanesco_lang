@@ -1,6 +1,6 @@
 // ==========================================
 // Tactics.scala
-// タクティクスの実装
+// タクティクスの実装（LazyList版Unifierへの対応）
 // ==========================================
 
 package romanesco.Solver.core
@@ -13,7 +13,6 @@ object Tactics {
 
   /**
    * 含意(→)や全称量化(∀)の導入。
-   * 目標が A → B のとき、Aを仮定に追加し目標をBにする。
    */
   def intro(state: ProofState, name: Option[String] = None): TacticResult = {
     state.currentGoal match {
@@ -34,7 +33,6 @@ object Tactics {
 
   /**
    * 連言(∧)の分解。
-   * 目標が A ∧ B のとき、AとBの2つの目標に分ける。
    */
   def split(state: ProofState): TacticResult = {
     state.currentGoal match {
@@ -48,7 +46,6 @@ object Tactics {
 
   /**
    * 仮定の分解。
-   * ∧ ならば2つの仮定に分け、∨ ならば2つのサブゴール（ケース分析）に分ける。
    */
   def destruct(state: ProofState, hypName: String): TacticResult = {
     state.currentGoal match {
@@ -56,12 +53,10 @@ object Tactics {
         ctx.zipWithIndex.find(_._1._1 == hypName) match {
           case Some(((name, hypExpr), idx)) =>
             hypExpr match {
-              // ∧ の分解
               case App(Sym(op), List(a, b)) if op == And || op == Product =>
                 val newCtx = ctx.patch(idx, List((s"$name.1", a), (s"$name.2", b)), 1)
                 Right(state.copy(goals = goal.copy(context = newCtx) :: state.goals.tail))
               
-              // ∨ の分解 (ケース分析)
               case App(Sym(op), List(a, b)) if op == Or || op == Coproduct =>
                 val g1 = Goal(ctx.patch(idx, List((s"$name.left", a)), 1), target)
                 val g2 = Goal(ctx.patch(idx, List((s"$name.right", b)), 1), target)
@@ -83,7 +78,7 @@ object Tactics {
       case Some(Goal(ctx, target)) =>
         ctx.find(_._1 == hypName) match {
           case Some((_, hypExpr)) =>
-            unify(hypExpr, target, emptySubst) match {
+            unify(hypExpr, target, emptySubst).headOption match {
               case Some(_) => Right(state.copy(goals = state.goals.tail))
               case None => Left(s"exact: Hypothesis '$hypName' ($hypExpr) does not match goal ($target)")
             }
@@ -99,7 +94,7 @@ object Tactics {
   def assumption(state: ProofState): TacticResult = {
     state.currentGoal match {
       case Some(Goal(ctx, target)) =>
-        val matched = ctx.exists { case (_, hyp) => unify(hyp, target, emptySubst).isDefined }
+        val matched = ctx.exists { case (_, hyp) => unify(hyp, target, emptySubst).nonEmpty }
         if (matched) Right(state.copy(goals = state.goals.tail))
         else Left("assumption: No matching hypothesis found")
       case None => Left("No current goal")
@@ -116,7 +111,7 @@ object Tactics {
           case Some((_, hypExpr)) =>
             hypExpr match {
               case App(Sym(op), List(a, b)) if op == Implies || op == ImpliesAlt1 || op == ImpliesAlt2 =>
-                unify(b, target, emptySubst) match {
+                unify(b, target, emptySubst).headOption match {
                   case Some(_) => Right(state.copy(goals = Goal(ctx, a) :: state.goals.tail))
                   case None => Left(s"apply: Conclusion of '$hypName' ($b) does not match goal ($target)")
                 }
