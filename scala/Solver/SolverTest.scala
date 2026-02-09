@@ -79,7 +79,7 @@ def processInput(input: String, classical: Boolean = false): Unit =
   catch case e: Exception => println(s"Error: ${e.getMessage}")
 
 @main def testSomeCases = {
-  logger.switch(true)
+  logger.switch(false)
 
   val intuitionisticCases = List(
     "A → A",
