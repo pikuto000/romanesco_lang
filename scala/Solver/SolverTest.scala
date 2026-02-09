@@ -79,7 +79,7 @@ def processInput(input: String, classical: Boolean = false): Unit =
   catch case e: Exception => println(s"Error: ${e.getMessage}")
 
 @main def testSomeCases = {
-  logger.switch(false)
+  logger.switch(true)
 
   val intuitionisticCases = List(
     "A → A",
@@ -89,14 +89,14 @@ def processInput(input: String, classical: Boolean = false): Unit =
     "a = b ∧ b = c → a = c",
     "(((A → ⊥) → ⊥) → ⊥) → (A → ⊥)",
     "A ∨ (A → ⊥)", // Should fail
-    "A ∨ B → A"    // Should fail
+    "A ∨ B → A" // Should fail
   )
 
   val classicalCases = List(
-    "A ∨ (A → ⊥)",                // Law of Excluded Middle
-    "((A → ⊥) → ⊥) → A",          // Double Negation Elimination
-    "((A → B) → A) → A",          // Peirce's Law
-    "(A → B) → ((A → ⊥) ∨ B)"     // Implication as Or
+    "A ∨ (A → ⊥)", // Law of Excluded Middle
+    "((A → ⊥) → ⊥) → A", // Double Negation Elimination
+    "((A → B) → A) → A", // Peirce's Law
+    "(A → B) → ((A → ⊥) ∨ B)" // Implication as Or
   )
 
   val categoricalCases = List(
@@ -109,55 +109,66 @@ def processInput(input: String, classical: Boolean = false): Unit =
     "case(f, g) ∘ inr = g"
   )
 
+  val higherOrderCases = List(
+    "∀P. (P(a) → ∃x. P(x))",
+    "∀P. ((∀x. P(x)) → (∀x. P(x)))",
+    "∀P. ∀Q. ((∀x. (P(x) ∧ Q(x))) → ((∀x. P(x)) ∧ (∀x. Q(x))))",
+    "∀P. ∀Q. ((∀x. (P(x) → Q(x))) → ((∃x. P(x)) → (∃x. Q(x))))"
+  )
+
   println("=== Intuitionistic Logic Tests ===")
   intuitionisticCases.foreach { input =>
     println(s"\n[Test Case] $input")
-    try {
-      val expr = TestParser.parse(input)
-      val prover = new Prover(classical = false)
-      val result = romanesco.Utils.times.watch { prover.prove(expr) }
-      result match
-        case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
-        case Left(trace) => 
-          println("✗ Failed to prove")
-          if (input == "A ∨ B → A" || input == "A ∨ (A → ⊥)") {
-            println("Failure Reason:")
-            println(trace.format(1))
-          }
-    } catch {
-      case e: Exception => println(s"Error parsing/proving '$input': ${e.getMessage}")
-    }
+    val expr = TestParser.parse(input)
+    val prover = new Prover(classical = false)
+    prover.prove(expr) match
+      case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
+      case Left(trace)  =>
+        println("✗ Failed to prove")
+        if (input == "A ∨ B → A" || input == "A ∨ (A → ⊥)") {
+          println("Failure Reason:")
+          println(trace.format(1))
+        }
   }
 
   println("\n=== Classical Logic Tests ===")
   classicalCases.foreach { input =>
     println(s"\n[Test Case] $input")
-    try {
-      val expr = TestParser.parse(input)
-      val prover = new Prover(classical = true)
-      val result = romanesco.Utils.times.watch { prover.prove(expr) }
-      result match
-        case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
-        case Left(trace) => println("✗ Failed to prove")
-    } catch {
-      case e: Exception => println(s"Error parsing/proving '$input': ${e.getMessage}")
-    }
+    val expr = TestParser.parse(input)
+    val prover = new Prover(classical = true)
+    prover.prove(expr) match
+      case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
+      case Left(trace)  => println("✗ Failed to prove")
   }
 
   println("\n=== Categorical Equational Tests ===")
   categoricalCases.foreach { input =>
     println(s"\n[Test Case] $input")
+    val expr = TestParser.parse(input)
+    val prover = new Prover(classical = false)
+    prover.prove(expr) match
+      case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
+      case Left(trace)  => println("✗ Failed to prove")
+  }
+
+  println("\n=== Higher-Order Logic Tests ===")
+  higherOrderCases.foreach { input =>
+    println(s"\n[Test Case] $input")
     try {
       val expr = TestParser.parse(input)
       val prover = new Prover(classical = false)
-      val result = romanesco.Utils.times.watch { prover.prove(expr) }
+      val result = prover.prove(expr)
       result match
-        case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
-        case Left(trace) => 
+        case Right(proof) =>
+          println(s"✓ Solved in ${proof.length} steps")
+          proof.zipWithIndex.foreach { case (step, i) =>
+            println(s"  ${i + 1}. $step")
+          }
+        case Left(trace) =>
           println("✗ Failed to prove")
           println(trace.format(1))
     } catch {
-      case e: Exception => println(s"Error parsing/proving '$input': ${e.getMessage}")
+      case e: Exception => println(s"Error: ${e.getMessage}")
     }
   }
 }

@@ -11,6 +11,7 @@ object LogicSymbols {
   val Implies = "→"
   val Forall = "∀"
   val Exists = "∃"
+  val Lambda = "λ"
   val Eq = "="
   val True = "⊤"
   val False = "⊥"

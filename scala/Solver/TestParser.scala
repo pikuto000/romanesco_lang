@@ -1,6 +1,6 @@
 // ==========================================
 // TestParser.scala
-// テスト用の簡易パーサー（数字の扱いを修正）
+// テスト用の簡易パーサー（Appラムダ対応）
 // ==========================================
 
 package romanesco.Solver
@@ -18,38 +18,31 @@ object TestParser:
     parseExpr(tokens)._1
 
   private def tokenize(s: String): List[String] =
-    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', '⇒', '⊃', '×', '⊥', '⊤', '∘')
-    // 0 と 1 は単独なら記号、名前に含まれるなら名前の一部とする
+    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', '⇒', '⊃', '×', '⊥', '⊤', '∘', 'λ')
     val terminalSymbols = Set('0', '1')
-    
     val sb = new StringBuilder
     val tokens = mutable.ListBuffer.empty[String]
-    
     def flush(): Unit = if (sb.nonEmpty) { tokens += sb.toString; sb.clear() }
-
     for (c <- s) {
-      if (symbols.contains(c)) {
-        flush(); tokens += c.toString
-      } else if (terminalSymbols.contains(c)) {
-        // 前に文字があれば名前の一部、なければ単独の記号（とりあえず名前の一部としてsbに入れ、後で判断する）
-        sb.append(c)
-      } else if (c.isWhitespace) {
-        flush()
-      } else {
-        sb.append(c)
-      }
+      if (symbols.contains(c)) { flush(); tokens += c.toString }
+      else if (terminalSymbols.contains(c)) { sb.append(c) }
+      else if (c.isWhitespace) { flush() }
+      else { sb.append(c) }
     }
     flush()
-    
-    // 単独の "0", "1" を記号に変換
     tokens.toList.map {
-      case "0" => Initial
-      case "1" => Terminal
-      case other => other
+      case "0" => Initial; case "1" => Terminal; case other => other
     }
 
   private def parseExpr(tokens: List[String]): (Expr, List[String]) =
-    parseImplication(tokens)
+    parseLambda(tokens)
+
+  private def parseLambda(tokens: List[String]): (Expr, List[String]) =
+    tokens match
+      case ("λ" | "lambda") :: varName :: "." :: rest =>
+        val (body, rest2) = parseLambda(rest)
+        (Expr.App(Expr.Sym("λ"), List(Expr.Var(varName), body)), rest2)
+      case _ => parseImplication(tokens)
 
   private def parseImplication(tokens: List[String]): (Expr, List[String]) =
     val (left, rest1) = parseOr(tokens)

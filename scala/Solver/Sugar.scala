@@ -6,6 +6,7 @@
 package romanesco.Solver.sugar
 
 import romanesco.Solver.core._
+import romanesco.Solver.core.LogicSymbols._
 
 object ExprBuilder:
   import Expr._
@@ -21,6 +22,10 @@ object ExprBuilder:
   val ⊥ = sym("⊥")
   val `1` = sym("1")
   val `0` = sym("0")
+
+  // ラムダ抽象 sugar (Appベース)
+  def lam(v: String, body: Expr): Expr =
+    Expr.App(Expr.Sym("λ"), List(Expr.Var(v), body))
 
   // 中置演算子
   extension (e: Expr)
@@ -106,7 +111,9 @@ object ProofDSL:
       steps = steps :+ Common.intro(name, subst)
       this
 
-    def elim(name: String)(using subst: Map[MetaId, Expr] = Map.empty): this.type =
+    def elim(name: String)(using
+        subst: Map[MetaId, Expr] = Map.empty
+    ): this.type =
       steps = steps :+ Common.elim(name, subst)
       this
 

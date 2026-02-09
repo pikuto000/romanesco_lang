@@ -1,6 +1,6 @@
 // ==========================================
 // Prover.scala
-// 証明探索エンジン（失敗トレース対応）
+// 証明探索エンジン（Appラムダ対応）
 // ==========================================
 
 package romanesco.Solver.core
@@ -29,10 +29,6 @@ final class Prover(val classical: Boolean = false) {
 
   type Context = List[(String, Expr)]
 
-  /**
-   * 与えられた目標(goal)を証明します。
-   * 成功した場合は Right(Proof) を、失敗した場合は Left(FailTrace) を返します。
-   */
   def prove(
       goal: Expr,
       rules: List[CatRule] = StandardRules.all,
@@ -70,7 +66,7 @@ final class Prover(val classical: Boolean = false) {
       recordFail(currentGoalObj, s"Depth limit reached ($limit)", depth)
       LazyList.empty
     else if visited.contains((currentGoal, contextExprs)) then
-      recordFail(currentGoalObj, "Cycle detected (already visited this state)", depth)
+      recordFail(currentGoalObj, "Cycle detected", depth)
       LazyList.empty
     else
       val nextVisited = visited + ((currentGoal, contextExprs))
@@ -85,11 +81,9 @@ final class Prover(val classical: Boolean = false) {
         searchClassical(currentGoal, rules, context, subst, depth, limit, nextVisited, raaCount)
 
       if (results.isEmpty) {
-        recordFail(currentGoalObj, "No rules or axioms applicable to this goal", depth)
+        recordFail(currentGoalObj, "No rules applicable", depth)
       }
       results
-
-  // --- 各探索フェーズ ---
 
   private def searchAxiom(goal: Expr, context: Context, subst: Subst, depth: Int): LazyList[(Proof, Subst)] =
     context.view.to(LazyList).flatMap { case (name, hyp) =>
@@ -122,10 +116,16 @@ final class Prover(val classical: Boolean = false) {
           .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.expUniversal, s), s) }
 
       case Expr.App(Expr.Sym(Forall), List(Expr.Var(v), body)) =>
-        val freshVar = s"${v}_$depth"
-        val instantiated = Prover.substVar(body, v, Expr.Var(freshVar))
-        search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount)
-          .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.forallCounit, s), s) }
+        if (v.nonEmpty && v(0).isUpper) then
+          val m = freshMeta(depth)
+          val instantiated = Prover.substVar(body, v, m)
+          search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount)
+            .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.forallCounit, s), s) }
+        else
+          val freshVar = s"${v}_$depth"
+          val instantiated = Prover.substVar(body, v, Expr.Var(freshVar))
+          search(instantiated, rules, context, subst, depth + 1, limit, visited, raaCount)
+            .map { case (proof, s) => (proof :+ ProofStep.Apply(StandardRules.forallCounit, s), s) }
 
       case Expr.App(Expr.Sym(Exists), List(Expr.Var(v), body)) =>
         val witness = freshMeta(depth)
@@ -150,8 +150,8 @@ final class Prover(val classical: Boolean = false) {
   ): LazyList[(Proof, Subst)] =
     context.zipWithIndex.view.to(LazyList).flatMap {
       case ((name, Expr.App(Expr.Sym(Exists), List(Expr.Var(v), body))), i) =>
-        val witness = freshMeta(depth)
-        val instantiated = Prover.substVar(body, v, witness)
+        val freshVar = s"${v}_${depth}_sk"
+        val instantiated = Prover.substVar(body, v, Expr.Var(freshVar))
         val newCtx = context.patch(i, List((s"${name}.witness", instantiated)), 1)
         search(goal, rules, newCtx, subst, depth + 1, limit, visited, raaCount)
       
@@ -273,7 +273,12 @@ object Prover {
   def substVar(expr: Expr, varName: String, replacement: Expr): Expr =
     expr match
       case Expr.Var(n) if n == varName => replacement
-      case Expr.App(h, args)           => Expr.App(substVar(h, varName, replacement), args.map(substVar(_, varName, replacement)))
+      case Expr.Sym(n) if n == varName => replacement
+      case Expr.App(h, args) =>
+        expr match
+          case Expr.Lam(v, body) if v == varName => expr
+          case Expr.Lam(v, body) => Expr.App(Expr.Sym("λ"), List(Expr.Var(v), substVar(body, varName, replacement)))
+          case _ => Expr.App(substVar(h, varName, replacement), args.map(substVar(_, varName, replacement)))
       case _ => expr
 
   /** 等式による書き換え */
@@ -283,15 +288,14 @@ object Prover {
       case Expr.App(h, args) => Expr.App(rewriteExpr(h, from, to), args.map(rewriteExpr(_, from, to)))
       case _ => expr
 
-  /** ルールのインスタンス化（メタ変数の割り当て） */
+  /** ルールのインスタンス化 */
   def instantiate(rule: CatRule, freshMeta: () => Expr): (CatRule, Map[MetaId, Expr]) =
     val vars = collectVars(rule.lhs) ++ collectVars(rule.rhs) ++ rule.universals.flatMap(collectVars)
     val substMap = vars.map(v => v -> freshMeta()).toMap
     
-    // 代入マップを Map[MetaId, Expr] に変換
-    val metaSubstMap: Subst = substMap.map { 
-      case (name, Expr.Meta(id)) => id -> Expr.Meta(id) 
-      case _ => throw new Exception("Unexpected expression in instantiate")
+    val metaSubstMap: Subst = substMap.flatMap { 
+      case (name, Expr.Meta(id)) => Some(id -> Expr.Meta(id))
+      case _ => None
     }
 
     val instLhs = applyVarSubst(rule.lhs, substMap)
@@ -301,11 +305,17 @@ object Prover {
 
   private def collectVars(e: Expr): Set[String] = e match
     case Expr.Var(n)       => Set(n)
-    case Expr.App(h, args) => collectVars(h) ++ args.flatMap(collectVars)
+    case Expr.App(h, args) => 
+      e match
+        case Expr.Lam(v, body) => collectVars(body) - v
+        case _ => collectVars(h) ++ args.flatMap(collectVars)
     case _                 => Set.empty
 
   private def applyVarSubst(e: Expr, s: Map[String, Expr]): Expr = e match
     case Expr.Var(n) if s.contains(n) => s(n)
-    case Expr.App(h, args)            => Expr.App(applyVarSubst(h, s), args.map(applyVarSubst(_, s)))
+    case Expr.App(h, args) => 
+      e match
+        case Expr.Lam(v, body) => Expr.App(Expr.Sym("λ"), List(Expr.Var(v), applyVarSubst(body, s)))
+        case _ => Expr.App(applyVarSubst(h, s), args.map(applyVarSubst(_, s)))
     case _ => e
 }
