@@ -65,13 +65,14 @@ def processInput(input: String, classical: Boolean = false): Unit =
 
     val prover = new Prover(classical = classical)
     prover.prove(expr) match
-      case Some(proof) =>
+      case Right(proof) =>
         println(s"✓ Proof found (${proof.length} steps):")
         proof.zipWithIndex.foreach { case (step, i) =>
           println(s"  ${i + 1}. $step")
         }
-      case None =>
-        println("✗ No proof found")
+      case Left(trace) =>
+        println("✗ No proof found. Failure trace:")
+        println(trace.format())
   catch case e: Exception => println(s"Error: ${e.getMessage}")
 
 @main def testSomeCases = {
@@ -84,7 +85,8 @@ def processInput(input: String, classical: Boolean = false): Unit =
     "(A ∧ B → C) → (A → (B → C))",
     "a = b ∧ b = c → a = c",
     "(((A → ⊥) → ⊥) → ⊥) → (A → ⊥)",
-    "A ∨ (A → ⊥)" // Should fail in intuitionistic
+    "A ∨ (A → ⊥)", // Should fail
+    "A ∨ B → A"    // Should fail
   )
 
   val classicalCases = List(
@@ -102,8 +104,13 @@ def processInput(input: String, classical: Boolean = false): Unit =
       val prover = new Prover(classical = false)
       val result = romanesco.Utils.times.watch { prover.prove(expr) }
       result match
-        case Some(proof) => println(s"✓ Solved in ${proof.length} steps")
-        case None => println("✗ Failed to prove (as expected for intuitionistic)")
+        case Right(proof) => println(s"✓ Solved in ${proof.length} steps")
+        case Left(trace) => 
+          println("✗ Failed to prove")
+          if (input == "A ∨ B → A" || input == "A ∨ (A → ⊥)") {
+            println("Failure Reason:")
+            println(trace.format(1))
+          }
     } catch {
       case e: Exception => println(s"Error parsing/proving '$input': ${e.getMessage}")
     }
@@ -117,10 +124,12 @@ def processInput(input: String, classical: Boolean = false): Unit =
       val prover = new Prover(classical = true)
       val result = romanesco.Utils.times.watch { prover.prove(expr) }
       result match
-        case Some(proof) => 
+        case Right(proof) => 
           println(s"✓ Solved in ${proof.length} steps")
-          proof.zipWithIndex.foreach { case (step, i) => println(s"  ${i + 1}. $step") }
-        case None => println("✗ Failed to prove")
+          // proof.zipWithIndex.foreach { case (step, i) => println(s"  ${i + 1}. $step") }
+        case Left(trace) => 
+          println("✗ Failed to prove")
+          println(trace.format())
     } catch {
       case e: Exception => println(s"Error parsing/proving '$input': ${e.getMessage}")
     }

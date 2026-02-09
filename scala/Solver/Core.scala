@@ -74,6 +74,21 @@ enum ProofStep:
 
 type Proof = List[ProofStep]
 
+/**
+ * 証明の失敗トレース
+ */
+case class FailTrace(
+    goal: Goal,
+    reason: String,
+    depth: Int,
+    children: List[FailTrace] = Nil
+):
+  def format(indent: Int = 0): String =
+    val sp = "  " * indent
+    val base = s"$sp- [Depth $depth] Goal: ${goal.target}\n$sp  Reason: $reason"
+    if children.isEmpty then base
+    else s"$base\n${children.map(_.format(indent + 1)).mkString("\n")}"
+
 // --- タクティクスシステム用の定義 ---
 
 /**
