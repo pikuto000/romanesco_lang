@@ -113,7 +113,8 @@ def processInput(input: String, classical: Boolean = false): Unit =
     "∀P. (P(a) → ∃x. P(x))",
     "∀P. ((∀x. P(x)) → (∀x. P(x)))",
     "∀P. ∀Q. ((∀x. (P(x) ∧ Q(x))) → ((∀x. P(x)) ∧ (∀x. Q(x))))",
-    "∀P. ∀Q. ((∀x. (P(x) → Q(x))) → ((∃x. P(x)) → (∃x. Q(x))))"
+    "∀P. ∀Q. ((∀x. (P(x) → Q(x))) → ((∃x. P(x)) → (∃x. Q(x))))",
+    "∀x. ∀y. ((∀P. (P(x) → P(y))) → (∀Q. (Q(y) → Q(x))))" // Leibniz Equality Symmetry
   )
 
   println("=== Intuitionistic Logic Tests ===")
