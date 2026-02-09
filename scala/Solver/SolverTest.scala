@@ -77,8 +77,8 @@ def processInput(input: String, classical: Boolean = false): Unit =
   catch case e: Exception => println(s"Error: ${e.getMessage}")
 
 @main def testSomeCases = {
-  logger.switch(true)
-  /*
+  logger.switch(false)
+
   val intuitionisticCases = List(
     "A → A",
     "A ∧ B → B ∧ A",
@@ -114,12 +114,10 @@ def processInput(input: String, classical: Boolean = false): Unit =
     "∀P. ∀Q. ((∀x. (P(x) → Q(x))) → ((∃x. P(x)) → (∃x. Q(x))))",
     "∀x. ∀y. ((∀P. (P(x) → P(y))) → (∀Q. (Q(y) → Q(x))))" // Leibniz Equality Symmetry
   )
-   */
   val autoInductionCases = List(
     "∀n. plus(n, 0) = n",
     "∀xs. append(xs, nil) = xs"
   )
-  /*
   println("=== Intuitionistic Logic Tests ===")
   intuitionisticCases.foreach { input =>
     println(s"\n[Test Case] $input")
@@ -172,7 +170,6 @@ def processInput(input: String, classical: Boolean = false): Unit =
       case e: Exception => println(s"Error: ${e.getMessage}")
     }
   }
-   */
   println("\n=== Automatic Induction Tests ===")
   autoInductionCases.foreach { input =>
     println(s"\n[Test Case] $input")
