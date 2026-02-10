@@ -12,10 +12,10 @@ import romanesco.Utils.Debug.logger
   val allRules = StandardRules.all ++ linearRules
 
   val testCases = List(
-    "A ⊸ B",           // Linear Implication
-    "A ⊗ B",           // Tensor
-    "!A → A",          // Bang elimination
-    "A ⊗ B → A ∧ B"    // Tensor to Product mapping
+    "A ⊸ B", // Linear Implication
+    "A ⊗ B", // Tensor
+    "!A → A", // Bang elimination
+    "A ⊗ B → A ∧ B" // Tensor to Product mapping
   )
 
   val config = ProverConfig(classical = false, rules = allRules)
