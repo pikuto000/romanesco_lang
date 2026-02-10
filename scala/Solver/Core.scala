@@ -5,9 +5,8 @@
 
 package romanesco.Solver.core
 
-/**
- * メタ変数のユニークな識別子
- */
+/** メタ変数のユニークな識別子
+  */
 case class MetaId(ids: List[Int]) {
   override def toString: String = ids.mkString(".")
 }
@@ -16,13 +15,12 @@ object MetaId {
   def apply(id: Int): MetaId = MetaId(List(id))
 }
 
-/**
- * 論理式を表現する抽象構文木
- */
+/** 論理式を表現する抽象構文木
+  */
 enum Expr:
-  case Var(name: String)    // 束縛変数 / 個体変数
-  case Meta(id: MetaId)     // メタ変数
-  case Sym(name: String)    // 定数
+  case Var(name: String) // 束縛変数 / 個体変数
+  case Meta(id: MetaId) // メタ変数
+  case Sym(name: String) // 定数
   case App(f: Expr, args: List[Expr])
 
   def apply(args: Expr*): Expr = App(this, args.toList)
@@ -36,20 +34,20 @@ enum Expr:
     case App(h, _)      => h.headSymbol
 
   override def toString: String = this match
-    case Var(n)                         => n
-    case Meta(id)                       => s"?$id"
-    case Sym(n)                         => n
+    case Var(n)                                   => n
+    case Meta(id)                                 => s"?$id"
+    case Sym(n)                                   => n
     case App(Expr.Sym("λ"), List(Expr.Var(v), b)) => s"λ$v. $b"
-    case App(Expr.Sym("="), List(l, r)) => s"$l = $r"
-    case App(h, args)                   =>
+    case App(Expr.Sym("="), List(l, r))           => s"$l = $r"
+    case App(h, args)                             =>
       if args.isEmpty then h.toString
       else s"$h(${args.mkString(",")})"
 
   /** 式の複雑さ（ヒューリスティック用スコア） */
   def complexity: Int = this match
-    case Var(_)    => 1
-    case Meta(_)   => 1
-    case Sym(_)    => 1
+    case Var(_)     => 1
+    case Meta(_)    => 1
+    case Sym(_)     => 1
     case App(f, as) => f.complexity + as.map(_.complexity).sum + 1
 
 object Expr:
@@ -66,11 +64,10 @@ object Expr:
   object Lam:
     def unapply(e: Expr): Option[(String, Expr)] = e match
       case App(Sym("λ"), List(Var(v), body)) => Some((v, body))
-      case _ => None
+      case _                                 => None
 
-/**
- * 圏論得推論規則
- */
+/** 圏論得推論規則
+  */
 case class CatRule(
     name: String,
     lhs: Expr,
@@ -83,9 +80,8 @@ case class CatRule(
       else s" where ${universals.mkString(", ")}"
     s"$name: $lhs ⟹ $rhs$cond"
 
-/**
- * 証明のツリー構造
- */
+/** 証明のツリー構造
+  */
 enum ProofTree:
   case Node(goal: Expr, ruleName: String, children: List[ProofTree])
   case Leaf(goal: Expr, ruleName: String)
@@ -93,16 +89,61 @@ enum ProofTree:
   def format(indent: Int = 0): String =
     val sp = "  " * indent
     this match
-      case Leaf(g, r) => s"$sp✓ $g  {$r}"
+      case Leaf(g, r)     => s"$sp✓ $g  {$r}"
       case Node(g, r, cs) =>
         val childrenStr = cs.map(_.format(indent + 1)).mkString("\n")
         s"$childrenStr\n$sp└─ $g  {$r}"
 
 type Proof = ProofTree
 
-/**
- * 証明の失敗トレース
- */
+/** コンストラクタの引数定義
+  */
+enum ArgType:
+  case Recursive
+  case Constant
+
+/** 代数の構造定義 */
+case class ConstructorDef(symbol: String, argTypes: List[ArgType])
+case class InitialAlgebra(
+    name: String,
+    constructors: List[ConstructorDef],
+    varPrefix: String
+)
+
+/** Lemma生成の制御モード
+  */
+enum LemmaGenerationMode:
+  case All // 全ての成功したゴールから生成
+  case InductionOnly // 帰納法が成功した時のみ生成
+  case EqualityOnly // 等式のみ生成
+  case ManualOnly // ユーザーが明示的にフラグを立てた時のみ（未実装）
+
+/** 証明エンジンの設定
+  */
+case class ProverConfig(
+    classical: Boolean = false,
+    rules: List[CatRule] = Nil,
+    algebras: List[InitialAlgebra] = Nil,
+    maxRaa: Int = 2,
+    maxInduction: Int = 2,
+    generateLemmas: Boolean = true,
+    lemmaMode: LemmaGenerationMode = LemmaGenerationMode.EqualityOnly,
+    excludeTrivialLemmas: Boolean = true
+)
+
+object ProverConfig {
+  def default: ProverConfig = ProverConfig()
+}
+
+/** 証明結果
+  */
+case class ProofResult(
+    tree: ProofTree,
+    generatedLemma: Option[CatRule] = None
+)
+
+/** 証明の失敗トレース
+  */
 case class FailTrace(
     goal: Goal,
     reason: String,
@@ -113,24 +154,25 @@ case class FailTrace(
   def format(indent: Int = 0): String =
     val sp = "  " * indent
     val typeMark = if failureType == "Normal" then "✗" else s"[$failureType]"
-    val base = s"$sp$typeMark (Depth $depth) Goal: ${goal.target}\n$sp  Reason: $reason"
+    val base =
+      s"$sp$typeMark (Depth $depth) Goal: ${goal.target}\n$sp  Reason: $reason"
     if children.isEmpty then base
     else s"$base\n${children.map(_.format(indent + 1)).mkString("\n")}"
 
 // --- タクティクスシステム用の定義 ---
 
 case class Goal(
-    context: List[(String, Expr)], 
-    target: Expr                   
+    context: List[(String, Expr)],
+    target: Expr
 ):
   override def toString: String =
     val ctx = context.map((n, e) => s"  $n: $e").mkString("\n")
     s"--------------------------------\n$ctx\n--------------------------------\n  Goal: $target"
 
 case class ProofState(
-    goals: List[Goal],             
-    completedProofs: List[Proof],  
-    originalGoal: Expr             
+    goals: List[Goal],
+    completedProofs: List[Proof],
+    originalGoal: Expr
 ):
   def isSolved: Boolean = goals.isEmpty
   def currentGoal: Option[Goal] = goals.headOption

@@ -170,11 +170,13 @@ def processInput(input: String, classical: Boolean = false): Unit =
       val rules =
         if (input.contains("m, n")) StandardRules.all ++ lemmas
         else StandardRules.all
-      val prover = new Prover(classical = false)
-      val result = prover.prove(expr, rules = rules)
+      val config = ProverConfig(classical = false, rules = rules)
+      val prover = new Prover(config)
+      val result = prover.prove(expr)
       result match
-        case Right(tree) =>
-          println(s"✓ Solved:\n${tree.format(1)}")
+        case Right(res) =>
+          println(s"✓ Solved:\n${res.tree.format(1)}")
+          res.generatedLemma.foreach(l => println(s"  Generated Lemma: $l"))
         case Left(trace) =>
           println("✗ Failed to prove")
           println(trace.format(1))

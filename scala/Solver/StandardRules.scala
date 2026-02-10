@@ -226,6 +226,97 @@ object StandardRules:
   val logicMapping =
     List(andIsProd, orIsCoprod, arrowIsExp, trueIsTerminal, falseIsInitial)
 
+  // --- モーダル論理 ---
+  import LogicSymbols._
+  val modalK = CatRule(
+    "modal-K",
+    sym(Box)(sym("→")(v("A"), v("B"))),
+    sym("→")(sym(Box)(v("A")), sym(Box)(v("B")))
+  )
+
+  val modalT = CatRule(
+    "modal-T",
+    sym(Box)(v("A")),
+    v("A")
+  )
+
+  val modal4 = CatRule(
+    "modal-4",
+    sym(Box)(v("A")),
+    sym(Box)(sym(Box)(v("A")))
+  )
+
+  val modal5 = CatRule(
+    "modal-5",
+    sym(Diamond)(v("A")),
+    sym(Box)(sym(Diamond)(v("A")))
+  )
+
+  val modalDuality = CatRule(
+    "modal-duality",
+    sym(Diamond)(v("A")),
+    sym("→")(sym(Box)(sym("→")(v("A"), sym("⊥"))), sym("⊥"))
+  )
+
+  val modal = List(modalK, modalT, modal4, modal5, modalDuality)
+
+  // --- 線形論理 ---
+  val linearImplies = CatRule(
+    "linear-implies-beta",
+    sym(LImplies)(v("A"), v("B")),
+    sym("→")(v("A"), v("B")) // 簡易的なマッピング
+  )
+
+  val tensorUniversal = CatRule(
+    "tensor-universal",
+    sym(Tensor)(v("A"), v("B")),
+    sym(Product)(v("A"), v("B")) // Tensor ⊗ を Product × にマッピング
+  )
+
+  val linearBang = CatRule(
+    "linear-bang-elim",
+    sym(Bang)(v("A")),
+    v("A")
+  )
+
+  val linear = List(linearImplies, tensorUniversal, linearBang)
+
+  // --- 時相論理 ---
+  val temporalG = CatRule(
+    "G-expansion",
+    sym(Globally)(v("A")),
+    sym(And)(v("A"), sym(Next)(sym(Globally)(v("A"))))
+  )
+
+  val temporalF = CatRule(
+    "F-expansion",
+    sym(Finally)(v("A")),
+    sym(Or)(v("A"), sym(Next)(sym(Finally)(v("A"))))
+  )
+
+  val temporalU = CatRule(
+    "U-expansion",
+    sym(Until)(v("A"), v("B")),
+    sym(Or)(v("B"), sym(And)(v("A"), sym(Next)(sym(Until)(v("A"), v("B")))))
+  )
+
+  val temporal = List(temporalG, temporalF, temporalU)
+
+  // --- 分離論理 ---
+  val sepAndCommutative = CatRule(
+    "sep-and-comm",
+    sym(SepAnd)(v("A"), v("B")),
+    sym(SepAnd)(v("B"), v("A"))
+  )
+
+  val sepAndToAnd = CatRule(
+    "sep-and-to-and",
+    sym(SepAnd)(v("A"), v("B")),
+    sym(And)(v("A"), v("B")) // 簡易的なマッピング
+  )
+
+  val separation = List(sepAndCommutative, sepAndToAnd)
+
   // --- 古典論理 ---
   val em = CatRule(
     "EM",
@@ -240,3 +331,11 @@ object StandardRules:
   )
 
   val classical = List(em, dne)
+
+  // --- 標準の初期代数 ---
+  import LogicSymbols._
+  val defaultAlgebras = List(
+    InitialAlgebra("Nat", List(ConstructorDef(Zero, Nil), ConstructorDef(Succ, List(ArgType.Recursive))), "n"),
+    InitialAlgebra("List", List(ConstructorDef("nil", Nil), ConstructorDef("cons", List(ArgType.Constant, ArgType.Recursive))), "xs"),
+    InitialAlgebra("Tree", List(ConstructorDef("leaf", Nil), ConstructorDef("node", List(ArgType.Recursive, ArgType.Constant, ArgType.Recursive))), "t")
+  )

@@ -1,27 +1,27 @@
 現在のTODOリスト（新しく生まれたもの中心・優先度順）
 
 【★ 高優先：すぐに実装すると全体の使い勝手が劇的に向上】
-- ProofResult を導入し、prove() の返り値に ProofTree + generatedLemma（Option[CatRule]）を含める
-- ProverConfig を新設し、algebras / extraRules / initialLemmas を外部から注入可能にする（Prover本体から初期代数・規則・lemmaを切り離す）
-- generateLemma 関数を実装（goal → proved の形から CatRule を生成、universals を自動抽出）
+- [DONE] ProofResult を導入し、prove() の返り値に ProofTree + generatedLemma（Option[CatRule]）を含める
+- [DONE] ProverConfig を新設し、algebras / extraRules / initialLemmas を外部から注入可能にする（Prover本体から初期代数・規則・lemmaを切り離す）
+- [DONE] generateLemma 関数を実装（goal → proved の形から CatRule を生成、universals を自動抽出）
 
 【★★ 中優先：lemmaの連鎖・再利用性を高める】
-- lemma生成条件の調整オプション（例: 等式のみ / induction成功時のみ / すべての成功goal / ユーザーフラグで制御）
-- lemmaの重複チェック（同じlhs/rhsのものが既にある場合はスキップ）
-- lemmaの保存・読み込み機能（JSONまたはテキストファイルでエクスポート/インポート対応）
-- lemma名の自動生成を改善（内容から意味のある名前を付ける、例: "lemma_map_fusion_xs" など）
+- [DONE] lemma生成条件の調整オプション（例: 等式のみ / induction成功時のみ / すべての成功goal / ユーザーフラグで制御）
+- [DONE] lemmaの重複チェック（同じlhs/rhsのものが既にある場合はスキップ）
+- [DONE] lemmaの保存・読み込み機能（JSONまたはテキストファイルでエクスポート/インポート対応）
+- [DONE] lemma名の自動生成を改善（内容から意味のある名前を付ける、例: "lemma_map_fusion_xs" など）
 
 【★★★ 低優先：将来的に欲しいもの】
 - lemmaの使用履歴・優先度管理（どのlemmaがよく使われたか記録）
 - lemmaのスコープ/バージョン管理（セッションごと・プロジェクトごと）
-- lemma生成時の簡約形抽出（ProofTreeから最終的な正規形をrhsに設定）
+- [DONE] lemma生成時の簡約形抽出（ProofTreeから最終的な正規形をrhsに設定）
 - lemmaの自動分類・タグ付け（例: "fusion", "induction", "high-order" などのタグ付け）
 
 【★★★★ 新規追加：特殊論理対応】
-- Modal logic の基本演算子（□, ◇, K, O など）を Sym で追加し、Kripkeフレーム風の規則を定義可能にする
-- Linear logic の演算子（⊸, !, ?, ⊗ など）を Sym で表現し、リソース消費・線形含意をunifyで追跡できるようにする
-- Temporal logic の演算子（G, F, X, U など）を Sym で追加し、時間的性質（常に・いつか・次に）を扱える規則を追加
-- Separation logic の演算子（*, ↦, frame rule など）を Sym で表現し、メモリ領域分離・所有権を証明できるようにする
+- [DONE] Modal logic の基本演算子（□, ◇, K, O など）を Sym で追加し、Kripkeフレーム風の規則を定義可能にする
+- [DONE] Linear logic の演算子（⊸, !, ?, ⊗ など）を Sym で表現し、リソース消費・線形含意をunifyで追跡できるようにする
+- [DONE] Temporal logic の演算子（G, F, X, U など）を Sym で追加し、時間的性質（常に・いつか・次に）を扱える規則を追加
+- [DONE] Separation logic の演算子（*, ↦, frame rule など）を Sym で表現し、メモリ領域分離・所有権を証明できるようにする
 
 これで一旦、現在の「生まれたTODO」はこの形です。
 特に最後の特殊論理対応は、システムプログラミングを視野に入れた新しい方向性として追加されています。

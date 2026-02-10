@@ -35,12 +35,13 @@ import romanesco.Utils.Debug.logger
   println(s"Goal: $goalStr")
   val goal = TestParser.parse(goalStr)
 
-  val prover = new Prover(maxInduction = 2)
+  val config = ProverConfig(classical = false, rules = allRules)
+  val prover = new Prover(config)
 
   prover.prove(goal, rules = allRules) match {
-    case Right(tree) =>
+    case Right(res) =>
       println("✓ Proof found:")
-      println(tree.format(1))
+      println(res.tree.format(1))
     case Left(trace) =>
       println("✗ No proof found. Failure trace:")
       println(trace.format())

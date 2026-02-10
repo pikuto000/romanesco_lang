@@ -36,6 +36,33 @@ object LogicSymbols {
   // 自然数 (Natural Numbers)
   val Zero = "0"
   val Succ = "S"
+
+  // モーダル論理 (Modal Logic)
+  val Box = "□"
+  val Diamond = "◇"
+  val Knowledge = "K"
+  val Obligation = "O"
+
+  // 線形論理 (Linear Logic)
+  val LImplies = "⊸"
+  val Bang = "!"
+  val Question = "?"
+  val Tensor = "⊗"
+  val LPlus = "⊕"
+  val LOne = "1"
+  val LZero = "0"
+  val LTop = "⊤"
+  val LWith = "&"
+
+  // 時相論理 (Temporal Logic)
+  val Globally = "G"
+  val Finally = "F"
+  val Next = "X"
+  val Until = "U"
+
+  // 分離論理 (Separation Logic)
+  val SepAnd = "*"
+  val PointsTo = "↦"
   
   // その他の表記揺れ
   val ImpliesAlt1 = "⊃"

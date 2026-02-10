@@ -12,6 +12,8 @@ import scala.io.StdIn
 
 object Repl:
   private var history: List[ProofState] = Nil
+  private var loadedLemmas: List[CatRule] = Nil
+  private var sessionLemmas: List[CatRule] = Nil
 
   def main(args: Array[String]): Unit =
     println("=== Romanesco Interactive Tactic Shell ===")
@@ -95,19 +97,38 @@ object Repl:
       case "exact" :: name :: Nil => Tactics.exact(s, name)
       case "assumption" :: Nil => Tactics.assumption(s)
       case "auto" :: Nil => 
-        val prover = new Prover()
+        val prover = new Prover(ProverConfig(rules = StandardRules.all ++ loadedLemmas ++ sessionLemmas))
         s.currentGoal match {
           case Some(g) => 
-            prover.prove(g.target, rules = StandardRules.all) match {
-              case Right(tree) => 
+            prover.prove(g.target) match {
+              case Right(result) => 
                 println("✓ Auto solved the goal!")
-                Right(s.copy(goals = s.goals.tail, completedProofs = tree :: s.completedProofs))
+                result.generatedLemma.foreach { lemma =>
+                   println(s"  Generated Lemma: $lemma")
+                   sessionLemmas = sessionLemmas :+ lemma
+                }
+                Right(s.copy(goals = s.goals.tail, completedProofs = result.tree :: s.completedProofs))
               case Left(fail) => 
                 println(s"✗ Auto failed: ${fail.reason}")
                 Left("Auto could not solve the goal.")
             }
           case None => Left("No active goal.")
         }
+      case "save" :: filename :: Nil =>
+        LemmaManager.saveLemmas(filename, sessionLemmas)
+        println(s"Saved ${sessionLemmas.size} session lemmas to $filename")
+        Right(s)
+      case "load" :: filename :: Nil =>
+        val newLemmas = LemmaManager.loadLemmas(filename)
+        loadedLemmas = loadedLemmas ++ newLemmas
+        println(s"Loaded ${newLemmas.size} lemmas from $filename")
+        Right(s)
+      case "lemmas" :: Nil =>
+        println("\n--- Loaded Lemmas ---")
+        loadedLemmas.foreach(println)
+        println("\n--- Session Lemmas ---")
+        sessionLemmas.foreach(println)
+        Right(s)
       case _ => Left(s"Unknown tactic or invalid arguments: $input")
 
   def showGeneralHelp(): Unit =
@@ -131,6 +152,9 @@ Tactics:
   exact <hyp>     - Solve goal by exact match with hypothesis
   assumption      - Try to solve goal using any hypothesis
   auto            - Automatically prove the current subgoal
+  lemmas          - List loaded and session lemmas
+  save <file>     - Save session lemmas to file
+  load <file>     - Load lemmas from file
   undo            - Undo the last tactic
   abort           - Abort the current proof
     """)
