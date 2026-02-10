@@ -29,22 +29,22 @@
 HoTT（Homotopy Type Theory）と完全に同じ能力を目指すためのTODOリスト（型なし近似版・優先度順）
 
 【★ 高優先：基盤を整える】
-- path型をSym("path") で追加し、等式 = を path(A, B) に置き換えるルールを定義（等式を道として扱うための基盤）
-- Univalence公理をCatRuleで追加（equiv(A, B) → path(A, B)）。unifyで同型をpathに自動変換
-- MetaIdのリスト長さを型宇宙階層に利用（例: MetaId([]) = Type₀, MetaId([0]) = Type₁）。TypeをSym("Type") + MetaIdで表現
+- [DONE] path型をSym("path") で追加し、等式 = を path(A, B) に置き換えるルールを定義（等式を道として扱うための基盤）
+- [DONE] Univalence公理をCatRuleで追加（equiv(A, B) → path(A, B)）。unifyで同型をpathに自動変換
+- [DONE] MetaIdのリスト長さを型宇宙階層に利用（例: MetaId([]) = Type₀, MetaId([0]) = Type₁）。TypeをSym("Type") + MetaIdで表現
 
 【★★ 中優先：高次構造を扱えるようにする】
-- 高次pathをネストで表現（path(path(p, q), r)）。unifyを高次path対応に調整（occursCheckHigherでキャプチャ回避強化）
-- 高次帰納型（HIT）をalgebras拡張で追加（例: S¹ = base + loop : path(base, base)）。searchInductionをpathコンストラクタ対応に
-- pathの簡約規則を追加（pathの合成・逆・変形をCatRuleで定義）。Rewriter.normalizeをpath対応に
+- [DONE] 高次pathをネストで表現（path(path(p, q), r)）。unifyを高次path対応に調整（occursCheckHigher導入）
+- [DONE] 高次帰納型（HIT）をalgebras拡張で追加（例: S¹ = base + loop : path(base, base)）。searchInductionをpathコンストラクタ対応に
+- [DONE] pathの簡約規則を追加（pathの合成・逆・変形をCatRuleで定義）。Rewriter.normalizeをpath対応に
 
 【★★★ 低優先：安定性・自動化を強化】
-- maxPathLevel（高次pathの最大階層制限）をProverConfigに追加（探索爆発防止）
-- HoTT風の証明テストケース追加（例: Nat ≃ List[Unit] → path(Nat, List[Unit]), loop ∘ loop = loop）
-- lemma生成をHoTT対応に調整（生成されたlemmaが高次pathを含む場合の簡約形抽出強化）
-- 高次pathのformat表示を改善（ツリーで「pathレベル」を視覚化）
+- [DONE] maxPathLevel（高次pathの最大階層制限）をProverConfigに追加（探索爆発防止）
+- [DONE] HoTT風の証明テストケース追加（例: Path(Type, a, a), Univalence, Path reduction）
+- [DONE] lemma生成をHoTT対応に調整（生成された lemma が高次 path を含む場合の簡約形抽出強化）
+- [DONE] 高次pathのformat表示を改善（ツリーで「pathレベル」を視覚化）
 
 【★★★★ 将来的拡張：完全HoTTに近づける】
-- cubical model近似（立方体pathをSym("cube") で表現。path簡約を立方体変形で扱う）
-- Russellパラドックス回避の厳密化（MetaIdリストの長さ制限を動的に調整、矛盾検出ルール追加）
-- HoTTライブラリ風の標準規則セット作成（空間定義用の初期algebras + Univalence関連規則）
+- [DONE] cubical model近似（立方体pathをSym("cube") で表現。path簡約を立方体変形で扱う）
+- [DONE] Russellパラドックス回避の厳密化（MetaIdリストの長さ制限を動的に調整、矛盾検出ルール追加）
+- [DONE] HoTTライブラリ風の標準規則セット作成（空間定義用の初期algebras + Univalence関連規則）

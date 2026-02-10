@@ -55,9 +55,9 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       logger.log(s"--- Iterative Deepening: current limit = $d ---")
       metaCounter = 0
       failureCache.clear()
-      search(goal, effectiveRules, Nil, emptySubst, 0, d, Set.empty, 0, 0).map(
-        _._1
-      )
+      val proofs =
+        search(goal, effectiveRules, Nil, emptySubst, 0, d, Set.empty, 0, 0)
+      proofs.map(_._1)
     }.headOption
 
     result match {
@@ -78,7 +78,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
 
     // モードによるフィルタリング
     val modeOk = config.lemmaMode match {
-      case LemmaGenerationMode.All => true
+      case LemmaGenerationMode.All           => true
       case LemmaGenerationMode.InductionOnly =>
         def hasInduction(t: ProofTree): Boolean = t match {
           case ProofTree.Node(_, rule, cs) =>
@@ -88,8 +88,8 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
         hasInduction(tree)
       case LemmaGenerationMode.EqualityOnly =>
         provedGoal match {
-          case Expr.App(Expr.Sym(Eq), _) => true
-          case _                         => false
+          case Expr.App(Expr.Sym(Eq | Path), _) => true
+          case _                                => false
         }
       case LemmaGenerationMode.ManualOnly => false
     }
@@ -98,7 +98,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
 
     // 変数を収集して一般化するヘルパー
     def collectFreeVars(e: Expr): Set[String] = e match {
-      case Expr.Var(n) => Set(n)
+      case Expr.Var(n)       => Set(n)
       case Expr.App(h, args) =>
         val vars = args.flatMap(collectFreeVars).toSet
         h match {
@@ -111,7 +111,10 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
     // ProofTreeから簡約形を抽出するヘルパー
     def extractSimplifiedRhs(t: ProofTree, originalLhs: Expr): Expr = {
       t match {
-        case ProofTree.Leaf(Expr.App(Expr.Sym(Eq), List(l, r)), "reflexivity") =>
+        case ProofTree.Leaf(
+              Expr.App(Expr.Sym(Eq | Path), List(_, r)),
+              "reflexivity" | "path-reflexivity"
+            ) =>
           // reflexivity が使われた場合、その時の正規化された右辺（または左辺）が簡約形
           r
         case ProofTree.Node(_, _, children) if children.nonEmpty =>
@@ -121,33 +124,43 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
         case _ =>
           // 見つからなければ等式の右辺をそのまま使う
           originalLhs match {
-            case Expr.App(Expr.Sym(Eq), List(_, r)) => r
-            case _                                  => originalLhs
+            case Expr.App(Expr.Sym(Eq | Path), List(_, r)) => r
+            case _                                         => originalLhs
           }
       }
     }
 
     // 等式の場合
     provedGoal match {
-      case Expr.App(Expr.Sym(Eq), List(lhs, rhs)) =>
+      case Expr.App(Expr.Sym(Eq | Path), List(lhs, rhs)) =>
         // 最終的な簡約形を rhs に設定することを試みる
         val finalRhs = extractSimplifiedRhs(tree, provedGoal) match {
-          case Expr.App(Expr.Sym(Eq), List(_, r)) => r
-          case other                              => other
+          case Expr.App(Expr.Sym(Eq | Path), List(_, r)) => r
+          case other                                     => other
         }
 
-        if (config.excludeTrivialLemmas && lhs == finalRhs) return None
+        println(s"[DEBUG] generateLemma check: lhs=$lhs, finalRhs=$finalRhs")
+        val isPath = provedGoal.headSymbol == Path
+        if (config.excludeTrivialLemmas && lhs == finalRhs && !isPath) {
+          println(s"[DEBUG] Skipping trivial lemma for $lhs")
+          return None
+        }
 
         // 重複チェック（既存のルールと同一の lhs/rhs を持つか）
-        val isDuplicate = config.rules.exists(r => r.lhs == lhs && r.rhs == finalRhs)
+        val isDuplicate =
+          config.rules.exists(r => r.lhs == lhs && r.rhs == finalRhs)
         if (isDuplicate) return None
 
         val vars = collectFreeVars(lhs) ++ collectFreeVars(finalRhs)
 
         // 意味のある名前の生成
         val lhsHead = lhs.headSymbol.toLowerCase.replaceAll("[^a-z0-9]", "_")
-        val rhsHead = finalRhs.headSymbol.toLowerCase.replaceAll("[^a-z0-9]", "_")
-        val baseName = s"lemma_${lhsHead}_to_${rhsHead}"
+        val rhsHead =
+          finalRhs.headSymbol.toLowerCase.replaceAll("[^a-z0-9]", "_")
+        val prefix =
+          if (provedGoal.headSymbol == Path) "path_lemma" else "lemma"
+        val baseName = s"${prefix}_${lhsHead}_to_${rhsHead}"
+        println(s"[DEBUG] Generating lemma: $baseName for $lhs -> $finalRhs")
         val ruleName =
           s"${baseName}_${java.util.UUID.randomUUID().toString.take(4)}"
 
@@ -157,7 +170,8 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       case _ if config.lemmaMode == LemmaGenerationMode.All =>
         // 等式以外でも All モードなら生成を試みる
         val vars = collectFreeVars(provedGoal)
-        val head = provedGoal.headSymbol.toLowerCase.replaceAll("[^a-z0-9]", "_")
+        val head =
+          provedGoal.headSymbol.toLowerCase.replaceAll("[^a-z0-9]", "_")
         val ruleName =
           s"lemma_${head}_${java.util.UUID.randomUUID().toString.take(4)}"
         val universals = vars.toList.map(Expr.Var(_))
@@ -165,6 +179,11 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
 
       case _ => None
     }
+  }
+
+  private def getPathLevel(e: Expr): Int = e match {
+    case Expr.App(Expr.Sym(Path), List(sub, _, _)) => 1 + getPathLevel(sub)
+    case _                                         => 0
   }
 
   private def search(
@@ -178,7 +197,17 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       raaCount: Int,
       inductionCount: Int
   ): LazyList[(ProofTree, Subst)] = {
+    logger.log("search begin")
     val currentGoal = applySubst(goal, subst)
+
+    // Check maxPathLevel
+    if (getPathLevel(currentGoal) > config.maxPathLevel) {
+      recordFail(
+        FailTrace(Goal(context, currentGoal), s"Max path level reached", depth)
+      )
+      return LazyList.empty
+    }
+
     val contextExprs = context.map(h => applySubst(h._2, subst)).toSet
     val currentGoalObj = Goal(context, currentGoal)
 
@@ -282,6 +311,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       subst: Subst,
       depth: Int
   ): LazyList[(ProofTree, Subst)] =
+    logger.log(s"searching Axiom: $goal")
     context.view.to(LazyList).flatMap { case (name, hyp) =>
       unify(hyp, goal, subst)
         .map(s => (ProofTree.Leaf(applySubst(goal, s), name), s))
@@ -292,12 +322,19 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       subst: Subst,
       depth: Int
   ): LazyList[(ProofTree, Subst)] =
+    logger.log(s"searching Reflexivity: $goal")
     goal match
       case Expr.App(Expr.Sym(Eq), List(l, r)) =>
         val nl = Rewriter.normalize(applySubst(l, subst))
         val nr = Rewriter.normalize(applySubst(r, subst))
         unify(nl, nr, subst).map { s =>
           (ProofTree.Leaf(applySubst(goal, s), "reflexivity"), s)
+        }
+      case Expr.App(Expr.Sym(Path), List(_, l, r)) => // Path(Type, l, r)
+        val nl = Rewriter.normalize(applySubst(l, subst))
+        val nr = Rewriter.normalize(applySubst(r, subst))
+        unify(nl, nr, subst).map { s =>
+          (ProofTree.Leaf(applySubst(goal, s), "path-reflexivity"), s)
         }
       case _ => LazyList.empty
 
@@ -312,6 +349,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       raaCount: Int,
       inductionCount: Int
   ): LazyList[(ProofTree, Subst)] =
+    logger.log(s"searching Decompose: $goal")
     goal match
       case Expr.App(Expr.Sym(And | Product), List(a, b)) =>
         for
@@ -456,6 +494,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       raaCount: Int,
       inductionCount: Int
   ): LazyList[(ProofTree, Subst)] =
+    logger.log(s"searching Induction: $goal")
     if (inductionCount >= config.maxInduction) LazyList.empty
     else
       goal match {
@@ -483,6 +522,22 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
                     Expr.App(Expr.Sym(c.symbol), args)
                   }
                 val instanceGoal = Prover.substVar(body, v, constructorTerm)
+
+                // 道コンストラクタの場合の追加ゴール生成
+                val finalGoal = c.ctorType match {
+                  case ConstructorType.Point          => instanceGoal
+                  case ConstructorType.Path(from, to) =>
+                    // HITの道ケース: P(from) から P(to) への道が存在することを示す
+                    // 単純化版: path(P(A), transport(P, loop, p_a), p_b) のような形
+                    // ここでは symbol(P(from), P(to)) のような形を生成
+                    val p_from = Prover.substVar(body, v, from)
+                    val p_to = Prover.substVar(body, v, to)
+                    Expr.App(
+                      Expr.Sym(Path),
+                      List(Expr.Sym("Type"), p_from, p_to)
+                    )
+                }
+
                 val ihs = constructorTerm match {
                   case Expr.App(_, args) =>
                     c.argTypes.zip(args).collect {
@@ -492,7 +547,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
                   case _ => Nil
                 }
                 search(
-                  instanceGoal,
+                  finalGoal,
                   rules,
                   ihs ++ context,
                   currentSubst,
@@ -531,6 +586,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       raaCount: Int,
       inductionCount: Int
   ): LazyList[(ProofTree, Subst)] =
+    logger.log(s"searching Decompose Context: $goal")
     context.zipWithIndex.view.to(LazyList).flatMap {
       case ((name, Expr.App(Expr.Sym(Exists), List(Expr.Var(v), body))), i) =>
         val freshVar = s"${v}_${depth}_sk"
@@ -634,6 +690,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       raaCount: Int,
       inductionCount: Int
   ): LazyList[(ProofTree, Subst)] =
+    logger.log(s"searching Context: $goal")
     context.view.to(LazyList).flatMap { case (name, hyp) =>
       val ch = applySubst(hyp, subst)
       if (ch == Expr.Sym(False) || ch == Expr.Sym(Initial)) {
@@ -825,6 +882,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       raaCount: Int,
       inductionCount: Int
   ): LazyList[(ProofTree, Subst)] = {
+    logger.log(s"searching Rules: $goal")
     val normGoal = Rewriter.normalize(goal)
 
     rules.to(LazyList).flatMap { rule =>
@@ -885,6 +943,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
       raaCount: Int,
       inductionCount: Int
   ): LazyList[(ProofTree, Subst)] =
+    logger.log(s"searching Classical: $goal")
     if (
       config.classical && raaCount < config.maxRaa && goal != Expr.Sym(
         False
@@ -911,7 +970,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
 object Prover {
   import Unifier._
   def substVar(expr: Expr, varName: String, replacement: Expr): Expr =
-    expr match
+    expr match {
       case Expr.Var(n) if n == varName => replacement
       case Expr.Sym(n) if n == varName => replacement
       case Expr.App(h, args)           =>
@@ -931,7 +990,7 @@ object Prover {
             )
         }
       case _ => expr
-
+    }
   def rewriteExpr(expr: Expr, from: Expr, to: Expr): Expr =
     if (expr == from) to
     else

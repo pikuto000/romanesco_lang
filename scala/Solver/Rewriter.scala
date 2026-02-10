@@ -52,6 +52,20 @@ object Rewriter {
     case Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("cons"), List(x, xs)), ys)) =>
       Expr.App(Expr.Sym("cons"), List(x, Expr.App(Expr.Sym("append"), List(xs, ys))))
 
+    // --- HoTT path reduction ---
+    // inv(refl) -> refl
+    case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym(Refl), List(a)))) => 
+      Expr.App(Expr.Sym(Refl), List(a))
+    // inv(inv(p)) -> p
+    case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym("inv"), List(p)))) => p
+    // p ∘ refl -> p
+    case Expr.App(Expr.Sym(Compose), List(p, Expr.App(Expr.Sym(Refl), List(_)))) => p
+    // refl ∘ p -> p
+    case Expr.App(Expr.Sym(Compose), List(Expr.App(Expr.Sym(Refl), List(_)), p)) => p
+    // inv(p ∘ q) -> inv(q) ∘ inv(p)
+    case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym(Compose), List(p, q)))) =>
+      Expr.App(Expr.Sym(Compose), List(Expr.App(Expr.Sym("inv"), List(q)), Expr.App(Expr.Sym("inv"), List(p))))
+
     case _ => expr
   }
 }

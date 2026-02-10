@@ -332,6 +332,27 @@ object StandardRules:
 
   val classical = List(em, dne)
 
+  // --- HoTT (Homotopy Type Theory) ---
+  val pathRefl = CatRule(
+    "path-refl",
+    sym(Refl)(v("a")),
+    sym(Path)(v("A"), v("a"), v("a"))
+  )
+
+  val pathInv = CatRule(
+    "path-inv",
+    sym("inv")(sym(Path)(v("A"), v("a"), v("b"))),
+    sym(Path)(v("A"), v("b"), v("a"))
+  )
+
+  val univalence = CatRule(
+    "univalence",
+    sym("equiv")(v("A"), v("B")),
+    sym(Path)(sym(Type)(v("L")), v("A"), v("B"))
+  )
+
+  val hott = List(pathRefl, pathInv, univalence)
+
   // --- 標準の初期代数 ---
   import LogicSymbols._
   val defaultAlgebras = List(

@@ -37,6 +37,20 @@ enum Expr:
     case Var(n)                                   => n
     case Meta(id)                                 => s"?$id"
     case Sym(n)                                   => n
+    case App(Expr.Sym("Type"), List(Expr.Meta(MetaId(ids)))) => s"Type${ids.length}"
+    case App(Expr.Sym("path"), args) =>
+      def getPathLevel(e: Expr): Int = e match {
+        case App(Expr.Sym("path"), List(sub, _, _)) => 1 + getPathLevel(sub)
+        case _ => 0
+      }
+      val level = getPathLevel(this)
+      if (level > 1) {
+        val superscripts = "⁰¹²³⁴⁵⁶⁷⁸⁹"
+        val levelStr = level.toString.map(c => if (c >= '0' && c <= '9') superscripts(c - '0') else c).mkString
+        s"path$levelStr(${args.mkString(",")})"
+      } else {
+        s"path(${args.mkString(",")})"
+      }
     case App(Expr.Sym("λ"), List(Expr.Var(v), b)) => s"λ$v. $b"
     case App(Expr.Sym("="), List(l, r))           => s"$l = $r"
     case App(h, args)                             =>
@@ -55,6 +69,8 @@ object Expr:
   def v(name: String): Expr = Var(name)
   def meta(id: Int): Expr = Meta(MetaId(id))
   def meta(ids: Int*): Expr = Meta(MetaId(ids.toList))
+
+  def typeLevel(level: Int): Expr = App(Sym("Type"), List(Meta(MetaId((0 until level).toList.map(_ => 0)))))
 
   def unapplyEq(e: Expr): Option[(Expr, Expr)] = e match
     case App(Sym("="), List(l, r)) => Some((l, r))
@@ -102,8 +118,18 @@ enum ArgType:
   case Recursive
   case Constant
 
+/** コンストラクタの型（点または道）
+ */
+enum ConstructorType:
+  case Point
+  case Path(from: Expr, to: Expr)
+
 /** 代数の構造定義 */
-case class ConstructorDef(symbol: String, argTypes: List[ArgType])
+case class ConstructorDef(
+    symbol: String, 
+    argTypes: List[ArgType], 
+    ctorType: ConstructorType = ConstructorType.Point
+)
 case class InitialAlgebra(
     name: String,
     constructors: List[ConstructorDef],
@@ -126,6 +152,7 @@ case class ProverConfig(
     algebras: List[InitialAlgebra] = Nil,
     maxRaa: Int = 2,
     maxInduction: Int = 2,
+    maxPathLevel: Int = 5, // 高次pathの最大階層
     generateLemmas: Boolean = true,
     lemmaMode: LemmaGenerationMode = LemmaGenerationMode.EqualityOnly,
     excludeTrivialLemmas: Boolean = true

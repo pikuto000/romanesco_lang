@@ -15,7 +15,7 @@ object LogicSymbols {
   val Eq = "="
   val True = "⊤"
   val False = "⊥"
-  
+
   // 圏論的な別名
   val Product = "×"
   val Coproduct = "+"
@@ -26,10 +26,10 @@ object LogicSymbols {
   // 圏論的演算子
   val Compose = "∘"
   val Id = "id"
-  val Pair = "pair"   // <f, g>
-  val Proj1 = "pi1"   // π1
-  val Proj2 = "pi2"   // π2
-  val Case = "case"   // [f, g]
+  val Pair = "pair" // <f, g>
+  val Proj1 = "pi1" // π1
+  val Proj2 = "pi2" // π2
+  val Case = "case" // [f, g]
   val Inl = "inl"
   val Inr = "inr"
 
@@ -63,7 +63,13 @@ object LogicSymbols {
   // 分離論理 (Separation Logic)
   val SepAnd = "*"
   val PointsTo = "↦"
-  
+
+  // HoTT (Homotopy Type Theory)
+  val Path = "path"
+  val Univ = "Univalence"
+  val Type = "Type"
+  val Refl = "refl"
+
   // その他の表記揺れ
   val ImpliesAlt1 = "⊃"
   val ImpliesAlt2 = "⇒"
