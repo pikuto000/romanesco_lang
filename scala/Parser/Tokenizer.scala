@@ -148,7 +148,7 @@ final class Tokenizer(rules: immutable.Map[String, Regex]) {
 }
 /*
 @main def testTokenizer(): Unit = {
-  Debug.logger.switch(true) // 大量に出る場合は一旦オフ
+  Debug.logger.switch(false) // 大量に出る場合は一旦オフ
   val rules = Map(
     "excramation" -> "!".r,
     "semicolon" -> ";".r,

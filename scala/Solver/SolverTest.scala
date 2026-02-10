@@ -32,7 +32,7 @@ import romanesco.Utils.Debug.logger
       val input = StdIn.readLine
       if input == null || input == "exit" then return
       else if input == "help" then showHelp
-      else if input == "enableDebug" then logger.switch(true)
+      else if input == "enableDebug" then logger.switch(false)
       else if input == "disableDebug" then logger.switch(false)
       else if input.trim.nonEmpty then processInput(input)
 
@@ -79,7 +79,7 @@ def processInput(input: String, classical: Boolean = false): Unit =
  */
 
 @main def testSomeCases = {
-  logger.switch(true)
+  logger.switch(false)
 
   // 証明済みの補助定理をルールに変換
   val lemmas = List(

@@ -5,7 +5,7 @@ import romanesco.Solver.sugar._
 import romanesco.Utils.Debug.logger
 
 @main def testPatternUnification = {
-  logger.switch(true)
+  logger.switch(false)
   println("=== Pattern Unification Test ===")
 
   // Test 1: ?P(x) = x = 0
@@ -15,7 +15,7 @@ import romanesco.Utils.Debug.logger
   val x = Expr.Var("x")
   val zero = Expr.Sym("0")
   val eq = Expr.Sym("=")
-  
+
   // LHS: ?P(x)
   val lhs = Expr.App(metaP, List(x))
   // RHS: x = 0
@@ -23,7 +23,7 @@ import romanesco.Utils.Debug.logger
 
   println(s"Unifying: $lhs = $rhs")
   val results = Unifier.unify(lhs, rhs, Unifier.emptySubst)
-  
+
   if (results.nonEmpty) {
     println("✓ Solutions found:")
     results.zipWithIndex.foreach { case (subst, i) =>

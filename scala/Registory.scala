@@ -118,7 +118,7 @@ final class Registory {
 /*
 @main def testregistry: Unit = {
   import Predicates._
-  Debug.logger.switch(true)
+  Debug.logger.switch(false)
   
   val reg = new Registory()
   

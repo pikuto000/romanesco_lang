@@ -40,7 +40,7 @@ final class Macro[T, R](init: T, expander: (T, R) => T, expandrule: R) {
 
 /*超簡易的なプリプロセッサを実装してテスト
 @main def macrotest:Unit ={
-  logger.switch(true)
+  logger.switch(false)
   val testString="define X 100 X"
   val expandRule= "define X 100"
   println("this is a macro tester.\n")

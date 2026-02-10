@@ -5,7 +5,7 @@ import romanesco.Solver.sugar._
 import romanesco.Utils.Debug.logger
 
 @main def testGeneralizedUnification = {
-  logger.switch(true)
+  logger.switch(false)
   println("=== Generalized Higher-Order Unification Test ===")
 
   val metaP = Expr.Meta(MetaId(List(1)))
@@ -22,7 +22,7 @@ import romanesco.Utils.Debug.logger
   println("\nTest 1: ?P(f(x)) = g(f(x))")
   val lhs1 = Expr.App(metaP, List(Expr.App(f, List(x))))
   val rhs1 = Expr.App(g, List(Expr.App(f, List(x))))
-  
+
   println(s"Unifying: $lhs1 = $rhs1")
   val res1 = Unifier.unify(lhs1, rhs1, Unifier.emptySubst)
   printResult(res1, lhs1, rhs1)
@@ -63,7 +63,8 @@ def printResult(results: LazyList[Unifier.Subst], lhs: Expr, rhs: Expr) = {
       val appliedLhs = Unifier.applySubst(lhs, subst)
       val normalized = Rewriter.normalize(appliedLhs)
       println(s"    Check: $normalized == $rhs")
-      if (normalized == rhs) println("    ✓ Valid") else println("    ✗ Invalid")
+      if (normalized == rhs) println("    ✓ Valid")
+      else println("    ✗ Invalid")
     }
   } else {
     println("✗ No solution found")
