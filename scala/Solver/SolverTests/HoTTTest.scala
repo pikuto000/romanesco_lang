@@ -90,6 +90,21 @@ object HoTTTest {
     println(s"Original: $complexPath")
     println(s"Normalized: ${Rewriter.normalize(complexPath)}")
 
+    println("\n=== HoTT Test: Transport Reduction ===")
+    // transport(P, refl(a), x) -> x
+    val P_type = v("P")
+    val x_val = v("x")
+    val transportExpr = sym(Transport)(P_type, sym(Refl)(v("a")), x_val)
+    println(s"Original: $transportExpr")
+    println(s"Normalized: ${Rewriter.normalize(transportExpr)}")
+
+    println("\n=== HoTT Test: Concat Reduction ===")
+    // concat(p, refl(b)) -> p
+    val p_path = v("p")
+    val concatExpr = sym(Concat)(p_path, sym(Refl)(v("b")))
+    println(s"Original: $concatExpr")
+    println(s"Normalized: ${Rewriter.normalize(concatExpr)}")
+
     println("\n=== HoTT Test: Higher Path (Path between Paths) ===")
     // Goal: path(path(A, x, y), inv(inv(p)), p)
     // This should be provable by normalization (inv(inv(p)) -> p) and then path-reflexivity.

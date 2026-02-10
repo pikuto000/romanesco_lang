@@ -69,6 +69,8 @@ object LogicSymbols {
   val Univ = "Univalence"
   val Type = "Type"
   val Refl = "refl"
+  val Transport = "transport"
+  val Concat = "concat" // パスの合成演算子
 
   // その他の表記揺れ
   val ImpliesAlt1 = "⊃"

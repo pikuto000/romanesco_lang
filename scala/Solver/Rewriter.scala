@@ -59,12 +59,14 @@ object Rewriter {
     // inv(inv(p)) -> p
     case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym("inv"), List(p)))) => p
     // p ∘ refl -> p
-    case Expr.App(Expr.Sym(Compose), List(p, Expr.App(Expr.Sym(Refl), List(_)))) => p
+    case Expr.App(Expr.Sym(Compose | Concat), List(p, Expr.App(Expr.Sym(Refl), List(_)))) => p
     // refl ∘ p -> p
-    case Expr.App(Expr.Sym(Compose), List(Expr.App(Expr.Sym(Refl), List(_)), p)) => p
+    case Expr.App(Expr.Sym(Compose | Concat), List(Expr.App(Expr.Sym(Refl), List(_)), p)) => p
     // inv(p ∘ q) -> inv(q) ∘ inv(p)
-    case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym(Compose), List(p, q)))) =>
+    case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym(Compose | Concat), List(p, q)))) =>
       Expr.App(Expr.Sym(Compose), List(Expr.App(Expr.Sym("inv"), List(q)), Expr.App(Expr.Sym("inv"), List(p))))
+    // transport(P, refl, x) -> x
+    case Expr.App(Expr.Sym(Transport), List(_, Expr.App(Expr.Sym(Refl), List(_)), x)) => x
 
     case _ => expr
   }

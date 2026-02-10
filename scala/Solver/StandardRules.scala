@@ -351,7 +351,19 @@ object StandardRules:
     sym(Path)(sym(Type)(v("L")), v("A"), v("B"))
   )
 
-  val hott = List(pathRefl, pathInv, univalence)
+  val pathConcat = CatRule(
+    "path-concat",
+    sym(Concat)(sym(Path)(v("A"), v("a"), v("b")), sym(Path)(v("A"), v("b"), v("c"))),
+    sym(Path)(v("A"), v("a"), v("c"))
+  )
+
+  val transport = CatRule(
+    "transport",
+    sym(Transport)(v("P"), sym(Path)(sym(Type)(v("L")), v("A"), v("B")), v("x")),
+    v("P")(v("B"))
+  )
+
+  val hott = List(pathRefl, pathInv, univalence, pathConcat, transport)
 
   // --- 標準の初期代数 ---
   import LogicSymbols._
