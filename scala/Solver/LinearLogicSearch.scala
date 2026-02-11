@@ -113,6 +113,7 @@ trait LinearLogicSearch { self: Prover =>
         val leftPart = leftIndexed.map(_._1)
         if (config.maxParallelism <= 1)
           logger.log(s"  Trying split - Left: $leftPart, Right: $rightPart")
+        // Step で包んで公平性を維持しつつ、flatMap 内で search を実行
         search(
           a,
           rules,
@@ -160,7 +161,12 @@ trait LinearLogicSearch { self: Prover =>
         }
       }
     }
-    SolveTree.merge(options)
+    // コンテキスト分割の選択肢を並列に探索
+    if (options.length > 1 && config.maxParallelism > 1) {
+      SolveTree.fromLazyList(SolveTree.Choice(options).solveParallel(config.maxParallelism))
+    } else {
+      SolveTree.merge(options)
+    }
   }
 
   /** 線形含意(⊸)の適用 */

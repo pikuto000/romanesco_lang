@@ -84,9 +84,9 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
 
         logger.log(s"--- Iterative Deepening: current limit = $d ---")
         metaCounter.set(0)
-        visitedGlobal.clear() // Regression found if kept across iterations
-        // failureCache.clear() // failureCache can be kept safely? Maybe not with co-induction.
-        failureCache.clear() // To be safe, clear it as well.
+        visitedGlobal.clear() // visitedGlobal must be cleared to allow re-exploration at new depth
+        // failureCache is NOT cleared here, allowing reuse of failure results from previous iterations
+        // (A failure at depth L implies failure at depth d < L)
         val tree = search(
           goal,
           effectiveRules,

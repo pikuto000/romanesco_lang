@@ -83,114 +83,64 @@ enum SolveTree[+T]:
   }
 
     /** 各ブランチを並行して探索し、最初に見つかった成功結果を返します */
-
     def solveParallel(maxParallelism: Int = 8): LazyList[T] = {
-
       import java.util.concurrent._
-
-      // solveParallel が呼ばれた際、最上位で solveFair を使って各ブランチに分解し、
-
-      // それらを個別に実行することで Memo の整合性を保つ
+      
+      // 共有スレッドプールの取得（肥大化を防ぐため）
+      val executor = SolveTree.sharedExecutor
 
       this match {
-
         case Choice(bs) if bs.nonEmpty =>
-
           val queue = new LinkedBlockingQueue[Option[T]]()
-
-          val executor = Executors.newFixedThreadPool(math.min(maxParallelism, bs.length))
-
           val activeCount = new java.util.concurrent.atomic.AtomicInteger(bs.length)
-
           
-
           bs.foreach { b =>
-
             executor.submit(new Runnable {
-
               def run(): Unit = {
-
                 try {
-
-                  // 各ブランチに対して solveFair を実行
-
-                  // これにより、ブランチ内の Memo は正しく処理される
-
+                  // ブランチ内でも並行性を維持するため、必要に応じて solveParallel を再帰呼び出し可能
+                  // ここではまず公平な探索を実行
                   b.solveFair.foreach { v => 
-
                     queue.put(Some(v))
-
                   }
-
                 } catch {
-
                   case _: InterruptedException => // cancelled
-
                   case e: Exception => 
-
-                    // エラーが発生した場合は無視するかログを出す
-
                 } finally {
-
                   if (activeCount.decrementAndGet() == 0) {
-
-                    queue.put(None) // 全てのタスクが終了した合図
-
+                    queue.put(None)
                   }
-
                 }
-
               }
-
             })
-
           }
-
           
-
           def results(): LazyList[T] = {
-
-            try {
-
-              queue.take() match {
-
-                case Some(v) => 
-
-                  v #:: results()
-
-                case None => 
-
-                  executor.shutdown()
-
-                  LazyList.empty
-
-              }
-
-            } catch {
-
-              case _: InterruptedException =>
-
-                executor.shutdownNow()
-
-                LazyList.empty
-
+            queue.take() match {
+              case Some(v) => v #:: results()
+              case None    => LazyList.empty
             }
-
           }
-
           results()
 
-  
-
         case _ => this.solveFair
-
       }
-
     }
 
-  
-
 object SolveTree:
+  import java.util.concurrent._
+  
+  // 証明器全体で共有するスレッドプール
+  private[core] val sharedExecutor = Executors.newFixedThreadPool(
+    Runtime.getRuntime().availableProcessors(),
+    new ThreadFactory {
+      def newThread(r: Runnable) = {
+        val t = new Thread(r)
+        t.setDaemon(true) // JVM終了を妨げない
+        t
+      }
+    }
+  )
   def fromLazyList[T](ll: LazyList[T]): SolveTree[T] =
     if (ll.isEmpty) Failure
     else Choice(List(Success(ll.head), Step(() => fromLazyList(ll.tail))))
