@@ -6,7 +6,6 @@ if ($action -eq "repl") {
 }
 else {
     sbt `
-        "runMain omanesco.Solver.Repl" `
         "runMain romanesco.Solver.SolverTests.CycleTest" `
         "runMain romanesco.Solver.SolverTests.CycleTest2" `
         "runMain romanesco.Solver.SolverTests.DebugAssoc" `
@@ -17,7 +16,6 @@ else {
         "runMain romanesco.Solver.SolverTests.SeparationLogicTest" `
         "runMain romanesco.Solver.SolverTests.TemporalLogicTest" `
         "runMain romanesco.Solver.SolverTests.TypeLevelTest" `
-        "runMain romanesco.Solver.runRepl" `
         "runMain romanesco.Solver.testGeneralizedUnification" `
         "runMain romanesco.Solver.testLinearLogic" `
         "runMain romanesco.Solver.testMapFusion" `
