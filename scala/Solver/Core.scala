@@ -60,20 +60,31 @@ enum Expr:
       if args.isEmpty then h.toString
       else s"$h(${args.mkString(",")})"
 
-  /** メタ変数を出現順に正規化（α同値性の判定用） */
+  /** メタ変数と変数を出現順に正規化（α同値性の判定用） */
   def canonicalize: Expr = {
     val metaMap = scala.collection.mutable.Map[MetaId, MetaId]()
-    var counter = 0
+    val varMap = scala.collection.mutable.Map[String, String]()
+    var metaCounter = 0
+    var varCounter = 0
     def loop(e: Expr): Expr = e match {
       case Meta(id) =>
         val newId = metaMap.getOrElseUpdate(
           id, {
-            val nid = MetaId(List(counter))
-            counter += 1
+            val nid = MetaId(List(metaCounter))
+            metaCounter += 1
             nid
           }
         )
         Meta(newId)
+      case Var(name) =>
+        val newName = varMap.getOrElseUpdate(
+          name, {
+            val n = s"v$varCounter"
+            varCounter += 1
+            n
+          }
+        )
+        Var(newName)
       case App(f, args) => App(loop(f), args.map(loop))
       case _            => e
     }
@@ -177,7 +188,8 @@ case class ProverConfig(
     maxRaa: Int = 2,
     maxInduction: Int = 2,
     maxPathLevel: Int = 5, // 高次pathの最大階層
-    maxComplexity: Int = 100, // 項の最大複雑度
+    maxComplexity: Int = 100, // 項の最大複雑度（大きめに設定）
+    maxParallelism: Int = 8,
     generateLemmas: Boolean = true,
     lemmaMode: LemmaGenerationMode = LemmaGenerationMode.EqualityOnly,
     excludeTrivialLemmas: Boolean = true

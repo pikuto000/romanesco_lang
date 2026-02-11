@@ -9,11 +9,11 @@ import romanesco.Utils.Debug.logger
   println("=== Linear Logic Test (Mapping Approach) ===")
 
   val linearRules = StandardRules.linear
-  val allRules = StandardRules.all ++ linearRules
+  val allRules = StandardRules.all ++ linearRules ++ StandardRules.linearMapping
 
   val testCases = List(
-    "A ⊸ B", // Linear Implication
-    "A ⊗ B", // Tensor
+    "A ⊸ A", // Linear Implication
+    "(A ⊗ B) ⊸ (A ⊗ B)", // Tensor
     "!A → A", // Bang elimination
     "A ⊗ B → A ∧ B" // Tensor to Product mapping
   )
@@ -30,7 +30,7 @@ import romanesco.Utils.Debug.logger
           println(s"✓ Solved:\n${result.tree.format(1)}")
           result.generatedLemma.foreach(l => println(s"  Generated Lemma: $l"))
         case Left(trace) =>
-          println("✗ Failed to prove")
+          println("✗ Failed to prove. should be solved.")
           println(trace.format(1))
       }
     } catch {

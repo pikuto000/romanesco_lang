@@ -17,7 +17,11 @@ object HoTTCubeTest {
 
     val testCases = List(
       ("cube(A, p, q, r, s) → path(path(A, x, y), p, r)", true, 10),
-      ("cube(A, p, q, r, s) → path(path(A, x, z), q, s)", false, 5) // Lower depth for false case
+      (
+        "cube(A, p, q, r, s) → path(path(A, x, z), q, s)",
+        false,
+        5
+      ) // Lower depth for false case
     )
 
     testCases.foreach { case (input, expected, depth) =>
@@ -26,8 +30,8 @@ object HoTTCubeTest {
         val goal = TestParser.parse(input)
         val result = prover.prove(goal, maxDepth = depth)
         result match {
-          case Right(_) => println("✓ OK (Solved)")
-          case Left(trace) => 
+          case Right(_)    => println("✓ OK (Solved)")
+          case Left(trace) =>
             if (expected) {
               println("✗ FAIL (Should have been solved)")
               // println(trace.format())

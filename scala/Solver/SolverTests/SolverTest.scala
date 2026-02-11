@@ -16,11 +16,15 @@ import romanesco.Utils.Debug.logger
 
   // 証明済みの補助定理をルールに変換
   val lemmas = List(
-    CatRule("plus_n_0", TestParser.parse("plus(n, 0)"), TestParser.parse("n")),
+    CatRule(
+      "plus_n_0",
+      TestParser.parse("plus(n, 0)", Set("n")),
+      TestParser.parse("n", Set("n"))
+    ),
     CatRule(
       "plus_n_Sm",
-      TestParser.parse("plus(n, S(m))"),
-      TestParser.parse("S(plus(n, m))")
+      TestParser.parse("plus(n, S(m))", Set("n", "m")),
+      TestParser.parse("S(plus(n, m))", Set("n", "m"))
     )
   )
 
@@ -61,7 +65,7 @@ import romanesco.Utils.Debug.logger
       .reflexivity(state)
       .getOrElse(throw Exception("Reflexivity failed"))
 
-    println("\nBase Case solved. Next goal:")
+    println("\nBase Case solved! Next goal:")
     printState(state)
 
     // 3. intro n, intro IH, intro m
@@ -105,7 +109,8 @@ import romanesco.Utils.Debug.logger
         else StandardRules.all
       val config = ProverConfig(classical = false, rules = rules)
       val prover = new Prover(config)
-      val result = prover.prove(expr)
+      val depth = if (input.contains("plus(n, S(m))")) 15 else 30
+      val result = prover.prove(expr, maxDepth = depth)
       result match
         case Right(res) =>
           println(s"✓ Solved:\n${res.tree.format(1)}")

@@ -8,7 +8,7 @@ import romanesco.Utils.Debug
     println("this is the romanesco toolchain.")
     val fileContents=GetFile.importfile(args)._1
     val options=GetFile.importfile(args)._2
-    if(options.contains("-debug"))Debug.logger.switch(true)elseDebug.logger.switch(false)
+    if(options.contains("-debug"))Debug.logger.switch(false)elseDebug.logger.switch(false)
     if (fileContents.isEmpty) {
       println("Usage: \"<files and options...>\" ")
     } else {

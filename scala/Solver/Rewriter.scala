@@ -69,6 +69,11 @@ object Rewriter {
     case Expr.App(Expr.Sym("plus"), List(Expr.App(Expr.Sym(s), List(n)), m)) if s == Succ =>
       Expr.App(Expr.Sym(Succ), List(Expr.App(Expr.Sym("plus"), List(n, m))))
 
+    // --- リストの演算 ---
+    case Expr.App(Expr.Sym("append"), List(Expr.Sym("nil"), ys)) => ys
+    case Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("cons"), List(x, xs)), ys)) =>
+      Expr.App(Expr.Sym("cons"), List(x, Expr.App(Expr.Sym("append"), List(xs, ys))))
+
     // --- HoTT path reduction ---
     // inv(refl) -> refl
     case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym(r), List(a)))) if r == Refl => 

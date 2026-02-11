@@ -55,7 +55,7 @@ import romanesco.Utils.Debug.logger
   if (results2.nonEmpty) {
     results2.headOption.foreach { subst =>
       println(s"  Solution: ${subst(MetaId(List(2)))}")
-      // Expected: λx. S(x)
+      // Expected: λx. S(x) //TODO: このケースの単一化が正しいかどうか確認する
     }
   } else {
     println("✗ No solution found")

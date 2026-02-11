@@ -12,18 +12,19 @@ object Unifier:
   def emptySubst: Subst = Map.empty
 
   def applySubst(e: Expr, s: Subst): Expr =
-    // logger.log(s"applySubst: $e, $s")
-    e match
+    if (s.isEmpty) e
+    else e match
       case Expr.Meta(id) if s.contains(id) =>
         applySubst(s(id), s)
       case Expr.App(f, args) =>
-        Rewriter.normalize(
-          Expr.App(applySubst(f, s), args.map(applySubst(_, s)))
-        )
+        val nextF = applySubst(f, s)
+        val nextArgs = args.map(applySubst(_, s))
+        // 実際に変化があった場合のみ正規化（またはアプリケーションの場合は常に一回正規化）
+        Rewriter.normalize(Expr.App(nextF, nextArgs))
       case _ => e
 
   def applySubstToRule(rule: CatRule, s: Subst): CatRule =
-    // logger.log(s"applySubstToRule: $rule, $s")
+    logger.log(s"applySubstToRule: $rule, $s")
     CatRule(
       rule.name,
       applySubst(rule.lhs, s),
@@ -36,10 +37,10 @@ object Unifier:
     val r2 = applySubst(e2, subst)
 
     if r1 == r2 then
-      // logger.log(s"Unify Success: $r1 = $r2")
+      logger.log(s"Unify Success: $r1 = $r2")
       LazyList(subst)
     else
-      // logger.log(s"Unifying: $r1 with $r2")
+      logger.log(s"Unifying: $r1 with $r2")
       val res = (r1, r2) match
         // --- ラムダ抽象の単一化 (App構造) ---
         case (Expr.Lam(v1, b1), Expr.Lam(v2, b2)) =>
@@ -54,22 +55,30 @@ object Unifier:
           }
 
         // --- Strict Universe Level Unification (Russell Paradox Avoidance) ---
-        case (Expr.App(Expr.Sym(LogicSymbols.Type), args1), Expr.App(Expr.Sym(LogicSymbols.Type), args2)) =>
+        case (
+              Expr.App(Expr.Sym(LogicSymbols.Type), args1),
+              Expr.App(Expr.Sym(LogicSymbols.Type), args2)
+            ) =>
           // 型宇宙のレベル構造が異なる場合は単一化しない（パラドックス回避）
           // Type(L1) = Type(L2) only if L1 == L2 structurally (same level depth)
           def getLevelDepth(e: Expr): Int = e match {
             case Expr.Meta(id) => id.ids.length
-            case _ => -1 // Unknown/Var
+            case _             => -1 // Unknown/Var
           }
           val l1 = args1.headOption.map(getLevelDepth).getOrElse(-1)
           val l2 = args2.headOption.map(getLevelDepth).getOrElse(-1)
-          
+
           if (l1 != -1 && l2 != -1 && l1 != l2) LazyList.empty
           else {
-             // Standard decomposition if levels match or are variables
-             unify(Expr.Sym(LogicSymbols.Type), Expr.Sym(LogicSymbols.Type), subst).flatMap { s =>
-              args1.zip(args2).foldLeft(LazyList(s)) { case (sList, (arg1, arg2)) =>
-                sList.flatMap(unify(arg1, arg2, _))
+            // Standard decomposition if levels match or are variables
+            unify(
+              Expr.Sym(LogicSymbols.Type),
+              Expr.Sym(LogicSymbols.Type),
+              subst
+            ).flatMap { s =>
+              args1.zip(args2).foldLeft(LazyList(s)) {
+                case (sList, (arg1, arg2)) =>
+                  sList.flatMap(unify(arg1, arg2, _))
               }
             }
           }
@@ -93,7 +102,7 @@ object Unifier:
         case (t, Expr.Meta(id)) if !occursCheckHigher(id, t, Nil) =>
           LazyList(subst + (id -> t))
 
-        case (Expr.Sym(n1), Expr.Sym(n2)) if n1 == n2 => LazyList(subst)
+        // --- 変数の単一化 ---
         case (Expr.Var(n1), Expr.Var(n2)) if n1 == n2 => LazyList(subst)
 
         // --- アプリケーションの単一化 (分解) ---
@@ -176,13 +185,41 @@ object Unifier:
       case _               => Set.empty
     }
 
+    // メタ変数の循環参照チェック
     if (collectMetaVars(expr).contains(metaId)) return true
 
-    // 簡易的な依存性チェック:
-    // args が空でない場合（高階メタ変数の場合）、expr 内に出現する変数が args に含まれているかを確認する
-    // 本来はもっと厳密なスコープ管理が必要だが、ここでは「未知の自由変数」が含まれていないかをチェックするプレースホルダとする
+    // 高階の場合の依存性チェック:
+    // args が空でない場合、expr 内に出現する変数が args に含まれているかを確認する
+    if (args.nonEmpty) {
+      def collectFreeVars(e: Expr): Set[String] = e match {
+        case Expr.Var(n) => Set(n)
+        case Expr.App(f, as) => e match {
+          case Expr.App(Expr.Sym("λ"), List(Expr.Var(v), body)) =>
+            collectFreeVars(body) - v
+          case _ => collectFreeVars(f) ++ as.flatMap(collectFreeVars)
+        }
+        case _ => Set.empty
+      }
+      
+      val exprVars = collectFreeVars(expr)
+      val argVars = args.flatMap(collectFreeVars).toSet
+      
+      // expr に args に含まれない自由変数がある場合は失敗
+      if (exprVars.exists(v => !argVars.contains(v))) {
+        logger.log(s"[OCCUR CHECK] Free variables in expr not in args: ${exprVars -- argVars}")
+        return true
+      }
+    }
+    
     false
   }
+
+  // Expr.Var用のoccur check
+  private def occursCheckVar(varName: String, expr: Expr): Boolean = expr match
+    case Expr.Var(n) => n == varName
+    case Expr.App(h, args) =>
+      occursCheckVar(varName, h) || args.exists(occursCheckVar(varName, _))
+    case _ => false
 
   private def occursCheck(metaId: MetaId, expr: Expr): Boolean = expr match
     case Expr.Meta(id)     => id == metaId

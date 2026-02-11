@@ -35,26 +35,26 @@ object StandardRules:
     sym("pair")(v("f"), v("g")),
     v("h"),
     List(
-      eq(sym("∘")(sym("π₁"), v("h")), v("f")),
-      eq(sym("∘")(sym("π₂"), v("h")), v("g"))
+      eq(sym("∘")(sym("pi1"), v("h")), v("f")),
+      eq(sym("∘")(sym("pi2"), v("h")), v("g"))
     )
   )
 
   val fstBeta = CatRule(
     "fst-β",
-    sym("π₁")(sym("pair")(v("a"), v("b"))),
+    sym("pi1")(sym("pair")(v("a"), v("b"))),
     v("a")
   )
 
   val sndBeta = CatRule(
     "snd-β",
-    sym("π₂")(sym("pair")(v("a"), v("b"))),
+    sym("pi2")(sym("pair")(v("a"), v("b"))),
     v("b")
   )
 
   val productEta = CatRule(
     "product-η",
-    sym("pair")(sym("π₁")(v("p")), sym("π₂")(v("p"))),
+    sym("pair")(sym("pi1")(v("p")), sym("pi2")(v("p"))),
     v("p")
   )
 
@@ -92,12 +92,6 @@ object StandardRules:
         v("f")
       )
     )
-  )
-
-  val lambdaBeta = CatRule(
-    "lambda-β",
-    sym("eval")(sym("pair")(sym("λ")(v("x"), v("body")), v("arg"))),
-    sym("subst")(v("body"), v("x"), v("arg"))
   )
 
   val lambdaEta = CatRule(
@@ -142,43 +136,6 @@ object StandardRules:
     eq(v("b"), v("a"))
   )
 
-  val eqTrans = CatRule(
-    "eq-trans",
-    sym("∘")(eq(v("a"), v("b")), eq(v("b"), v("c"))),
-    eq(v("a"), v("c"))
-  )
-
-  val eqSubst = CatRule(
-    "eq-subst",
-    sym("rewrite")(eq(v("a"), v("b")), v("P")(v("a"))),
-    v("P")(v("b"))
-  )
-
-  // --- 随伴: ∃ ⊣ subst ⊣ ∀ ---
-  val existsUnit = CatRule(
-    "∃-η",
-    v("P"),
-    sym("∃")(v("x"), sym("subst")(v("P"), v("y"), v("x")))
-  )
-
-  val existsCounit = CatRule(
-    "∃-ε",
-    sym("∃")(v("x"), v("P")),
-    sym("subst")(v("P"), v("x"), v("witness"))
-  )
-
-  val forallUnit = CatRule(
-    "∀-η",
-    sym("subst")(sym("∀")(v("x"), v("P")), v("x"), v("t")),
-    v("P")
-  )
-
-  val forallCounit = CatRule(
-    "∀-ε",
-    sym("∀")(v("x"), sym("subst")(v("P"), v("y"), v("x"))),
-    v("P")
-  )
-
   // --- 論理結合子と圏論的構造の対応 ---
   val andIsProd = CatRule(
     "and-is-×",
@@ -213,13 +170,26 @@ object StandardRules:
   // カテゴリー別
   val products = List(productUniversal, fstBeta, sndBeta, productEta)
   val coproducts = List(coproductUniversal, caseInlBeta, caseInrBeta)
-  val exponentials = List(expUniversal, lambdaBeta, lambdaEta)
-  val limits = List(terminalUniversal, terminalUnique)
+  val exponentials = List(expUniversal, lambdaEta)
   val colimits = List(initialUniversal)
-  val equality = List(eqRefl, eqSymm, eqTrans, eqSubst)
-  val adjoints = List(existsUnit, existsCounit, forallUnit, forallCounit)
+  val equality = List(eqRefl) // eqSymm is removed from automatic rules
+
+  val tensorIsProd = CatRule(
+    "tensor-is-×",
+    sym("⊗")(v("A"), v("B")),
+    sym("×")(v("A"), v("B"))
+  )
+
+  val lImpliesIsExp = CatRule(
+    "⊸-is-^",
+    sym("⊸")(v("A"), v("B")),
+    sym("^")(v("B"), v("A"))
+  )
+
   val logicMapping =
     List(andIsProd, orIsCoprod, arrowIsExp, trueIsTerminal, falseIsInitial)
+
+  val linearMapping = List(tensorIsProd, lImpliesIsExp)
 
   // --- モーダル論理 ---
   import LogicSymbols._
@@ -265,12 +235,6 @@ object StandardRules:
   val linear = List(linearBang)
 
   // --- 時相論理 ---
-  val temporalG = CatRule(
-    "G-expansion",
-    sym(Globally)(v("A")),
-    sym(And)(v("A"), sym(Next)(sym(Globally)(v("A"))))
-  )
-
   val temporalF = CatRule(
     "F-expansion",
     sym(Finally)(v("A")),
@@ -283,7 +247,7 @@ object StandardRules:
     sym(Or)(v("B"), sym(And)(v("A"), sym(Next)(sym(Until)(v("A"), v("B")))))
   )
 
-  val temporal = List(temporalG, temporalF, temporalU)
+  val temporal = List(temporalF, temporalU)
 
   // --- 分離論理 ---
   val sepAndCommutative = CatRule(
@@ -340,6 +304,48 @@ object StandardRules:
     sym(Path)(v("A"), v("a"), v("c"))
   )
 
+  val concatReflLeft = CatRule(
+    "concat-refl-left",
+    sym(Concat)(sym(Refl)(v("x")), v("p")),
+    v("p")
+  )
+
+  val concatReflRight = CatRule(
+    "concat-refl-right",
+    sym(Concat)(v("p"), sym(Refl)(v("x"))),
+    v("p")
+  )
+
+  val concatPathReflLeft = CatRule(
+    "concat-path-refl-left",
+    sym(Concat)(sym(Path)(v("A"), v("x"), v("x")), v("p")),
+    v("p")
+  )
+
+  val concatPathReflRight = CatRule(
+    "concat-path-refl-right",
+    sym(Concat)(v("p"), sym(Path)(v("A"), v("x"), v("x"))),
+    v("p")
+  )
+
+  val transportRefl = CatRule(
+    "transport-refl",
+    sym(Transport)(v("P"), sym(Refl)(v("x")), v("v")),
+    v("v")
+  )
+
+  val transportPathRefl = CatRule(
+    "transport-path-refl",
+    sym(Transport)(v("P"), sym(Path)(v("A"), v("x"), v("x")), v("v")),
+    v("v")
+  )
+
+  val pathInvRefl = CatRule(
+    "path-inv-refl",
+    sym("inv")(sym(Refl)(v("x"))),
+    sym(Refl)(v("x"))
+  )
+
   val transportRule = CatRule(
     "transport",
     sym(Transport)(v("P"), sym(Path)(sym(Type), v("A"), v("B")), v("x")),
@@ -358,10 +364,10 @@ object StandardRules:
     )
   )
 
-  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, transportRule, cubeRule)
+  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, concatReflLeft, concatReflRight, concatPathReflLeft, concatPathReflRight, transportRefl, transportPathRefl, pathInvRefl, transportRule, cubeRule)
 
   // 全ての標準規則を populate
-  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ adjoints ++ logicMapping ++ modal ++ linear ++ temporal ++ separation ++ classical ++ hott
+  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ logicMapping ++ modal ++ linear ++ separation ++ hott
 
   // --- 標準の初期代数 ---
   import LogicSymbols._
