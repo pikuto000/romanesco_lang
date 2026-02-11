@@ -147,6 +147,30 @@ enum ProofTree:
 
 type Proof = ProofTree
 
+/** 証明の失敗トレース
+  */
+case class FailTrace(
+    goal: Goal,
+    reason: String,
+    depth: Int,
+    children: List[FailTrace] = Nil,
+    failureType: String = "Normal" // "Unify", "Depth", "Cycle", etc.
+):
+  def format(indent: Int = 0): String =
+    val sp = "  " * indent
+    val typeMark = if failureType == "Normal" then "✗" else s"[$failureType]"
+    val base =
+      s"$sp$typeMark (Depth $depth) Goal: ${goal.target}\n$sp  Reason: $reason"
+    if children.isEmpty then base
+    else s"$base\n${children.map(_.format(indent + 1)).mkString("\n")}"
+
+/** 証明結果
+  */
+case class ProofResult(
+    tree: ProofTree,
+    generatedLemma: Option[CatRule] = None
+)
+
 /** コンストラクタの引数定義
   */
 enum ArgType:
@@ -198,30 +222,6 @@ case class ProverConfig(
 object ProverConfig {
   def default: ProverConfig = ProverConfig()
 }
-
-/** 証明結果
-  */
-case class ProofResult(
-    tree: ProofTree,
-    generatedLemma: Option[CatRule] = None
-)
-
-/** 証明の失敗トレース
-  */
-case class FailTrace(
-    goal: Goal,
-    reason: String,
-    depth: Int,
-    children: List[FailTrace] = Nil,
-    failureType: String = "Normal" // "Unify", "Depth", "Cycle", etc.
-):
-  def format(indent: Int = 0): String =
-    val sp = "  " * indent
-    val typeMark = if failureType == "Normal" then "✗" else s"[$failureType]"
-    val base =
-      s"$sp$typeMark (Depth $depth) Goal: ${goal.target}\n$sp  Reason: $reason"
-    if children.isEmpty then base
-    else s"$base\n${children.map(_.format(indent + 1)).mkString("\n")}"
 
 // --- タクティクスシステム用の定義 ---
 

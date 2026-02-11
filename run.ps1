@@ -6,12 +6,24 @@ if ($action -eq "repl") {
 }
 else {
     sbt `
-        "runMain romanesco.Solver.testTactics" `
-        "runMain romanesco.testSomeCases" `
-        "runMain romanesco.Solver.SolverTests.HoTTTest" `
+        "runMain omanesco.Solver.Repl" `
+        "runMain romanesco.Solver.SolverTests.CycleTest" `
+        "runMain romanesco.Solver.SolverTests.CycleTest2" `
+        "runMain romanesco.Solver.SolverTests.DebugAssoc" `
+        "runMain romanesco.Solver.SolverTests.DebugLinear" `
         "runMain romanesco.Solver.SolverTests.HoTTCubeTest" `
-        "runMain romanesco.Solver.SolverTests.TypeLevelTest" `
+        "runMain romanesco.Solver.SolverTests.HoTTTest" `
         "runMain romanesco.Solver.SolverTests.LinearResourceTest" `
+        "runMain romanesco.Solver.SolverTests.SeparationLogicTest" `
         "runMain romanesco.Solver.SolverTests.TemporalLogicTest" `
-        "runMain romanesco.Solver.SolverTests.SeparationLogicTest"
+        "runMain romanesco.Solver.SolverTests.TypeLevelTest" `
+        "runMain romanesco.Solver.runRepl" `
+        "runMain romanesco.Solver.testGeneralizedUnification" `
+        "runMain romanesco.Solver.testLinearLogic" `
+        "runMain romanesco.Solver.testMapFusion" `
+        "runMain romanesco.Solver.testModalLogic" `
+        "runMain romanesco.Solver.testPatternUnification" `
+        "runMain romanesco.Solver.testTactics" `
+        "runMain romanesco.Solver.testTreeInduction" `
+        "runMain romanesco.testSomeCases"
 }
