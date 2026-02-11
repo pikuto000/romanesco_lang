@@ -626,8 +626,13 @@ final class Prover(val config: ProverConfig = ProverConfig.default) {
               (ProofTree.Node(applySubst(goal, s), "inr", List(p)), s, restL)
             }
 
-      case Expr.Sym(True | Terminal) =>
-        LazyList((ProofTree.Leaf(goal, "terminal-universal"), subst, linearContext))
+      case Expr.Sym(True) =>
+        LazyList((ProofTree.Leaf(goal, "true-intro"), subst, linearContext))
+
+      case Expr.Sym(Terminal) =>
+        if (linearContext.isEmpty) {
+          LazyList((ProofTree.Leaf(goal, "terminal-intro"), subst, Nil))
+        } else LazyList.empty
 
       // --- 時相論理: Globally (G) ---
       case Expr.App(Expr.Sym(Globally), List(a)) =>

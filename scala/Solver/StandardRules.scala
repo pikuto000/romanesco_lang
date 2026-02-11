@@ -361,7 +361,7 @@ object StandardRules:
   val hott = List(pathRefl, pathInv, univalence, pathConcatRule, transportRule, cubeRule)
 
   // 全ての標準規則を populate
-  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ limits ++ colimits ++ equality ++ adjoints ++ logicMapping ++ modal ++ linear ++ temporal ++ separation ++ classical ++ hott
+  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ adjoints ++ logicMapping ++ modal ++ linear ++ temporal ++ separation ++ classical ++ hott
 
   // --- 標準の初期代数 ---
   import LogicSymbols._
