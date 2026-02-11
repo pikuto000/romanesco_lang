@@ -16,16 +16,22 @@ object Tactics {
     */
   def intro(state: ProofState, name: Option[String] = None): TacticResult = {
     state.currentGoal match {
-      case Some(Goal(ctx, App(Sym(op), List(a, b))))
+      case Some(Goal(ctx, lin, App(Sym(op), List(a, b))))
           if op == Implies || op == ImpliesAlt1 || op == ImpliesAlt2 =>
         val hypName = name.getOrElse(s"h${ctx.size}")
-        val newGoal = Goal((hypName, a) :: ctx, b)
+        val newGoal = Goal((hypName, a) :: ctx, lin, b)
         Right(state.copy(goals = newGoal :: state.goals.tail))
 
-      case Some(Goal(ctx, App(Sym(Forall), List(Var(v), body)))) =>
+      // 線形含意(⊸)
+      case Some(Goal(ctx, lin, App(Sym(LImplies), List(a, b)))) =>
+        val hypName = name.getOrElse(s"lin${lin.size}")
+        val newGoal = Goal(ctx, (hypName, a) :: lin, b)
+        Right(state.copy(goals = newGoal :: state.goals.tail))
+
+      case Some(Goal(ctx, lin, App(Sym(Forall), List(Var(v), body)))) =>
         val hypName = name.getOrElse(s"${v}_t${state.goals.size}")
         val instantiated = Prover.substVar(body, v, Var(hypName))
-        val newGoal = Goal(ctx, instantiated)
+        val newGoal = Goal(ctx, lin, instantiated)
         Right(state.copy(goals = newGoal :: state.goals.tail))
 
       case _ =>
@@ -37,10 +43,10 @@ object Tactics {
     */
   def split(state: ProofState): TacticResult = {
     state.currentGoal match {
-      case Some(Goal(ctx, App(Sym(op), List(a, b))))
+      case Some(Goal(ctx, lin, App(Sym(op), List(a, b))))
           if op == And || op == Product =>
-        val g1 = Goal(ctx, a)
-        val g2 = Goal(ctx, b)
+        val g1 = Goal(ctx, lin, a)
+        val g2 = Goal(ctx, lin, b)
         Right(state.copy(goals = g1 :: g2 :: state.goals.tail))
       case _ => Left("split: Goal is not a conjunction")
     }
@@ -50,7 +56,8 @@ object Tactics {
     */
   def destruct(state: ProofState, hypName: String): TacticResult = {
     state.currentGoal match {
-      case Some(goal @ Goal(ctx, target)) =>
+      case Some(goal @ Goal(ctx, lin, target)) =>
+        // 持続的文脈の検索
         ctx.zipWithIndex.find(_._1._1 == hypName) match {
           case Some(((name, hypExpr), idx)) =>
             hypExpr match {
@@ -65,15 +72,26 @@ object Tactics {
 
               case App(Sym(op), List(a, b)) if op == Or || op == Coproduct =>
                 val g1 =
-                  Goal(ctx.patch(idx, List((s"$name.left", a)), 1), target)
+                  Goal(ctx.patch(idx, List((s"$name.left", a)), 1), lin, target)
                 val g2 =
-                  Goal(ctx.patch(idx, List((s"$name.right", b)), 1), target)
+                  Goal(ctx.patch(idx, List((s"$name.right", b)), 1), lin, target)
                 Right(state.copy(goals = g1 :: g2 :: state.goals.tail))
 
               case _ =>
                 Left(s"destruct: Hypothesis '$hypName' cannot be destructed")
             }
-          case None => Left(s"destruct: Hypothesis '$hypName' not found")
+          case None => 
+            // 線形文脈の検索
+            lin.zipWithIndex.find(_._1._1 == hypName) match {
+              case Some(((name, hypExpr), idx)) =>
+                hypExpr match {
+                  case App(Sym(Tensor), List(a, b)) =>
+                    val newLin = lin.patch(idx, List((s"$name.1", a), (s"$name.2", b)), 1)
+                    Right(state.copy(goals = goal.copy(linearContext = newLin) :: state.goals.tail))
+                  case _ => Left(s"destruct: Linear hypothesis '$hypName' cannot be destructed")
+                }
+              case None => Left(s"destruct: Hypothesis '$hypName' not found")
+            }
         }
       case None => Left("No current goal")
     }
@@ -86,14 +104,15 @@ object Tactics {
       varName: Option[String] = None
   ): TacticResult = {
     state.currentGoal match {
-      case Some(Goal(ctx, App(Sym(Forall), List(Var(v), body)))) =>
+      case Some(Goal(ctx, lin, App(Sym(Forall), List(Var(v), body)))) =>
         val targetVar = varName.getOrElse(v)
-        val baseGoal = Goal(ctx, Prover.substVar(body, v, Sym(Zero)))
+        val baseGoal = Goal(ctx, lin, Prover.substVar(body, v, Sym(Zero)))
         val n = targetVar
         val pn = Prover.substVar(body, v, Var(n))
         val psn = Prover.substVar(body, v, App(Sym(Succ), List(Var(n))))
         val stepGoal = Goal(
           ctx,
+          lin,
           App(Sym(Forall), List(Var(n), App(Sym(Implies), List(pn, psn))))
         )
         Right(state.copy(goals = baseGoal :: stepGoal :: state.goals.tail))
@@ -105,7 +124,7 @@ object Tactics {
     */
   def reflexivity(state: ProofState): TacticResult = {
     state.currentGoal match {
-      case Some(Goal(ctx, App(Sym(Eq), List(l, r)))) =>
+      case Some(Goal(ctx, lin, App(Sym(Eq), List(l, r)))) =>
         if (Rewriter.normalize(l) == Rewriter.normalize(r))
           Right(state.copy(goals = state.goals.tail))
         else
@@ -120,10 +139,10 @@ object Tactics {
     */
   def rewrite(state: ProofState, hypName: String): TacticResult = {
     state.currentGoal match {
-      case Some(goal @ Goal(ctx, target)) =>
-        ctx.find(_._1 == hypName) match {
+      case Some(goal @ Goal(ctx, lin, target)) =>
+        (ctx ++ lin).find(_._1 == hypName) match {
           case Some((_, hypExpr)) =>
-            // 1. 仮定をインスタンス化（メタ変数はユニークにするために state のハッシュ等を利用）
+            // 1. 仮定をインスタンス化
             var metaCounter = 0
             def instantiate(expr: Expr): Expr = expr match {
               case App(Sym(Forall), List(Var(v), body)) =>
@@ -139,7 +158,7 @@ object Tactics {
               case App(Sym(Eq), List(l, r)) =>
                 val normTarget = Rewriter.normalize(target)
 
-                // 2. 単一化を伴う部分式書き換え (デフォルトは左辺から右辺への単方向)
+                // 2. 単一化を伴う部分式書き換え
                 def findAndReplace(expr: Expr): Option[(Expr, Subst)] = {
                   unify(expr, l, emptySubst).headOption
                     .map(s => (applySubst(r, s), s))
@@ -189,8 +208,8 @@ object Tactics {
 
   def exact(state: ProofState, hypName: String): TacticResult = {
     state.currentGoal match {
-      case Some(Goal(ctx, target)) =>
-        ctx.find(_._1 == hypName) match {
+      case Some(Goal(ctx, lin, target)) =>
+        (ctx ++ lin).find(_._1 == hypName) match {
           case Some((_, hypExpr)) =>
             unify(hypExpr, target, emptySubst).headOption match {
               case Some(_) => Right(state.copy(goals = state.goals.tail))
@@ -205,9 +224,9 @@ object Tactics {
 
   def assumption(state: ProofState): TacticResult = {
     state.currentGoal match {
-      case Some(Goal(ctx, target)) =>
+      case Some(Goal(ctx, lin, target)) =>
         if (
-          ctx.exists { case (_, hyp) =>
+          (ctx ++ lin).exists { case (_, hyp) =>
             unify(hyp, target, emptySubst).nonEmpty
           }
         )
@@ -219,7 +238,7 @@ object Tactics {
 
   def applyHyp(state: ProofState, hypName: String): TacticResult = {
     state.currentGoal match {
-      case Some(Goal(ctx, target)) =>
+      case Some(Goal(ctx, lin, target)) =>
         ctx.find(_._1 == hypName) match {
           case Some((_, hypExpr)) =>
             hypExpr match {
@@ -227,7 +246,7 @@ object Tactics {
                   if op == Implies || op == ImpliesAlt1 || op == ImpliesAlt2 =>
                 unify(b, target, emptySubst).headOption match {
                   case Some(_) =>
-                    Right(state.copy(goals = Goal(ctx, a) :: state.goals.tail))
+                    Right(state.copy(goals = Goal(ctx, lin, a) :: state.goals.tail))
                   case None =>
                     Left(s"apply: Conclusion of '$hypName' does not match goal")
                 }

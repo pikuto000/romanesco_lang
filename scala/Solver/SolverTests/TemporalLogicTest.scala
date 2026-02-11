@@ -1,39 +1,41 @@
-package romanesco.Solver
+package romanesco.Solver.SolverTests
 
 import romanesco.Solver.core._
-import romanesco.Solver.sugar._
+import romanesco.Solver.core.Expr._
+import romanesco.Solver.core.LogicSymbols._
+import romanesco.Solver.TestParser
 import romanesco.Utils.Debug.logger
 
-@main def testTemporalLogic = {
-  logger.switch(false)
-  println("=== Temporal Logic Test ===")
+object TemporalLogicTest {
+  def main(args: Array[String]): Unit = {
+    logger.switch(false)
+    val rules = StandardRules.temporal ++ StandardRules.all
+    val config = ProverConfig(rules = rules)
+    val prover = new Prover(config)
 
-  val temporalRules = StandardRules.temporal
-  val allRules = StandardRules.all ++ temporalRules
+    println("=== Temporal Logic: Co-induction Test ===")
 
-  val testCases = List(
-    "G A → A",                       // Global expansion (simplified)
-    "F A → A ∨ X F A",               // Finally expansion
-    "A U B → B ∨ (A ∧ X (A U B))"    // Until expansion
-  )
+    val testCases = List(
+      "G(A) → A",
+      "G(A) → X(A)",
+      "G(A) → G(G(A))",
+      "G(A → B) → G(A) → G(B)"
+    )
 
-  val config = ProverConfig(classical = false, rules = allRules)
-  val prover = new Prover(config)
-
-  testCases.foreach { input =>
-    println(s"\n[Test Case] $input")
-    try {
-      val expr = TestParser.parse(input)
-      prover.prove(expr) match {
-        case Right(result) =>
-          println(s"✓ Solved:\n${result.tree.format(1)}")
-          result.generatedLemma.foreach(l => println(s"  Generated Lemma: $l"))
-        case Left(trace) =>
-          println("✗ Failed to prove")
-          println(trace.format(1))
+    testCases.foreach { input =>
+      print(s"Case: $input ... ")
+      try {
+        val goal = TestParser.parse(input)
+        val result = prover.prove(goal, maxDepth = 15)
+        result match {
+          case Right(_) => println("✓ OK (Solved)")
+          case Left(trace) => 
+            println("✗ FAIL")
+            // println(trace.format())
+        }
+      } catch {
+        case e: Exception => println(s"Error: ${e.getMessage}")
       }
-    } catch {
-      case e: Exception => println(s"Error: ${e.getMessage}")
     }
   }
 }

@@ -34,19 +34,22 @@ enum Expr:
     case App(h, _)      => h.headSymbol
 
   override def toString: String = this match
-    case Var(n)                                   => n
-    case Meta(id)                                 => s"?$id"
-    case Sym(n)                                   => n
-    case App(Expr.Sym("Type"), List(Expr.Meta(MetaId(ids)))) => s"Type${ids.length}"
+    case Var(n)                                              => n
+    case Meta(id)                                            => s"?$id"
+    case Sym(n)                                              => n
+    case App(Expr.Sym("Type"), List(Expr.Meta(MetaId(ids)))) =>
+      s"Type${ids.length}"
     case App(Expr.Sym("path"), args) =>
       def getPathLevel(e: Expr): Int = e match {
         case App(Expr.Sym("path"), List(sub, _, _)) => 1 + getPathLevel(sub)
-        case _ => 0
+        case _                                      => 0
       }
       val level = getPathLevel(this)
       if (level > 1) {
         val superscripts = "⁰¹²³⁴⁵⁶⁷⁸⁹"
-        val levelStr = level.toString.map(c => if (c >= '0' && c <= '9') superscripts(c - '0') else c).mkString
+        val levelStr = level.toString
+          .map(c => if (c >= '0' && c <= '9') superscripts(c - '0') else c)
+          .mkString
         s"path$levelStr(${args.mkString(",")})"
       } else {
         s"path(${args.mkString(",")})"
@@ -56,6 +59,26 @@ enum Expr:
     case App(h, args)                             =>
       if args.isEmpty then h.toString
       else s"$h(${args.mkString(",")})"
+
+  /** メタ変数を出現順に正規化（α同値性の判定用） */
+  def canonicalize: Expr = {
+    val metaMap = scala.collection.mutable.Map[MetaId, MetaId]()
+    var counter = 0
+    def loop(e: Expr): Expr = e match {
+      case Meta(id) =>
+        val newId = metaMap.getOrElseUpdate(
+          id, {
+            val nid = MetaId(List(counter))
+            counter += 1
+            nid
+          }
+        )
+        Meta(newId)
+      case App(f, args) => App(loop(f), args.map(loop))
+      case _            => e
+    }
+    loop(this)
+  }
 
   /** 式の複雑さ（ヒューリスティック用スコア） */
   def complexity: Int = this match
@@ -70,7 +93,8 @@ object Expr:
   def meta(id: Int): Expr = Meta(MetaId(id))
   def meta(ids: Int*): Expr = Meta(MetaId(ids.toList))
 
-  def typeLevel(level: Int): Expr = App(Sym("Type"), List(Meta(MetaId((0 until level).toList.map(_ => 0)))))
+  def typeLevel(level: Int): Expr =
+    App(Sym("Type"), List(Meta(MetaId((0 until level).toList.map(_ => 0)))))
 
   def unapplyEq(e: Expr): Option[(Expr, Expr)] = e match
     case App(Sym("="), List(l, r)) => Some((l, r))
@@ -119,15 +143,15 @@ enum ArgType:
   case Constant
 
 /** コンストラクタの型（点または道）
- */
+  */
 enum ConstructorType:
   case Point
   case Path(from: Expr, to: Expr)
 
 /** 代数の構造定義 */
 case class ConstructorDef(
-    symbol: String, 
-    argTypes: List[ArgType], 
+    symbol: String,
+    argTypes: List[ArgType],
     ctorType: ConstructorType = ConstructorType.Point
 )
 case class InitialAlgebra(
@@ -153,6 +177,7 @@ case class ProverConfig(
     maxRaa: Int = 2,
     maxInduction: Int = 2,
     maxPathLevel: Int = 5, // 高次pathの最大階層
+    maxComplexity: Int = 100, // 項の最大複雑度
     generateLemmas: Boolean = true,
     lemmaMode: LemmaGenerationMode = LemmaGenerationMode.EqualityOnly,
     excludeTrivialLemmas: Boolean = true
@@ -190,11 +215,18 @@ case class FailTrace(
 
 case class Goal(
     context: List[(String, Expr)],
+    linearContext: List[(String, Expr)] = Nil,
     target: Expr
 ):
   override def toString: String =
     val ctx = context.map((n, e) => s"  $n: $e").mkString("\n")
-    s"--------------------------------\n$ctx\n--------------------------------\n  Goal: $target"
+    val lctx =
+      if (linearContext.isEmpty) ""
+      else
+        "\n  (Linear):\n" + linearContext
+          .map((n, e) => s"  $n: $e")
+          .mkString("\n")
+    s"--------------------------------\n$ctx$lctx\n--------------------------------\n  Goal: $target"
 
 case class ProofState(
     goals: List[Goal],

@@ -71,6 +71,7 @@ object LogicSymbols {
   val Refl = "refl"
   val Transport = "transport"
   val Concat = "concat" // パスの合成演算子
+  val Cube = "cube" // 立方体モデル近似
 
   // その他の表記揺れ
   val ImpliesAlt1 = "⊃"

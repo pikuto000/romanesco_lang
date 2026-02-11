@@ -25,6 +25,13 @@
 
 これで一旦、現在の「生まれたTODO」はこの形です。
 特に最後の特殊論理対応は、システムプログラミングを視野に入れた新しい方向性として追加されています。
+
+【強化：高度な論理推論の深化】
+- [DONE] Linear Logic: リソース管理の厳密化。Prover に `linearContext` を導入し、使用済み仮定の消費・コンテキスト分割を実装する。
+- [DONE] Temporal Logic: 余帰納法（Co-induction）の実装。Cycle Detection を拡張し、G(A) などの安全性を証明可能にする。
+- [DONE] Separation Logic: Frame Rule の自動適用と、AC書き換え（Associative-Commutative）によるヒープ項の相殺（Cancellation）機能を実装する。
+- [DONE] HoTT: パス誘導（Path Induction / J-rule）の自動化。パスの結合法則や随伴等価性の体系的な証明テスト。
+
 --------------------------------------------------------------------------------------------------------------------------------
 HoTT（Homotopy Type Theory）と完全に同じ能力を目指すためのTODOリスト（型なし近似版・優先度順）
 

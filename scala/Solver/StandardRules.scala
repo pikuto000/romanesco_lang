@@ -210,11 +210,6 @@ object StandardRules:
     sym("0")
   )
 
-  // 全ての標準規則
-  // 基本的な論理・圏論的構造は Prover.scala にハードコードされているため、
-  // ここではデフォルトで適用する追加規則は空にする。
-  val all: List[CatRule] = Nil
-
   // カテゴリー別
   val products = List(productUniversal, fstBeta, sndBeta, productEta)
   val coproducts = List(coproductUniversal, caseInlBeta, caseInrBeta)
@@ -261,25 +256,13 @@ object StandardRules:
   val modal = List(modalK, modalT, modal4, modal5, modalDuality)
 
   // --- 線形論理 ---
-  val linearImplies = CatRule(
-    "linear-implies-beta",
-    sym(LImplies)(v("A"), v("B")),
-    sym("→")(v("A"), v("B")) // 簡易的なマッピング
-  )
-
-  val tensorUniversal = CatRule(
-    "tensor-universal",
-    sym(Tensor)(v("A"), v("B")),
-    sym(Product)(v("A"), v("B")) // Tensor ⊗ を Product × にマッピング
-  )
-
   val linearBang = CatRule(
     "linear-bang-elim",
     sym(Bang)(v("A")),
     v("A")
   )
 
-  val linear = List(linearImplies, tensorUniversal, linearBang)
+  val linear = List(linearBang)
 
   // --- 時相論理 ---
   val temporalG = CatRule(
@@ -309,13 +292,7 @@ object StandardRules:
     sym(SepAnd)(v("B"), v("A"))
   )
 
-  val sepAndToAnd = CatRule(
-    "sep-and-to-and",
-    sym(SepAnd)(v("A"), v("B")),
-    sym(And)(v("A"), v("B")) // 簡易的なマッピング
-  )
-
-  val separation = List(sepAndCommutative, sepAndToAnd)
+  val separation = List(sepAndCommutative)
 
   // --- 古典論理 ---
   val em = CatRule(
@@ -348,27 +325,52 @@ object StandardRules:
   val univalence = CatRule(
     "univalence",
     sym("equiv")(v("A"), v("B")),
-    sym(Path)(sym(Type)(v("L")), v("A"), v("B"))
+    sym(Path)(sym(Type), v("A"), v("B"))
   )
 
-  val pathConcat = CatRule(
+  val pathToEquiv = CatRule(
+    "path-to-equiv",
+    sym(Path)(sym(Type), v("A"), v("B")),
+    sym("equiv")(v("A"), v("B"))
+  )
+
+  val pathConcatRule = CatRule(
     "path-concat",
     sym(Concat)(sym(Path)(v("A"), v("a"), v("b")), sym(Path)(v("A"), v("b"), v("c"))),
     sym(Path)(v("A"), v("a"), v("c"))
   )
 
-  val transport = CatRule(
+  val transportRule = CatRule(
     "transport",
-    sym(Transport)(v("P"), sym(Path)(sym(Type)(v("L")), v("A"), v("B")), v("x")),
+    sym(Transport)(v("P"), sym(Path)(sym(Type), v("A"), v("B")), v("x")),
     v("P")(v("B"))
   )
 
-  val hott = List(pathRefl, pathInv, univalence, pathConcat, transport)
+  val cubeRule = CatRule(
+    "cube-reduction",
+    sym(Cube)(v("A"), v("p"), v("q"), v("r"), v("s")),
+    sym(Path)(sym(Path)(v("A"), v("x"), v("y")), v("p"), v("r")), 
+    List(
+      eq(v("p"), sym(Path)(v("A"), v("x"), v("y"))),
+      eq(v("q"), sym(Path)(v("A"), v("x"), v("z"))),
+      eq(v("r"), sym(Path)(v("A"), v("z"), v("w"))),
+      eq(v("s"), sym(Path)(v("A"), v("y"), v("w")))
+    )
+  )
+
+  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, transportRule, cubeRule)
+
+  // 全ての標準規則を populate
+  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ limits ++ colimits ++ equality ++ adjoints ++ logicMapping ++ modal ++ linear ++ temporal ++ separation ++ classical ++ hott
 
   // --- 標準の初期代数 ---
   import LogicSymbols._
   val defaultAlgebras = List(
     InitialAlgebra("Nat", List(ConstructorDef(Zero, Nil), ConstructorDef(Succ, List(ArgType.Recursive))), "n"),
     InitialAlgebra("List", List(ConstructorDef("nil", Nil), ConstructorDef("cons", List(ArgType.Constant, ArgType.Recursive))), "xs"),
-    InitialAlgebra("Tree", List(ConstructorDef("leaf", Nil), ConstructorDef("node", List(ArgType.Recursive, ArgType.Constant, ArgType.Recursive))), "t")
+    InitialAlgebra("Tree", List(ConstructorDef("leaf", Nil), ConstructorDef("node", List(ArgType.Recursive, ArgType.Constant, ArgType.Recursive))), "t"),
+    InitialAlgebra("S1", List(
+      ConstructorDef("base", Nil),
+      ConstructorDef("loop", Nil, ConstructorType.Path(sym("base"), sym("base")))
+    ), "x")
   )

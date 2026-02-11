@@ -13,7 +13,7 @@ import romanesco.Solver.core.Tactics._
 
   // 目標: A ∧ B → B ∧ A
   val goalExpr = TestParser.parse("A ∧ B → B ∧ A")
-  val initialState = ProofState(List(Goal(Nil, goalExpr)), Nil, goalExpr)
+  val initialState = ProofState(List(Goal(Nil, Nil, goalExpr)), Nil, goalExpr)
 
   println(s"Initial state:\n${initialState.currentGoal.get}")
 
@@ -44,7 +44,7 @@ import romanesco.Solver.core.Tactics._
 
   println("\n=== Induction Test: plus(n, 0) = n ===")
   val inductionGoal = TestParser.parse("∀n. plus(n, 0) = n")
-  val inductionState = ProofState(List(Goal(Nil, inductionGoal)), Nil, inductionGoal)
+  val inductionState = ProofState(List(Goal(Nil, Nil, inductionGoal)), Nil, inductionGoal)
   
   val indResult = for {
     s1 <- induction(inductionState)

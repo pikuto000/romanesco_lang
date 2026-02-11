@@ -12,7 +12,7 @@ object Unifier:
   def emptySubst: Subst = Map.empty
 
   def applySubst(e: Expr, s: Subst): Expr =
-    logger.log(s"applySubst: $e, $s")
+    // logger.log(s"applySubst: $e, $s")
     e match
       case Expr.Meta(id) if s.contains(id) =>
         applySubst(s(id), s)
@@ -23,7 +23,7 @@ object Unifier:
       case _ => e
 
   def applySubstToRule(rule: CatRule, s: Subst): CatRule =
-    logger.log(s"applySubstToRule: $rule, $s")
+    // logger.log(s"applySubstToRule: $rule, $s")
     CatRule(
       rule.name,
       applySubst(rule.lhs, s),
@@ -36,10 +36,10 @@ object Unifier:
     val r2 = applySubst(e2, subst)
 
     if r1 == r2 then
-      logger.log(s"Unify Success: $r1 = $r2")
+      // logger.log(s"Unify Success: $r1 = $r2")
       LazyList(subst)
     else
-      logger.log(s"Unifying: $r1 with $r2")
+      // logger.log(s"Unifying: $r1 with $r2")
       val res = (r1, r2) match
         // --- ラムダ抽象の単一化 (App構造) ---
         case (Expr.Lam(v1, b1), Expr.Lam(v2, b2)) =>
@@ -51,6 +51,27 @@ object Unifier:
             if id1 == id2 && args1.length == args2.length =>
           args1.zip(args2).foldLeft(LazyList(subst)) { case (sList, (a1, a2)) =>
             sList.flatMap(unify(a1, a2, _))
+          }
+
+        // --- Strict Universe Level Unification (Russell Paradox Avoidance) ---
+        case (Expr.App(Expr.Sym(LogicSymbols.Type), args1), Expr.App(Expr.Sym(LogicSymbols.Type), args2)) =>
+          // 型宇宙のレベル構造が異なる場合は単一化しない（パラドックス回避）
+          // Type(L1) = Type(L2) only if L1 == L2 structurally (same level depth)
+          def getLevelDepth(e: Expr): Int = e match {
+            case Expr.Meta(id) => id.ids.length
+            case _ => -1 // Unknown/Var
+          }
+          val l1 = args1.headOption.map(getLevelDepth).getOrElse(-1)
+          val l2 = args2.headOption.map(getLevelDepth).getOrElse(-1)
+          
+          if (l1 != -1 && l2 != -1 && l1 != l2) LazyList.empty
+          else {
+             // Standard decomposition if levels match or are variables
+             unify(Expr.Sym(LogicSymbols.Type), Expr.Sym(LogicSymbols.Type), subst).flatMap { s =>
+              args1.zip(args2).foldLeft(LazyList(s)) { case (sList, (arg1, arg2)) =>
+                sList.flatMap(unify(arg1, arg2, _))
+              }
+            }
           }
 
         // --- 高階パターン単一化 (一般化) ---
@@ -85,7 +106,7 @@ object Unifier:
 
         case _ => LazyList.empty
 
-      if (res.nonEmpty) logger.log(s"Unify Success: $r1 = $r2 with ${res.head}")
+      // if (res.nonEmpty) logger.log(s"Unify Success: $r1 = $r2 with ${res.head}")
       res
 
   // 項tの中にあるtermToReplaceをreplacementに置き換える

@@ -1,38 +1,48 @@
-package romanesco.Solver
+package romanesco.Solver.SolverTests
 
 import romanesco.Solver.core._
-import romanesco.Solver.sugar._
+import romanesco.Solver.core.Expr._
+import romanesco.Solver.core.LogicSymbols._
+import romanesco.Solver.TestParser
 import romanesco.Utils.Debug.logger
 
-@main def testSeparationLogic = {
-  logger.switch(false)
-  println("=== Separation Logic Test ===")
+object SeparationLogicTest {
+  def main(args: Array[String]): Unit = {
+    logger.switch(false)
+    val rules = StandardRules.separation ++ StandardRules.all
+    val config = ProverConfig(rules = rules)
+    val prover = new Prover(config)
 
-  val sepRules = StandardRules.separation
-  val allRules = StandardRules.all ++ sepRules
+    println("=== Separation Logic: Resource Management Test ===")
 
-  val testCases = List(
-    "A * B → B * A",    // Commutativity
-    "A * B → A ∧ B"     // Mapping to And
-  )
+    // Use ⊸ (LImplies) to ensure antecedents go to Linear Context
+    val testCases = List(
+      ("A * B ⊸ B * A", true),
+      ("(A * B) * C ⊸ A * (B * C)", true),
+      ("(A ⊸ B) ⊸ (A * C ⊸ B * C)", true),
+      ("A * A ⊸ A", false), 
+      ("A ⊸ A * A", false),
+      ("(∀v. (x ↦ v ⊸ P(v))) ⊸ (x ↦ 5 ⊸ P(5))", true),
+      ("A * B * C ⊸ C * A * B", true),
+      ("(∀v. (x ↦ v * R)) ⊸ (x ↦ 5 * R)", true) // Quantifier for variable v
+    )
 
-  val config = ProverConfig(classical = false, rules = allRules)
-  val prover = new Prover(config)
-
-  testCases.foreach { input =>
-    println(s"\n[Test Case] $input")
-    try {
-      val expr = TestParser.parse(input)
-      prover.prove(expr) match {
-        case Right(result) =>
-          println(s"✓ Solved:\n${result.tree.format(1)}")
-          result.generatedLemma.foreach(l => println(s"  Generated Lemma: $l"))
-        case Left(trace) =>
-          println("✗ Failed to prove")
-          println(trace.format(1))
+    testCases.foreach { case (input, expected) =>
+      print(s"Case: $input ... ")
+      try {
+        val goal = TestParser.parse(input)
+        val result = prover.prove(goal, maxDepth = 10)
+        result match {
+          case Right(_) if expected => println("✓ OK (Solved)")
+          case Right(_) if !expected => println("✗ FAIL (Should have failed)")
+          case Left(_) if !expected => println("✓ OK (Failed)")
+          case Left(trace) if expected => 
+            println("✗ FAIL (Should have been solved)")
+            // println(trace.format())
+        }
+      } catch {
+        case e: Exception => println(s"Error: ${e.getMessage}")
       }
-    } catch {
-      case e: Exception => println(s"Error: ${e.getMessage}")
     }
   }
 }

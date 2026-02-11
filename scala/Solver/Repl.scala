@@ -36,7 +36,7 @@ object Repl:
           else
             try
               val expr = TestParser.parse(input)
-              val s = ProofState(List(Goal(Nil, expr)), Nil, expr)
+              val s = ProofState(List(Goal(Nil, Nil, expr)), Nil, expr)
               state = Some(s)
               history = List(s)
               println(s"\nInitial Goal: $expr")

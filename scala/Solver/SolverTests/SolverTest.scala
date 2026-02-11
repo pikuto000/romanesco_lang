@@ -38,7 +38,7 @@ import romanesco.Utils.Debug.logger
   println("\n=== Induction Test: plus(n, S(m)) = S(plus(n, m)) ===")
   try {
     val expr = TestParser.parse("∀n. ∀m. plus(n, S(m)) = S(plus(n, m))")
-    var state = ProofState(List(Goal(Nil, expr)), Nil, expr)
+    var state = ProofState(List(Goal(Nil, Nil, expr)), Nil, expr)
 
     def printState(s: ProofState): Unit = {
       println("Goals:")

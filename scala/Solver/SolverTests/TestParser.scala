@@ -18,7 +18,7 @@ object TestParser:
     parseExpr(tokens, variables)._1
 
   private def tokenize(s: String): List[String] =
-    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', '⇒', '⊃', '×', '⊥', '⊤', '∘', '□', '◇', 'K', 'O', '⊸', '!', '?', '⊗', '⊕', '&', 'G', 'F', 'X', 'U', '*', '↦')
+    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', ':', '⇒', '⊃', '×', '⊥', '⊤', '∘', '□', '◇', 'K', 'O', '⊸', '!', '?', '⊗', '⊕', '&', 'G', 'F', 'X', 'U', '*', '↦')
     
     val sb = new StringBuilder
     val tokens = mutable.ListBuffer.empty[String]
@@ -139,6 +139,13 @@ object TestParser:
 
   private def parseQuantifier(tokens: List[String], vars: Set[String]): (Expr, List[String]) =
     tokens match
+      case Forall :: varName :: ":" :: rest =>
+        val (typeExpr, rest2) = parseExpr(rest, vars)
+        rest2 match
+          case "." :: rest3 =>
+            val (body, rest4) = parseExpr(rest3, vars + varName)
+            (sym(Forall)(v(varName), typeExpr, body), rest4)
+          case _ => throw new Exception(s"Expected '.' after type in Forall at ${rest2.take(5).mkString(" ")}")
       case Forall :: varName :: "." :: rest =>
         val (body, rest2) = parseExpr(rest, vars + varName)
         (sym(Forall)(v(varName), body), rest2)
