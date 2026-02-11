@@ -12,6 +12,79 @@ trait LinearLogicSearch { self: Prover =>
   import Expr._
   import Unifier._
 
+  /** 線形論理・分離論理の相殺（Cancellation）規則の適用
+    * A * C ⊸ B * C  => A ⊸ B
+    */
+  private[core] def searchCancellation(
+      goal: Expr,
+      rules: List[CatRule],
+      context: Context,
+      linearContext: Context,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr])],
+      raaCount: Int,
+      inductionCount: Int,
+      guarded: Boolean,
+      history: List[Expr]
+  ): SolveTree[(ProofTree, Subst, Context)] = {
+    // 目標が A * B または A ⊗ B の場合に、線形文脈との共通項を探す
+    goal match {
+      case Expr.App(Expr.Sym(op), List(a, b)) if op == Tensor || op == SepAnd =>
+        val goalTerms = collectTerms(goal, op)
+        val cancelOptions = linearContext.zipWithIndex.flatMap { case ((name, hyp), idx) =>
+          val hypTerms = collectTerms(hyp, op)
+          val common = goalTerms.intersect(hypTerms)
+          if (common.nonEmpty) {
+            val remainingGoal = buildTerm(goalTerms.diff(common), op)
+            val remainingHyp = buildTerm(hypTerms.diff(common), op)
+            val nextLinear = if (remainingHyp == Expr.Sym(Terminal) || remainingHyp == Expr.Sym(LOne)) {
+              linearContext.patch(idx, Nil, 1)
+            } else {
+              linearContext.patch(idx, List((s"$name.c", remainingHyp)), 1)
+            }
+            
+            Some(search(
+              remainingGoal,
+              rules,
+              context,
+              nextLinear,
+              subst,
+              depth + 1,
+              limit,
+              visited,
+              raaCount,
+              inductionCount,
+              guarded,
+              history
+            ).map { case (t, s, restL) =>
+              (
+                ProofTree.Node(applySubst(goal, s), s"cancel[$name]", List(t)),
+                s,
+                restL
+              )
+            })
+          } else None
+        }
+        SolveTree.merge(cancelOptions)
+      case _ => SolveTree.Failure
+    }
+  }
+
+  private def collectTerms(e: Expr, op: String): List[Expr] = e match {
+    case Expr.App(Expr.Sym(`op`), List(a, b)) => collectTerms(a, op) ++ collectTerms(b, op)
+    case other => List(other)
+  }
+
+  private def buildTerm(terms: List[Expr], op: String): Expr = {
+    if (terms.isEmpty) {
+      if (op == Tensor) Expr.Sym(LOne) else Expr.Sym(Terminal)
+    } else {
+      terms.reduceLeft((acc, t) => Expr.App(Expr.Sym(op), List(acc, t)))
+    }
+  }
+
   /** 線形論理のテンソル(⊗)・分離論理の積(*)の分解 */
   private[core] def searchLinearGoal(
       goal: Expr,

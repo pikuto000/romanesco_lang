@@ -16,7 +16,8 @@ import scala.util.boundary
 final class Prover(val config: ProverConfig = ProverConfig.default)
     extends LinearLogicSearch
     with TemporalLogicSearch
-    with PersistentLogicSearch {
+    with PersistentLogicSearch
+    with HoTTSearch {
   import Unifier._
 
   private val metaCounter = new AtomicInteger(0)
@@ -333,6 +334,20 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
               guarded,
               nextHistory
             ),
+            searchCancellation(
+              currentGoalRaw,
+              rules,
+              context,
+              linearContext,
+              subst,
+              depth,
+              limit,
+              nextVisited,
+              raaCount,
+              inductionCount,
+              guarded,
+              nextHistory
+            ),
             searchDecomposeContext(
               currentGoalRaw,
               rules,
@@ -451,11 +466,6 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       })
     }
     h.complexity < g.complexity && loop(h, g)
-  }
-
-  private def getPathLevel(e: Expr): Int = e match {
-    case Expr.App(Expr.Sym(Path), List(_, x, y)) => 1 + getPathLevel(x)
-    case _                                       => 0
   }
 
   private def searchAxiom(
@@ -861,71 +871,6 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
           }
         case _ => SolveTree.Failure
       }
-  }
-
-  private def searchPathInduction(
-      goal: Expr,
-      rules: List[CatRule],
-      context: Context,
-      linearContext: Context,
-      subst: Subst,
-      depth: Int,
-      limit: Int,
-      visited: Set[(Expr, Set[Expr], List[Expr])],
-      raaCount: Int,
-      inductionCount: Int,
-      guarded: Boolean,
-      history: List[Expr]
-  ): SolveTree[(ProofTree, Subst, Context)] = {
-    if (inductionCount >= config.maxInduction) SolveTree.Failure
-    else {
-      val piOptions = context.indices.flatMap { i =>
-        context(i) match {
-          case (pName, Expr.App(Expr.Sym(Path), List(_, x, Expr.Var(yName))))
-              if x != Expr.Var(yName) =>
-            val reflX = Expr.App(Expr.Sym(Refl), List(x))
-            val substGoal =
-              Prover.substVar(Prover.substVar(goal, yName, x), pName, reflX)
-            val nextCtx = context
-              .patch(i, Nil, 1)
-              .map(h =>
-                (
-                  h._1,
-                  Prover.substVar(Prover.substVar(h._2, yName, x), pName, reflX)
-                )
-              )
-            List(
-              search(
-                substGoal,
-                rules,
-                nextCtx,
-                linearContext,
-                subst,
-                depth + 1,
-                limit,
-                visited,
-                raaCount,
-                inductionCount + 1,
-                guarded,
-                history
-              )
-                .map { case (t, s, restL) =>
-                  (
-                    ProofTree.Node(
-                      applySubst(goal, s),
-                      s"path-induction[$pName]",
-                      List(t)
-                    ),
-                    s,
-                    restL
-                  )
-                }
-            )
-          case _ => Nil
-        }
-      }
-      SolveTree.merge(piOptions)
-    }
   }
 
   private def searchRules(
