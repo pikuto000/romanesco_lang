@@ -23,5 +23,6 @@ else {
         "runMain romanesco.Solver.testPatternUnification" `
         "runMain romanesco.Solver.testTactics" `
         "runMain romanesco.Solver.testTreeInduction" `
+        "runMain romanesco.Solver.SolverTests.RecursiveInductionTest" `
         "runMain romanesco.testSomeCases"
 }

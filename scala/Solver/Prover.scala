@@ -784,93 +784,126 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       history: List[Expr]
   ): SolveTree[(ProofTree, Subst, Context)] = {
     if (inductionCount >= config.maxInduction) SolveTree.Failure
-    else
-      goal match {
+    else {
+      // 1. ∀ に対する帰納法
+      val forallOptions = goal match {
         case Expr.App(Expr.Sym(Forall), args) =>
           boundary {
             val (vName, body) = args match {
               case List(Expr.Var(v), b)    => (v, b)
               case List(Expr.Var(v), _, b) => (v, b)
-              case _                       => boundary.break(SolveTree.Failure)
+              case _                       => boundary.break(Nil)
             }
-            val targetAlgebras =
-              algebras.filter(a => vName.startsWith(a.varPrefix))
-            val candidates =
-              if (targetAlgebras.nonEmpty) targetAlgebras else algebras
-
-            val algTrees = candidates.map { algebra =>
-              def solveConstructors(
-                  cs: List[ConstructorDef],
-                  s: Subst,
-                  l: Context,
-                  solved: List[ProofTree]
-              ): SolveTree[(List[ProofTree], Subst, Context)] = cs match {
-                case Nil       => SolveTree.Success((solved, s, l))
-                case c :: tail =>
-                  val cTerm =
-                    if (c.argTypes.isEmpty) Expr.Sym(c.symbol)
-                    else
-                      Expr.App(
-                        Expr.Sym(c.symbol),
-                        c.argTypes.zipWithIndex.map {
-                          case (ArgType.Recursive, i) =>
-                            Expr.Var(s"${vName}_$i")
-                          case (ArgType.Constant, i) => Expr.Var(s"a_$i")
-                        }
-                      )
-                  val g = Prover.substVar(body, vName, cTerm)
-                  val finalGoal = c.ctorType match {
-                    case ConstructorType.Point          => g
-                    case ConstructorType.Path(from, to) =>
-                      val p_from = Prover.substVar(body, vName, from)
-                      val p_to = Prover.substVar(body, vName, to)
-                      Expr.App(
-                        Expr.Sym(Path),
-                        List(Expr.Sym("Type"), p_from, p_to)
-                      )
-                  }
-                  val ihs = cTerm match {
-                    case Expr.App(_, argsC) =>
-                      c.argTypes.zip(argsC).collect {
-                        case (ArgType.Recursive, arg) =>
-                          (s"IH_${arg}", Prover.substVar(body, vName, arg))
-                      }
-                    case _ => Nil
-                  }
-                  search(
-                    finalGoal,
-                    rules,
-                    ihs ++ context,
-                    l,
-                    s,
-                    depth + 1,
-                    limit,
-                    visited,
-                    raaCount,
-                    inductionCount + 1,
-                    guarded,
-                    history
-                  ).flatMap { case (t, ns, nl) =>
-                    solveConstructors(tail, ns, nl, solved :+ t)
-                  }
-              }
-              solveConstructors(algebra.constructors, subst, linearContext, Nil)
-                .map { case (ts, fs, fl) =>
-                  (
-                    ProofTree.Node(
-                      applySubst(goal, fs),
-                      s"induction[${algebra.name}]",
-                      ts
-                    ),
-                    fs,
-                    fl
-                  )
-                }
-            }
-            SolveTree.merge(algTrees)
+            solveInduction(vName, body, goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history)
           }
-        case _ => SolveTree.Failure
+        case _ => Nil
       }
+
+      // 2. 文脈中の変数に対する帰納法 (destruct/induction on variable)
+      val ctxOptions = if (inductionCount < 1) { // 文脈への帰納法は1回までに制限して爆発を防ぐ
+        context.collect {
+          case (vName, Expr.Sym("Type")) => 
+            // 型が代数データ型である可能性のある変数を探す
+            algebras.find(a => vName.startsWith(a.varPrefix)).map { algebra =>
+              solveInduction(vName, goal, goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history)
+            }
+        }.flatten.flatten
+      } else Nil
+
+      SolveTree.merge(forallOptions ++ ctxOptions)
+    }
+  }
+
+  private def solveInduction(
+      vName: String,
+      body: Expr,
+      originalGoal: Expr,
+      rules: List[CatRule],
+      context: Context,
+      linearContext: Context,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr])],
+      raaCount: Int,
+      inductionCount: Int,
+      guarded: Boolean,
+      history: List[Expr]
+  ): List[SolveTree[(ProofTree, Subst, Context)]] = {
+    val targetAlgebras =
+      algebras.filter(a => vName.startsWith(a.varPrefix))
+    val candidates =
+      if (targetAlgebras.nonEmpty) targetAlgebras else algebras
+
+    candidates.map { algebra =>
+      def solveConstructors(
+          cs: List[ConstructorDef],
+          s: Subst,
+          l: Context,
+          solved: List[ProofTree]
+      ): SolveTree[(List[ProofTree], Subst, Context)] = cs match {
+        case Nil => SolveTree.Success((solved, s, l))
+        case c :: tail =>
+          val cTerm =
+            if (c.argTypes.isEmpty) Expr.Sym(c.symbol)
+            else
+              Expr.App(
+                Expr.Sym(c.symbol),
+                c.argTypes.zipWithIndex.map {
+                  case (ArgType.Recursive, i) =>
+                    Expr.Var(s"${vName}_$i")
+                  case (ArgType.Constant, i) => Expr.Var(s"a_$i")
+                }
+              )
+          val g = Prover.substVar(body, vName, cTerm)
+          val finalGoal = c.ctorType match {
+            case ConstructorType.Point => g
+            case ConstructorType.Path(from, to) =>
+              val p_from = Prover.substVar(body, vName, from)
+              val p_to = Prover.substVar(body, vName, to)
+              Expr.App(
+                Expr.Sym(Path),
+                List(Expr.Sym("Type"), p_from, p_to)
+              )
+          }
+          val ihs = cTerm match {
+            case Expr.App(_, argsC) =>
+              c.argTypes.zip(argsC).collect {
+                case (ArgType.Recursive, arg) =>
+                  (s"IH_${arg}", Prover.substVar(body, vName, arg))
+              }
+            case _ => Nil
+          }
+          search(
+            finalGoal,
+            rules,
+            ihs ++ context,
+            l,
+            s,
+            depth + 1,
+            limit,
+            visited,
+            raaCount,
+            inductionCount + 1,
+            guarded,
+            history
+          ).flatMap { case (t, ns, nl) =>
+            solveConstructors(tail, ns, nl, solved :+ t)
+          }
+      }
+      solveConstructors(algebra.constructors, subst, linearContext, Nil)
+        .map { case (ts, fs, fl) =>
+          (
+            ProofTree.Node(
+              applySubst(originalGoal, fs),
+              s"induction[${algebra.name}]",
+              ts
+            ),
+            fs,
+            fl
+          )
+        }
+    }
   }
 
   private def searchRules(
