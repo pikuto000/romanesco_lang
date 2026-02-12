@@ -36,12 +36,22 @@ object CombinedLogicTest {
       // 3. Separation + Temporal: Temporal persistence of framed resource
       "G(A * B) ⊸ (G(A) * G(B))",
 
+      // 5. Linear + Temporal + Modal: Interaction between G, □, and Linear Implication
+      "□G(A ⊸ B) → G(□A ⊸ □B)",
+
+      // 6. Linear + Modal: Distribution of □ over *
+      "□(A * B) → (□A * □B)",
+
+      // 7. Temporal + Linear: Interaction of G and Linear implication with quantifiers
+      "G(∀x. A(x) ⊸ B(x)) → ∀x. (G(A(x)) ⊸ G(B(x)))",
+
       // 4. Forall + Linear + Modal
       "∀x. □(P(x) ⊸ Q(x)) → ∀x. (□P(x) ⊸ □Q(x))"
     )
 
     testCases.zipWithIndex.foreach { case (input, i) =>
       println(s"\n[Test Case] $input")
+
       // if (i == 3) {
       //  logger.switch(false)
       //  logger.setMaxDepth(5)

@@ -7,7 +7,7 @@
 【ロマネスク・エンジンの洗練と次なる強化】
 
 1. コード構造の整理（モジュール化）
-- [ ] Prover.scala の肥大化解消: 論理体系ごとの探索ロジックを分離（trait LinearLogicSearch, TemporalLogicSearch 等）
+- [DONE] Prover.scala の肥大化解消: 論理体系ごとの探索ロジックを分離（trait LinearLogicSearch, TemporalLogicSearch 等）
 - [ ] 共通インターフェースの確立: 各論理拡張が search() の各フェーズ（目標分解、仮定適用）にフックできる構造にする
 
 2. 推論能力とパフォーマンスの強化
