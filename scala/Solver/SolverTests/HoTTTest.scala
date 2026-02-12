@@ -41,7 +41,9 @@ object HoTTTest {
           case Right(_)    => println("✓ OK (Solved)")
           case Left(trace) =>
             if (expected) {
-              println("✗ FAIL (Should have been solved)")
+              println(
+                s"✗ FAIL (Should have been solved) reason: ${trace.reason}"
+              )
               // println(trace.format())
             } else println("✓ OK (Failed as expected)")
         }

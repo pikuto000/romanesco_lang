@@ -4,6 +4,8 @@
 
 package romanesco.Solver.core
 
+import romanesco.Solver.core.LogicSymbols._
+
 object StandardRules:
   import Expr._
 
@@ -139,51 +141,51 @@ object StandardRules:
   // --- 論理結合子と圏論的構造の対応 ---
   val andIsProd = CatRule(
     "and-is-×",
-    sym("∧")(v("A"), v("B")),
-    sym("×")(v("A"), v("B"))
+    sym(And)(v("A"), v("B")),
+    sym(Product)(v("A"), v("B"))
   )
 
   val orIsCoprod = CatRule(
     "or-is-+",
-    sym("∨")(v("A"), v("B")),
-    sym("+")(v("A"), v("B"))
+    sym(Or)(v("A"), v("B")),
+    sym(Coproduct)(v("A"), v("B"))
   )
 
   val arrowIsExp = CatRule(
     "→-is-^",
-    sym("→")(v("A"), v("B")),
-    sym("^")(v("B"), v("A"))
+    sym(Implies)(v("A"), v("B")),
+    sym(Exp)(v("B"), v("A"))
   )
 
   val trueIsTerminal = CatRule(
     "⊤-is-1",
-    sym("⊤"),
-    sym("1")
+    sym(True),
+    sym(Terminal)
   )
 
   val falseIsInitial = CatRule(
     "⊥-is-0",
-    sym("⊥"),
-    sym("0")
+    sym(False),
+    sym(Initial)
   )
 
   // カテゴリー別
-  val products = List(productUniversal, fstBeta, sndBeta, productEta)
-  val coproducts = List(coproductUniversal, caseInlBeta, caseInrBeta)
-  val exponentials = List(expUniversal, lambdaEta)
-  val colimits = List(initialUniversal)
+  val products = List(fstBeta, sndBeta, productEta) // Removed productUniversal
+  val coproducts = List(caseInlBeta, caseInrBeta) // Removed coproductUniversal
+  val exponentials = List(lambdaEta) // Removed expUniversal
+  val colimits = Nil // Removed initialUniversal
   val equality = List(eqRefl) // eqSymm is removed from automatic rules
 
   val tensorIsProd = CatRule(
     "tensor-is-×",
-    sym("⊗")(v("A"), v("B")),
-    sym("×")(v("A"), v("B"))
+    sym(Tensor)(v("A"), v("B")),
+    sym(Product)(v("A"), v("B"))
   )
 
   val lImpliesIsExp = CatRule(
     "⊸-is-^",
-    sym("⊸")(v("A"), v("B")),
-    sym("^")(v("B"), v("A"))
+    sym(LImplies)(v("A"), v("B")),
+    sym(Exp)(v("B"), v("A"))
   )
 
   val logicMapping =
@@ -192,11 +194,16 @@ object StandardRules:
   val linearMapping = List(tensorIsProd, lImpliesIsExp)
 
   // --- モーダル論理 ---
-  import LogicSymbols._
   val modalK = CatRule(
     "modal-K",
-    sym(Box)(sym("→")(v("A"), v("B"))),
-    sym("→")(sym(Box)(v("A")), sym(Box)(v("B")))
+    sym(Box)(sym(Implies)(v("A"), v("B"))),
+    sym(Implies)(sym(Box)(v("A")), sym(Box)(v("B")))
+  )
+
+  val modalKLinear = CatRule(
+    "modal-K-linear",
+    sym(Box)(sym(LImplies)(v("A"), v("B"))),
+    sym(LImplies)(sym(Box)(v("A")), sym(Box)(v("B")))
   )
 
   val modalT = CatRule(
@@ -220,10 +227,26 @@ object StandardRules:
   val modalDuality = CatRule(
     "modal-duality",
     sym(Diamond)(v("A")),
-    sym("→")(sym(Box)(sym("→")(v("A"), sym("⊥"))), sym("⊥"))
+    sym(Implies)(sym(Box)(sym(Implies)(v("A"), sym(False))), sym(False))
   )
 
-  val modal = List(modalK, modalT, modal4, modal5, modalDuality)
+  val modalDistTensor = CatRule(
+    "modal-dist-tensor",
+    sym(Box)(sym(Tensor)(v("A"), v("B"))),
+    sym(Tensor)(sym(Box)(v("A")), sym(Box)(v("B")))
+  )
+
+  val modalDistForall = CatRule(
+    "modal-dist-forall",
+    sym(Box)(sym(Forall)(v("x"), v("P")(v("x")))),
+    sym(Forall)(v("x"), sym(Box)(v("P")(v("x"))))
+  )
+
+  val modalBasic = List(modalK, modalKLinear, modalT, modalDuality, modalDistTensor, modalDistForall)
+  val modalS4 = List(modal4)
+  val modalS5 = List(modal5)
+
+  val modal = modalBasic ++ modalS4 ++ modalS5 // Default to S5 modal logic
 
   // --- 線形論理 ---
   val linearBang = CatRule(
@@ -235,6 +258,24 @@ object StandardRules:
   val linear = List(linearBang)
 
   // --- 時相論理 ---
+  val temporalGDistTensor = CatRule(
+    "G-dist-tensor",
+    sym(Globally)(sym(Tensor)(v("A"), v("B"))),
+    sym(Tensor)(sym(Globally)(v("A")), sym(Globally)(v("B")))
+  )
+
+  val temporalGDistSepAnd = CatRule(
+    "G-dist-sepand",
+    sym(Globally)(sym(SepAnd)(v("A"), v("B"))),
+    sym(SepAnd)(sym(Globally)(v("A")), sym(Globally)(v("B")))
+  )
+
+  val temporalGDistLImplies = CatRule(
+    "G-dist-limplies",
+    sym(Globally)(sym(LImplies)(v("A"), v("B"))),
+    sym(LImplies)(sym(Globally)(v("A")), sym(Globally)(v("B")))
+  )
+
   val temporalF = CatRule(
     "F-expansion",
     sym(Finally)(v("A")),
@@ -247,7 +288,7 @@ object StandardRules:
     sym(Or)(v("B"), sym(And)(v("A"), sym(Next)(sym(Until)(v("A"), v("B")))))
   )
 
-  val temporal = List(temporalF, temporalU)
+  val temporal = List(temporalGDistTensor, temporalGDistSepAnd, temporalGDistLImplies, temporalF, temporalU)
 
   // --- 分離論理 ---
   val sepAndCommutative = CatRule(
@@ -261,13 +302,13 @@ object StandardRules:
   // --- 古典論理 ---
   val em = CatRule(
     "EM",
-    sym("⊤"),
-    sym("∨")(v("A"), sym("→")(v("A"), sym("⊥")))
+    sym(True),
+    sym(Or)(v("A"), sym(Implies)(v("A"), sym(False)))
   )
 
   val dne = CatRule(
     "DNE",
-    sym("→")(sym("→")(v("A"), sym("⊥")), sym("⊥")),
+    sym(Implies)(sym(Implies)(v("A"), sym(False)), sym(False)),
     v("A")
   )
 
@@ -370,7 +411,6 @@ object StandardRules:
   val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ logicMapping ++ modal ++ linear ++ separation ++ hott
 
   // --- 標準の初期代数 ---
-  import LogicSymbols._
   val defaultAlgebras = List(
     InitialAlgebra("Nat", List(ConstructorDef(Zero, Nil), ConstructorDef(Succ, List(ArgType.Recursive))), "n"),
     InitialAlgebra("List", List(ConstructorDef("nil", Nil), ConstructorDef("cons", List(ArgType.Constant, ArgType.Recursive))), "xs"),
@@ -378,5 +418,6 @@ object StandardRules:
     InitialAlgebra("S1", List(
       ConstructorDef("base", Nil),
       ConstructorDef("loop", Nil, ConstructorType.Path(sym("base"), sym("base")))
-    ), "x")
+    ), "s")
   )
+
