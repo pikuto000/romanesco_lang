@@ -42,6 +42,40 @@ import romanesco.Solver.core.Tactics._
       println(s"\n✗ Tactic error: $error")
   }
 
+  println("\n=== Auto Tactic Test: A ∧ B → B ∧ A ===")
+  val autoResult = for {
+    s1 <- intro(initialState, Some("h0"))
+    _  = println(s"\nAfter intro, calling auto on goal: ${s1.currentGoal.get}")
+    s2 <- auto(s1, new Prover())
+  } yield s2
+
+  autoResult match {
+    case Right(finalState) =>
+      if (finalState.isSolved) println("\n✓ Auto tactic solved the goal with context!")
+      else println(s"\nRemaining goals: ${finalState.goals.size}")
+    case Left(error) =>
+      println(s"\n✗ Auto tactic error: $error")
+  }
+
+  println("\n=== Simpl Tactic Test: plus(0, n) = n ===")
+  val simplGoal = TestParser.parse("∀n. plus(0, n) = n")
+  val simplState = ProofState(List(Goal(Nil, Nil, simplGoal)), Nil, simplGoal)
+  val simplResult = for {
+    s1 <- intro(simplState)
+    _  = println(s"\nAfter intro:\n${s1.currentGoal.get}")
+    s2 <- simpl(s1)
+    _  = println(s"\nAfter simpl:\n${s2.currentGoal.get}")
+    s3 <- reflexivity(s2)
+  } yield s3
+
+  simplResult match {
+    case Right(finalState) =>
+      if (finalState.isSolved) println("\n✓ Simpl tactic worked!")
+      else println(s"\nRemaining goals: ${finalState.goals.size}")
+    case Left(error) =>
+      println(s"\n✗ Simpl tactic error: $error")
+  }
+
   println("\n=== Induction Test: plus(n, 0) = n ===")
   val inductionGoal = TestParser.parse("∀n. plus(n, 0) = n")
   val inductionState = ProofState(List(Goal(Nil, Nil, inductionGoal)), Nil, inductionGoal)

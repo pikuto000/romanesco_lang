@@ -96,23 +96,14 @@ object Repl:
       case "apply" :: name :: Nil => Tactics.applyHyp(s, name)
       case "exact" :: name :: Nil => Tactics.exact(s, name)
       case "assumption" :: Nil => Tactics.assumption(s)
+      case "simpl" :: Nil => Tactics.simpl(s)
       case "auto" :: Nil => 
         val prover = new Prover(ProverConfig(rules = StandardRules.all ++ loadedLemmas ++ sessionLemmas))
-        s.currentGoal match {
-          case Some(g) => 
-            prover.prove(g.target) match {
-              case Right(result) => 
-                println("✓ Auto solved the goal!")
-                result.generatedLemma.foreach { lemma =>
-                   println(s"  Generated Lemma: $lemma")
-                   sessionLemmas = sessionLemmas :+ lemma
-                }
-                Right(s.copy(goals = s.goals.tail, completedProofs = result.tree :: s.completedProofs))
-              case Left(fail) => 
-                println(s"✗ Auto failed: ${fail.reason}")
-                Left("Auto could not solve the goal.")
-            }
-          case None => Left("No active goal.")
+        Tactics.auto(s, prover) match {
+          case Right(newState) =>
+            // 補題生成機能との連携（もし必要ならTactics.auto側で戻り値を拡張する）
+            Right(newState)
+          case Left(err) => Left(err)
         }
       case "save" :: filename :: Nil =>
         LemmaManager.saveLemmas(filename, sessionLemmas)

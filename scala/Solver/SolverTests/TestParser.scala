@@ -18,7 +18,7 @@ object TestParser:
     parseExpr(tokens, variables)._1
 
   private def tokenize(s: String): List[String] =
-    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', ':', '⇒', '⊃', '×', '⊥', '⊤', '∘', '□', '◇', 'K', 'O', '⊸', '!', '?', '⊗', '⊕', '&', 'G', 'F', 'X', 'U', '*', '↦')
+    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', ':', '⇒', '⊃', '×', '⊥', '⊤', '∘', '□', '◇', 'K', 'O', '⊸', '!', '?', '⊗', '⊕', '&', 'G', 'F', 'X', 'U', '*', '↦', 'λ', '¬')
     
     val sb = new StringBuilder
     val tokens = mutable.ListBuffer.empty[String]
@@ -131,7 +131,7 @@ object TestParser:
 
   private def parseUnary(tokens: List[String], vars: Set[String]): (Expr, List[String]) =
     tokens match
-      case (Box | Diamond | Knowledge | Obligation | Bang | Question | Globally | Finally | Next) :: rest =>
+      case (Box | Diamond | Knowledge | Obligation | Bang | Question | Globally | Finally | Next | Not) :: rest =>
         val op = tokens.head
         val (body, rest2) = parseUnary(rest, vars)
         (sym(op)(body), rest2)
@@ -146,12 +146,10 @@ object TestParser:
             val (body, rest4) = parseExpr(rest3, vars + varName)
             (sym(Forall)(v(varName), typeExpr, body), rest4)
           case _ => throw new Exception(s"Expected '.' after type in Forall at ${rest2.take(5).mkString(" ")}")
-      case Forall :: varName :: "." :: rest =>
+      case (Forall | Exists | Lambda) :: varName :: "." :: rest =>
+        val op = tokens.head
         val (body, rest2) = parseExpr(rest, vars + varName)
-        (sym(Forall)(v(varName), body), rest2)
-      case Exists :: varName :: "." :: rest =>
-        val (body, rest2) = parseExpr(rest, vars + varName)
-        (sym(Exists)(v(varName), body), rest2)
+        (sym(op)(v(varName), body), rest2)
       case _ => parseAtom(tokens, vars)
 
   private def parseAtom(tokens: List[String], vars: Set[String]): (Expr, List[String]) =

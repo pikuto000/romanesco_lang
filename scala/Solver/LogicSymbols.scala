@@ -9,6 +9,7 @@ object LogicSymbols {
   val And = "∧"
   val Or = "∨"
   val Implies = "→"
+  val Not = "¬"
   val Forall = "∀"
   val Exists = "∃"
   val Lambda = "λ"

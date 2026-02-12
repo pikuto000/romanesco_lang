@@ -1,0 +1,538 @@
+Active code page: 65001
+[info] welcome to sbt 1.12.1 (Oracle Corporation Java 25.0.2)
+[info] loading project definition from C:\Users\Cocoa\romanesco\project\project\project
+[info] loading settings for project romanesco-build-build from metals.sbt...
+[info] loading project definition from C:\Users\Cocoa\romanesco\project\project
+[info] loading settings for project romanesco-build from metals.sbt, plugins.sbt...
+[info] loading project definition from C:\Users\Cocoa\romanesco\project
+[info] loading settings for project root from build.sbt...
+[info] set current project to romanesco (in build file:/C:/Users/Cocoa/romanesco/)
+[info] running romanesco.Solver.SolverTests.CycleTest 
+[DEBUG] logger disabled
+=== Cycle Detection Test ===
+Testing simple loop: P(a)
+[DEBUG] Max log depth set to 3
+Failed as expected: No proof found
+Testing loop with Forall: ∀(x,P(x))
+[DEBUG] Max log depth set to 3
+Failed: No proof found
+Testing complex loop: P(a) -> Q(a) -> P(a)
+[DEBUG] Max log depth set to 3
+Failed: No proof found
+Testing growth loop: P(a) -> P(f(a))
+[DEBUG] Max log depth set to 3
+Failed: No proof found
+[success] Total time: 2 s, completed 2026/02/13 4:34:10
+[info] running romanesco.Solver.SolverTests.CycleTest2 
+[DEBUG] logger disabled
+=== Cycle Detection Test 2 (Inner Branch) ===
+Testing loop: P(a)
+[DEBUG] Max log depth set to 3
+[success] Total time: 0 s, completed 2026/02/13 4:34:10
+[info] running romanesco.Solver.SolverTests.DebugAssoc 
+[DEBUG] logger disabled
+[DEBUG] Max log depth set to 10
+=== Debug: Path Associativity ===
+[DEBUG] Max log depth set to 3
+✓ Solved!
+              ✓ concat(p_4,concat(q_5,r_6)) = concat(p_4,concat(q_5,r_6))  {reflexivity}
+            └─ ∀(r,path(A,z_2,w_3),concat(p_4,concat(q_5,r)) = concat(p_4,concat(q_5,r)))  {forall-intro}
+          └─ ∀(q,path(A,y_1,z_2),∀(r,path(A,z_2,w_3),concat(p_4,concat(q,r)) = concat(p_4,concat(q,r))))  {forall-intro}
+        └─ ∀(p,path(A,x_0,y_1),∀(q,path(A,y_1,z_2),∀(r,path(A,z_2,w_3),concat(p,concat(q,r)) = concat(p,concat(q,r)))))  {forall-intro}
+      └─ ∀(w,∀(p,path(A,x_0,y_1),∀(q,path(A,y_1,z_2),∀(r,path(A,z_2,w),concat(p,concat(q,r)) = concat(p,concat(q,r))))))  {forall-intro}
+    └─ ∀(z,∀(w,∀(p,path(A,x_0,y_1),∀(q,path(A,y_1,z),∀(r,path(A,z,w),concat(p,concat(q,r)) = concat(p,concat(q,r)))))))  {forall-intro}
+  └─ ∀(y,∀(z,∀(w,∀(p,path(A,x_0,y),∀(q,path(A,y,z),∀(r,path(A,z,w),concat(p,concat(q,r)) = concat(p,concat(q,r))))))))  {forall-intro}
+└─ ∀(x,∀(y,∀(z,∀(w,∀(p,path(A,x,y),∀(q,path(A,y,z),∀(r,path(A,z,w),concat(p,concat(q,r)) = concat(p,concat(q,r)))))))))  {forall-intro}
+[success] Total time: 3 s, completed 2026/02/13 4:34:13
+[info] running romanesco.Solver.SolverTests.DebugLinear 
+[DEBUG] logger disabled
+=== Debug: A ⊸ B ⊸ (A ⊗ B) ===
+[DEBUG] Max log depth set to 3
+✓ Solved!
+      ✓ A  {linear:lh0}
+      ✓ B  {linear:lh1}
+    └─ ⊗(A,B)  {tensor-intro}
+  └─ ⊸(B,⊗(A,B))  {linear-implies-intro}
+└─ ⊸(A,⊸(B,⊗(A,B)))  {linear-implies-intro}
+[success] Total time: 0 s, completed 2026/02/13 4:34:14
+[info] running romanesco.Solver.SolverTests.HoTTCubeTest 
+[DEBUG] logger disabled
+=== HoTT: Cubical Model Approximation Test ===
+Case: cube(A, p, q, r, s) → path(path(A, x, y), p, r) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: cube(A, p, q, r, s) → path(path(A, x, z), q, s) ... [DEBUG] Max log depth set to 3
+✓ OK (Failed as expected)
+[success] Total time: 1 s, completed 2026/02/13 4:34:15
+[info] running romanesco.Solver.SolverTests.HoTTTest 
+[DEBUG] logger disabled
+=== HoTT: Path Induction and HIT Test ===
+Case: ∀x. ∀y. ∀p:path(A,x,y). concat(p, refl(y)) = p ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: ∀x. ∀y. ∀p:path(A,x,y). concat(refl(x), p) = p ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: ∀x. ∀y. ∀z. ∀w. ∀p:path(A,x,y). ∀q:path(A,y,z). ∀r:path(A,z,w). concat(concat(p, q), r) = concat(p, concat(q, r)) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: ∀x. ∀y. ∀p:path(A,x,y). inv(inv(p)) = p ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: ∀x:S1. P(base) → P(x) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: equiv(A, B) → path(Type, A, B) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+[success] Total time: 2 s, completed 2026/02/13 4:34:17
+[info] running romanesco.Solver.SolverTests.LinearResourceTest 
+[DEBUG] logger disabled
+=== Linear Logic: Resource Consumption Test ===
+Case: A ⊸ A ... [DEBUG] Max log depth set to 3
+✓ OK (Solved as expected)
+Case: (A ⊗ B) ⊸ (B ⊗ A) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved as expected)
+Case: A ⊸ (A ⊗ A) ... [DEBUG] Max log depth set to 3
+✓ OK (Failed as expected)
+Case: A ⊸ B ⊸ (A ⊗ B) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved as expected)
+Case: (A ⊗ A) ⊸ A ... [DEBUG] Max log depth set to 3
+✓ OK (Failed as expected)
+[success] Total time: 0 s, completed 2026/02/13 4:34:17
+[info] running romanesco.Solver.SolverTests.SeparationLogicTest 
+[DEBUG] logger disabled
+=== Separation Logic: Resource Management Test ===
+Case: A * B ⊸ B * A (depth 10) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: (A * B) * C ⊸ A * (B * C) (depth 10) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: (A ⊸ B) ⊸ (A * C ⊸ B * C) (depth 15) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: A * A ⊸ A (depth 5) ... [DEBUG] Max log depth set to 3
+✓ OK (Failed as expected)
+Case: A ⊸ A * A (depth 5) ... [DEBUG] Max log depth set to 3
+✓ OK (Failed as expected)
+Case: (∀v. (x ↦ v ⊸ P(v))) ⊸ (x ↦ 5 ⊸ P(5)) (depth 8) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: A * B * C ⊸ C * A * B (depth 8) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: (∀v. (x ↦ v * R)) ⊸ (x ↦ 5 * R) (depth 8) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+[success] Total time: 0 s, completed 2026/02/13 4:34:18
+[info] running romanesco.Solver.SolverTests.TemporalLogicTest 
+[DEBUG] logger disabled
+=== Temporal Logic: Co-induction Test ===
+Case: G(A) → A ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: G(A) → X(A) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: G(A) → G(G(A)) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Case: G(A → B) → G(A) → G(B) ... [DEBUG] Max log depth set to 3
+✓ OK (Solved)
+[success] Total time: 0 s, completed 2026/02/13 4:34:18
+[info] running romanesco.Solver.SolverTests.TypeLevelTest 
+[DEBUG] logger disabled
+=== Strict Universe Level Unification Test ===
+Proving: Type0 = Type0 ...
+[DEBUG] Max log depth set to 3
+✓ OK (Solved)
+Proving: Type0 = Type1 ...
+[DEBUG] Max log depth set to 3
+✓ OK (Failed as expected)
+[success] Total time: 0 s, completed 2026/02/13 4:34:18
+[info] running romanesco.Solver.testGeneralizedUnification 
+[DEBUG] logger disabled
+=== Generalized Higher-Order Unification Test ===
+
+Test 1: ?P(f(x)) = g(f(x))
+Unifying: ?1(f(x)) = g(f(x))
+✓ Solutions found:
+  Solution 0:
+    ?1 -> λv_0. g(v_0)
+    Check: g(f(x)) == g(f(x))
+    ✓ Valid
+
+Test 2: ?P(a, b) = f(b, a)
+Unifying: ?1(a,b) = f(b,a)
+✓ Solutions found:
+  Solution 0:
+    ?1 -> λv_0. λv_1. f(v_1,v_0)
+    Check: f(b,a) == f(b,a)
+    ✓ Valid
+
+Test 3: ?P(S(x), x) = S(S(x))
+Unifying: ?1(S(x),x) = S(S(x))
+✓ Solutions found:
+  Solution 0:
+    ?1 -> λv_0. λv_1. S(v_0)
+    Check: S(S(x)) == S(S(x))
+    ✓ Valid
+[success] Total time: 0 s, completed 2026/02/13 4:34:18
+[info] running romanesco.Solver.testLinearLogic 
+[DEBUG] logger disabled
+=== Linear Logic Test (Mapping Approach) ===
+
+[Test Case] A ⊸ A
+[DEBUG] Max log depth set to 3
+✓ Solved:
+    ✓ A  {linear:lh0}
+  └─ ⊸(A,A)  {linear-implies-intro}
+
+[Test Case] (A ⊗ B) ⊸ (A ⊗ B)
+[DEBUG] Max log depth set to 3
+✓ Solved:
+    ✓ ⊗(A,B)  {linear:lh0}
+  └─ ⊸(⊗(A,B),⊗(A,B))  {linear-implies-intro}
+
+[Test Case] !A → A
+[DEBUG] Max log depth set to 3
+✓ Solved:
+      ✓ A  {h0}
+    └─ A  {linear-bang-elim[h0]}
+  └─ →(!(A),A)  {implies-intro}
+
+[Test Case] A ⊗ B → A ∧ B
+[DEBUG] Max log depth set to 3
+✓ Solved:
+        ✓ ⊗(A,B)  {h0}
+      └─ ×(A,B)  {tensor-is-×}
+    └─ ∧(A,B)  {and-is-×}
+  └─ →(⊗(A,B),∧(A,B))  {implies-intro}
+[success] Total time: 0 s, completed 2026/02/13 4:34:19
+[info] running romanesco.Solver.testMapFusion 
+[DEBUG] logger disabled
+=== Map Fusion Test ===
+Goal: ∀f. ∀g. ∀xs. map(f, map(g, xs)) = map(f ∘ g, xs)
+[DEBUG] Max log depth set to 3
+✓ Proof found:
+              ✓ nil = nil  {reflexivity}
+            └─ nil = map(∘(f_0,g_1),nil)  {map_nil}
+          └─ map(f_0,nil) = map(∘(f_0,g_1),nil)  {map_nil}
+        └─ map(f_0,map(g_1,nil)) = map(∘(f_0,g_1),nil)  {map_nil}
+                  ✓ cons(f_0(g_1(a_0)),map(∘(f_0,g_1),xs_1)) = cons(f_0(g_1(a_0)),map(∘(f_0,g_1),xs_1))  {reflexivity}
+                └─ cons(f_0(g_1(a_0)),map(∘(f_0,g_1),xs_1)) = cons(∘(f_0,g_1)(a_0),map(∘(f_0,g_1),xs_1))  {compose_app}
+              └─ cons(f_0(g_1(a_0)),map(∘(f_0,g_1),xs_1)) = map(∘(f_0,g_1),cons(a_0,xs_1))  {map_cons}
+            └─ cons(f_0(g_1(a_0)),map(f_0,map(g_1,xs_1))) = map(∘(f_0,g_1),cons(a_0,xs_1))  {rewrite[IH_xs_1]}
+          └─ map(f_0,cons(g_1(a_0),map(g_1,xs_1))) = map(∘(f_0,g_1),cons(a_0,xs_1))  {map_cons}
+        └─ map(f_0,map(g_1,cons(a_0,xs_1))) = map(∘(f_0,g_1),cons(a_0,xs_1))  {map_cons}
+      └─ ∀(xs,map(f_0,map(g_1,xs)) = map(∘(f_0,g_1),xs))  {induction[List]}
+    └─ ∀(g,∀(xs,map(f_0,map(g,xs)) = map(∘(f_0,g),xs)))  {forall-intro}
+  └─ ∀(f,∀(g,∀(xs,map(f,map(g,xs)) = map(∘(f,g),xs))))  {forall-intro}
+[success] Total time: 1 s, completed 2026/02/13 4:34:19
+[info] running romanesco.Solver.testModalLogic 
+[DEBUG] logger disabled
+=== Modal Logic Test ===
+[Test Case] □(A → B) → (□A → □B)
+[DEBUG] Max log depth set to 3
+✓ Solved:      ✓ □(→(A,B))  {h0}
+    └─ →(□(A),□(B))  {modal-K}
+  └─ →(□(→(A,B)),→(□(A),□(B)))  {implies-intro}
+[Test Case] □A → A
+[DEBUG] Max log depth set to 3
+✓ Solved:      ✓ A  {h0}
+    └─ A  {modal-T[h0]}
+  └─ →(□(A),A)  {implies-intro}
+[Test Case] □A → □□A
+[DEBUG] Max log depth set to 3
+✓ Solved:      ✓ □(A)  {h0}
+    └─ □(□(A))  {modal-4}
+  └─ →(□(A),□(□(A)))  {implies-intro}
+[Test Case] ◇A → □◇A
+[DEBUG] Max log depth set to 3
+✓ Solved:      ✓ ◇(A)  {h0}
+    └─ □(◇(A))  {modal-5}
+  └─ →(◇(A),□(◇(A)))  {implies-intro}
+[Test Case] ◇A → (□(A → ⊥) → ⊥)
+[DEBUG] Max log depth set to 3
+✓ Solved:      ✓ ◇(A)  {h0}
+    └─ →(□(→(A,⊥)),⊥)  {modal-duality}
+  └─ →(◇(A),→(□(→(A,⊥)),⊥))  {implies-intro}
+[success] Total time: 1 s, completed 2026/02/13 4:34:20
+[info] running romanesco.Solver.testPatternUnification 
+[DEBUG] logger disabled
+=== Pattern Unification Test ===
+Test 1: ?P(x) = x = 0
+Unifying: ?1(x) = x = 0
+✓ Solutions found:
+  Solution 0:
+    ?1 -> λv_0. v_0 = 0
+    Applied LHS: x = 0
+    Normalized:  x = 0
+    ✓ Valid solution
+
+Test 2: ?M(x) = S(x)
+Unifying: ?2(x) = S(x)
+  Solution: λv_0. S(v_0)
+[success] Total time: 0 s, completed 2026/02/13 4:34:20
+[info] running romanesco.Solver.testTactics 
+=== Tactic System Test ===
+Initial state:
+--------------------------------
+
+--------------------------------
+  Goal: →(∧(A,B),∧(B,A))
+
+After intro:
+--------------------------------
+  h0: ∧(A,B)
+--------------------------------
+  Goal: ∧(B,A)
+
+After destruct h0:
+--------------------------------
+  h0.1: A
+  h0.2: B
+--------------------------------
+  Goal: ∧(B,A)
+
+After split (Subgoal 1):
+--------------------------------
+  h0.1: A
+  h0.2: B
+--------------------------------
+  Goal: B
+
+After solve B (Subgoal 2):
+--------------------------------
+  h0.1: A
+  h0.2: B
+--------------------------------
+  Goal: A
+
+✓ Goal solved successfully using tactics!
+
+=== Induction Test: plus(n, 0) = n ===
+
+Base Case:
+--------------------------------
+
+--------------------------------
+  Goal: plus(0,0) = 0
+
+Inductive Step:
+--------------------------------
+
+--------------------------------
+  Goal: ∀(n,→(plus(n,0) = n,plus(S(n),0) = S(n)))
+
+Base Case solved! Next goal:
+--------------------------------
+
+--------------------------------
+  Goal: ∀(n,→(plus(n,0) = n,plus(S(n),0) = S(n)))
+
+After intro n:
+--------------------------------
+
+--------------------------------
+  Goal: →(plus(n_t1,0) = n_t1,plus(S(n_t1),0) = S(n_t1))
+
+After intro IH:
+--------------------------------
+  IH: plus(n_t1,0) = n_t1
+--------------------------------
+  Goal: plus(S(n_t1),0) = S(n_t1)
+
+After rewrite IH:
+--------------------------------
+  IH: plus(n_t1,0) = n_t1
+--------------------------------
+  Goal: S(n_t1) = S(n_t1)
+
+✓ Induction goal solved successfully!
+[success] Total time: 0 s, completed 2026/02/13 4:34:21
+[info] running romanesco.Solver.testTreeInduction 
+[DEBUG] logger disabled
+=== Tree Induction Test ===
+Goal: ∀t. reverse(reverse(t)) = t
+[DEBUG] Max log depth set to 3
+✓ Proof found:
+        ✓ leaf = leaf  {reflexivity}
+      └─ reverse(leaf) = leaf  {reverse_leaf}
+    └─ reverse(reverse(leaf)) = leaf  {reverse_leaf}
+            ✓ node(t_0,a_1,t_2) = node(t_0,a_1,t_2)  {reflexivity}
+          └─ node(t_0,a_1,reverse(reverse(t_2))) = node(t_0,a_1,t_2)  {rewrite[IH_t_2]}
+        └─ node(reverse(reverse(t_0)),a_1,reverse(reverse(t_2))) = node(t_0,a_1,t_2)  {rewrite[IH_t_0]}
+      └─ reverse(node(reverse(t_2),a_1,reverse(t_0))) = node(t_0,a_1,t_2)  {reverse_node}
+    └─ reverse(reverse(node(t_0,a_1,t_2))) = node(t_0,a_1,t_2)  {reverse_node}
+  └─ ∀(t,reverse(reverse(t)) = t)  {induction[Tree]}
+[success] Total time: 1 s, completed 2026/02/13 4:34:21
+[info] running romanesco.Solver.SolverTests.RecursiveInductionTest 
+[DEBUG] logger disabled
+=== Recursive Data Structure Induction Test ===
+Case: ∀xs. append(xs, nil) = xs ... [DEBUG] Max log depth set to 3
+✓ OK
+  (Induction used)
+Case: ∀xs. ∀ys. ∀zs. append(append(xs, ys), zs) = append(xs, append(ys, zs)) ... [DEBUG] Max log depth set to 3
+✓ OK
+  (Induction used)
+Case: ∀t. mirror(mirror(t)) = t ... [DEBUG] Max log depth set to 3
+✓ OK
+  (Induction used)
+Case: ∀xs. ∀ys. list_prop(append(xs, ys)) ... [DEBUG] Max log depth set to 3
+✓ OK
+[success] Total time: 1 s, completed 2026/02/13 4:34:22
+[info] running romanesco.testSomeCases 
+[DEBUG] logger disabled
+
+=== Induction Test: plus(n, S(m)) = S(plus(n, m)) ===
+
+Base Case solved! Next goal:
+Goals:
+  0: --------------------------------
+
+--------------------------------
+  Goal: ∀(n,→(∀(m,plus(n,S(m)) = S(plus(n,m))),∀(m,plus(S(n),S(m)) = S(plus(S(n),m)))))
+
+After intros:
+Goals:
+  0: --------------------------------
+  IH: ∀(m,plus(n_step,S(m)) = S(plus(n_step,m)))
+--------------------------------
+  Goal: plus(S(n_step),S(m)) = S(plus(S(n_step),m))
+
+After rewrite IH:
+Goals:
+  0: --------------------------------
+  IH: ∀(m,plus(n_step,S(m)) = S(plus(n_step,m)))
+--------------------------------
+  Goal: S(S(plus(n_step,m))) = S(S(plus(n_step,m)))
+
+✓ Manual induction goal solved successfully!
+
+=== Automatic Induction Tests ===
+
+[Test Case] ∀n. plus(n, 0) = n
+[DEBUG] Max log depth set to 3
+✓ Solved:
+    ✓ 0 = 0  {reflexivity}
+      ✓ S(n_0) = S(n_0)  {reflexivity}
+    └─ S(plus(n_0,0)) = S(n_0)  {rewrite[IH_n_0]}
+  └─ ∀(n,plus(n,0) = n)  {induction[Nat]}
+
+[Test Case] ∀n. plus(0, n) = n
+[DEBUG] Max log depth set to 3
+✓ Solved:
+    ✓ n_0 = n_0  {reflexivity}
+  └─ ∀(n,n = n)  {forall-intro}
+
+[Test Case] ∀n. ∀m. plus(n, S(m)) = S(plus(n, m))
+[DEBUG] Max log depth set to 3
+✓ Solved:
+      ✓ S(m_1) = S(m_1)  {reflexivity}
+    └─ ∀(m,S(m) = S(m))  {forall-intro}
+        ✓ S(S(plus(n_0,m_1))) = S(S(plus(n_0,m_1)))  {reflexivity}
+      └─ S(plus(n_0,S(m_1))) = S(S(plus(n_0,m_1)))  {rewrite[IH_n_0]}
+    └─ ∀(m,S(plus(n_0,S(m))) = S(S(plus(n_0,m))))  {forall-intro}
+  └─ ∀(n,∀(m,plus(n,S(m)) = S(plus(n,m))))  {induction[Nat]}
+
+[Test Case] ∀xs. append(xs, nil) = xs
+[DEBUG] Max log depth set to 3
+✓ Solved:
+    ✓ nil = nil  {reflexivity}
+      ✓ cons(a_0,xs_1) = cons(a_0,xs_1)  {reflexivity}
+    └─ cons(a_0,append(xs_1,nil)) = cons(a_0,xs_1)  {rewrite[IH_xs_1]}
+  └─ ∀(xs,append(xs,nil) = xs)  {induction[List]}
+
+[Test Case] ∀xs. append(nil, xs) = xs
+[DEBUG] Max log depth set to 3
+✓ Solved:
+    ✓ xs_0 = xs_0  {reflexivity}
+  └─ ∀(xs,xs = xs)  {forall-intro}
+
+[Test Case] ∀xs. ∀ys. ∀zs. append(append(xs, ys), zs) = append(xs, append(ys, zs))
+[DEBUG] Max log depth set to 3
+✓ Solved:
+        ✓ append(ys_1,zs_2) = append(ys_1,zs_2)  {reflexivity}
+      └─ ∀(zs,append(ys_1,zs) = append(ys_1,zs))  {forall-intro}
+    └─ ∀(ys,∀(zs,append(ys,zs) = append(ys,zs)))  {forall-intro}
+          ✓ cons(a_0,append(xs_1,append(ys_1,zs_2))) = cons(a_0,append(xs_1,append(ys_1,zs_2)))  {reflexivity}
+        └─ cons(a_0,append(append(xs_1,ys_1),zs_2)) = cons(a_0,append(xs_1,append(ys_1,zs_2)))  {rewrite[IH_xs_1]}
+      └─ ∀(zs,cons(a_0,append(append(xs_1,ys_1),zs)) = cons(a_0,append(xs_1,append(ys_1,zs))))  {forall-intro}
+    └─ ∀(ys,∀(zs,cons(a_0,append(append(xs_1,ys),zs)) = cons(a_0,append(xs_1,append(ys,zs)))))  {forall-intro}
+  └─ ∀(xs,∀(ys,∀(zs,append(append(xs,ys),zs) = append(xs,append(ys,zs)))))  {induction[List]}
+
+[Test Case] ∀n. ∀m. plus(n, m) = plus(m, n)
+[DEBUG] Max log depth set to 3
+✓ Solved:
+        ✓ m_1 = m_1  {reflexivity}
+      └─ m_1 = plus(m_1,0)  {plus_n_0}
+    └─ ∀(m,m = plus(m,0))  {forall-intro}
+          ✓ plus(n_0,S(m_1)) = S(plus(m_1,n_0))  {IH_n_0}
+        └─ plus(n_0,S(m_1)) = plus(m_1,S(n_0))  {plus_n_Sm}
+      └─ S(plus(n_0,m_1)) = plus(m_1,S(n_0))  {plus_n_Sm}
+    └─ ∀(m,S(plus(n_0,m)) = plus(m,S(n_0)))  {forall-intro}
+  └─ ∀(n,∀(m,plus(n,m) = plus(m,n)))  {induction[Nat]}
+
+[Test Case] ∀n. ∀m. ∀k. plus(plus(n, m), k) = plus(n, plus(m, k))
+[DEBUG] Max log depth set to 3
+✓ Solved:
+        ✓ plus(m_1,k_2) = plus(m_1,k_2)  {reflexivity}
+      └─ ∀(k,plus(m_1,k) = plus(m_1,k))  {forall-intro}
+    └─ ∀(m,∀(k,plus(m,k) = plus(m,k)))  {forall-intro}
+          ✓ S(plus(n_0,plus(m_1,k_2))) = S(plus(n_0,plus(m_1,k_2)))  {reflexivity}
+        └─ S(plus(plus(n_0,m_1),k_2)) = S(plus(n_0,plus(m_1,k_2)))  {rewrite[IH_n_0]}
+      └─ ∀(k,S(plus(plus(n_0,m_1),k)) = S(plus(n_0,plus(m_1,k))))  {forall-intro}
+    └─ ∀(m,∀(k,S(plus(plus(n_0,m),k)) = S(plus(n_0,plus(m,k)))))  {forall-intro}
+  └─ ∀(n,∀(m,∀(k,plus(plus(n,m),k) = plus(n,plus(m,k)))))  {induction[Nat]}
+[success] Total time: 1 s, completed 2026/02/13 4:34:23
+[info] running romanesco.Solver.SolverTests.CombinedLogicTest 
+=== Combined Multi-Logic Test ===
+
+[Test Case] G(A ⊸ B) → (G(A) ⊸ G(B))
+[DEBUG] Max log depth set to 3
+✓ Solved!
+      ✓ G(⊸(A,B))  {h0}
+    └─ ⊸(G(A),G(B))  {G-dist-limplies}
+  └─ →(G(⊸(A,B)),⊸(G(A),G(B)))  {implies-intro}
+
+[Test Case] □(A ⊸ B) → (□A ⊸ □B)
+[DEBUG] Max log depth set to 3
+✓ Solved!
+      ✓ □(⊸(A,B))  {h0}
+    └─ ⊸(□(A),□(B))  {modal-K-linear}
+  └─ →(□(⊸(A,B)),⊸(□(A),□(B)))  {implies-intro}
+
+[Test Case] G(A * B) ⊸ (G(A) * G(B))
+[DEBUG] Max log depth set to 3
+✓ Solved!
+      ✓ G(*(A,B))  {linear:lh0}
+    └─ *(G(A),G(B))  {G-dist-sepand}
+  └─ ⊸(G(*(A,B)),*(G(A),G(B)))  {linear-implies-intro}
+
+[Test Case] □G(A ⊸ B) → G(□A ⊸ □B)
+[DEBUG] Max log depth set to 3
+✓ Solved!
+          ✓ G(⊸(A,B))  {h0}
+        └─ G(⊸(A,B))  {modal-T[h0]}
+      └─ G(□(⊸(A,B)))  {modal-T}
+    └─ G(⊸(□(A),□(B)))  {modal-K-linear}
+  └─ →(□(G(⊸(A,B))),G(⊸(□(A),□(B))))  {implies-intro}
+
+[Test Case] □(A * B) → (□A * □B)
+[DEBUG] Max log depth set to 3
+✓ Solved!
+          ✓ *(A,B)  {h0}
+        └─ *(A,B)  {modal-T[h0]}
+      └─ *(A,□(B))  {modal-T}
+    └─ *(□(A),□(B))  {modal-T}
+  └─ →(□(*(A,B)),*(□(A),□(B)))  {implies-intro}
+
+[Test Case] G(∀x. A(x) ⊸ B(x)) → ∀x. (G(A(x)) ⊸ G(B(x)))
+[DEBUG] Max log depth set to 3
+✓ Solved!
+                  ✓ G(⊸(A(x_1),B(x_1)))  {co-induction}
+                └─ ⊸(G(A(x_1)),G(B(x_1)))  {G-dist-limplies}
+              └─ G(⊸(A(x_1),B(x_1)))  {G-dist-limplies}
+            └─ X(G(⊸(A(x_1),B(x_1))))  {next-step}
+            ✓ ⊸(A(x_1),B(x_1))  {h0}
+          └─ ∧(X(G(⊸(A(x_1),B(x_1)))),⊸(A(x_1),B(x_1)))  {product-intro}
+        └─ G(⊸(A(x_1),B(x_1)))  {G-expansion}
+      └─ ⊸(G(A(x_1)),G(B(x_1)))  {G-dist-limplies}
+    └─ ∀(x,⊸(G(A(x)),G(B(x))))  {forall-intro}
+  └─ →(G(∀(x,⊸(A(x),B(x)))),∀(x,⊸(G(A(x)),G(B(x)))))  {implies-intro}
+
+[Test Case] ∀x. □(P(x) ⊸ Q(x)) → ∀x. (□P(x) ⊸ □Q(x))
+[DEBUG] Max log depth set to 3
+✓ Solved!
+          ✓ □(⊸(P(x_0_2),Q(x_0_2)))  {h1}
+        └─ ⊸(□(P(x_0_2)),□(Q(x_0_2)))  {modal-K-linear}
+      └─ ∀(x_0,⊸(□(P(x_0)),□(Q(x_0))))  {forall-intro}
+    └─ →(□(⊸(P(x_0),Q(x_0))),∀(x_0,⊸(□(P(x_0)),□(Q(x_0)))))  {implies-intro}
+  └─ ∀(x,→(□(⊸(P(x),Q(x))),∀(x,⊸(□(P(x)),□(Q(x))))))  {forall-intro}
+[success] Total time: 5 s, completed 2026/02/13 4:34:28

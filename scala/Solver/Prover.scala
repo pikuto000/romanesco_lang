@@ -69,7 +69,8 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       goal: Expr,
       rules: List[CatRule] = Nil,
       maxDepth: Int = 30,
-      timeoutMs: Long = 10000
+      timeoutMs: Long = 10000,
+      initialGoal: Option[Goal] = None
   ): Either[FailTrace, ProofResult] =
     val effectiveRules = if (rules.nonEmpty) rules else config.rules
 
@@ -83,11 +84,13 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     visitedGlobal.clear()
     deadline = System.currentTimeMillis() + timeoutMs
 
+    val startGoal = initialGoal.getOrElse(Goal(Nil, Nil, goal))
+
     boundary {
       val result = (1 to maxDepth).view.flatMap { d =>
         if (System.currentTimeMillis() > deadline)
           boundary.break(
-            Left(FailTrace(Goal(Nil, Nil, goal), "Watchdog timeout", 0))
+            Left(FailTrace(startGoal, "Watchdog timeout", 0))
           )
 
         logger.log(s"--- Iterative Deepening: current limit = $d ---")
@@ -97,10 +100,10 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
         // failureCache is NOT cleared here, allowing reuse of failure results from previous iterations
         // (A failure at depth L implies failure at depth d < L)
         val tree = search(
-          goal,
+          startGoal.target,
           effectiveRules,
-          Nil,
-          Nil,
+          startGoal.context,
+          startGoal.linearContext,
           emptySubst,
           0,
           d,
@@ -122,7 +125,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
           Left(
             bestFail
               .get()
-              .getOrElse(FailTrace(Goal(Nil, Nil, goal), "No proof found", 0))
+              .getOrElse(FailTrace(startGoal, "No proof found", 0))
           )
       }
     }

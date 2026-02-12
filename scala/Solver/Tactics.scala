@@ -258,4 +258,40 @@ object Tactics {
       case None => Left("No current goal")
     }
   }
+
+  /** 全自動探索による解決。
+    */
+  def auto(state: ProofState, prover: Prover): TacticResult = {
+    state.currentGoal match {
+      case Some(goal) =>
+        prover.prove(goal.target, initialGoal = Some(goal)) match {
+          case Right(result) =>
+            println(s"✓ Auto solved: ${result.tree.format(0)}")
+            Right(
+              state.copy(
+                goals = state.goals.tail,
+                completedProofs = result.tree :: state.completedProofs
+              )
+            )
+          case Left(fail) =>
+            Left(s"auto: No proof found. Best attempt depth: ${fail.depth}")
+        }
+      case None => Left("No current goal")
+    }
+  }
+
+  /** 目標と仮定の正規化（簡約）。
+    */
+  def simpl(state: ProofState): TacticResult = {
+    state.currentGoal match {
+      case Some(goal) =>
+        val nextGoal = Goal(
+          goal.context.map((n, e) => (n, Rewriter.normalize(e))),
+          goal.linearContext.map((n, e) => (n, Rewriter.normalize(e))),
+          Rewriter.normalize(goal.target)
+        )
+        Right(state.copy(goals = nextGoal :: state.goals.tail))
+      case None => Left("No current goal")
+    }
+  }
 }

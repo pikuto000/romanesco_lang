@@ -407,8 +407,18 @@ object StandardRules:
 
   val hott = List(pathRefl, pathInv, univalence, pathConcatRule, concatReflLeft, concatReflRight, concatPathReflLeft, concatPathReflRight, transportRefl, transportPathRefl, pathInvRefl, transportRule, cubeRule)
 
+  // --- 自然数の演算 ---
+  val plus0 = CatRule("plus_0", sym("plus")(sym("0"), v("n")), v("n"), List(v("n")))
+  val plusS = CatRule("plus_S", sym("plus")(sym("S")(v("n")), v("m")), sym("S")(sym("plus")(v("n"), v("m"))), List(v("n"), v("m")))
+  val natPlusRules = List(plus0, plusS)
+
+  // --- リストの演算 ---
+  val appendNil = CatRule("append_nil", sym("append")(sym("nil"), v("ys")), v("ys"), List(v("ys")))
+  val appendCons = CatRule("append_cons", sym("append")(sym("cons")(v("x"), v("xs")), v("ys")), sym("cons")(v("x"), sym("append")(v("xs"), v("ys"))), List(v("x"), v("xs"), v("ys")))
+  val listAppendRules = List(appendNil, appendCons)
+
   // 全ての標準規則を populate
-  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ logicMapping ++ modal ++ linear ++ separation ++ hott
+  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ logicMapping ++ modal ++ linear ++ separation ++ hott ++ natPlusRules ++ listAppendRules
 
   // --- 標準の初期代数 ---
   val defaultAlgebras = List(
@@ -420,4 +430,14 @@ object StandardRules:
       ConstructorDef("loop", Nil, ConstructorType.Path(sym("base"), sym("base")))
     ), "s")
   )
+
+  val natAlgebra = defaultAlgebras(0)
+  val listAlgebra = defaultAlgebras(1)
+  val treeAlgebra = defaultAlgebras(2)
+  val s1Algebra = defaultAlgebras(3)
+
+  val nat = natAlgebra
+  val list = listAlgebra
+  val tree = treeAlgebra
+  val s1 = s1Algebra
 
