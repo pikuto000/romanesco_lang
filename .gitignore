@@ -1,94 +1,21 @@
-# macOS
-.DS_Store
-
-# sbt specific
-dist/*
 target/
-lib_managed/
-src_managed/
-project/boot/
-project/plugins/project/
-project/local-plugins.sbt
-.history
-.ensime
-.ensime_cache/
-.sbt-scripted/
-local.sbt
-
-# Bloop
-.bsp
-
-# VS Code
-.vscode/
-
-# Metals
-.bloop/
-.metals/
-metals.sbt
-
-# IDEA
-.idea
-.idea_modules
-/.worksheet/
-
-# Logs
-*.log
-
-# Temporary test files
-test_*.romanesco
-macros.romanesco
-
-
-__pycache__/
-
-*.pyc
-
-*.pyo
-
-*.pyd
-
-.Python
-
-env/
-
-venv/
-
-.venv/
-
-build/
-
-develop-eggs/
-
-dist/
-
-downloads/
-
-eggs/
-
-.eggs/
-
-lib/
-
-lib64/
-
-parts/
-
-sdist/
-
-var/
-
-*.egg-info/
-
-.installed.cfg
-
-*.egg/.lake
-
-#text folder
-
-sbt_launch.jar
-
-texts.ps1
-
-test.txt
 
 null/
+
+fileTest/
+
+.vscode/
+
+.metals/
+
+.bsp/
+
+.bloop/
+
+sbt-launch.jar
+
+project/project
+
+project/metals.sbt
+
+project/build.properties
