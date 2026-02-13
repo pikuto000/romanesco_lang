@@ -27,9 +27,30 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     TrieMap[(Expr, Set[Expr], List[Expr], Boolean), Int]()
   private[core] var deadline: Long = 0
 
-  private val algebras =
-    if (config.algebras.nonEmpty) config.algebras
-    else StandardRules.defaultAlgebras
+  // 探索中に動的に発見された補題を保持する
+  private val dynamicRules = TrieMap[String, CatRule]()
+
+  private val dynamicAlgebras = mutable.ListBuffer[InitialAlgebra]()
+
+  private val algebras = {
+    val base = if (config.algebras.nonEmpty) config.algebras
+               else StandardRules.defaultAlgebras
+    base.to(mutable.ListBuffer) ++ dynamicAlgebras
+  }
+
+  def addHIT(hit: InitialAlgebra): Unit = {
+    if (!algebras.exists(_.name == hit.name)) {
+      algebras += hit
+      logger.log(s"[HIT DSL] Registered new HIT: ${hit.name}")
+    }
+  }
+
+  def addDynamicRule(rule: CatRule): Unit = {
+    if (!dynamicRules.contains(rule.toString)) {
+      dynamicRules.put(rule.toString, rule)
+      logger.log(s"[Proof Mining] New lemma discovered: $rule")
+    }
+  }
 
   private val forwardRuleIndex: Map[String, List[CatRule]] = {
     val allRules = if (config.classical) config.rules ++ StandardRules.classical else config.rules
@@ -513,7 +534,11 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
             case _ => (null, null, None)
           }
           if (vn != null) {
-            algebras.filter(a => topt.contains(Expr.Sym(a.name)) || vn.startsWith(a.varPrefix)).flatMap(algebra =>
+            val annotationAlgebra = topt.flatMap(t => algebras.find(_.name == t.headSymbol))
+            val targetAlgebras = if (annotationAlgebra.isDefined) List(annotationAlgebra.get)
+                                 else algebras.filter(a => vn.startsWith(a.varPrefix))
+            
+            targetAlgebras.flatMap(algebra =>
               solveInduction(vn, body, goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history, Some(algebra))
             )
           } else Nil
@@ -568,7 +593,9 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
 
   protected[core] def applyRules(e: Expr, subst: Subst, depth: Int, isGoal: Boolean): List[(Expr, List[Expr], String, Subst)] = {
     val index = if (isGoal) backwardRuleIndex else forwardRuleIndex
-    val candidates = index.getOrElse(e.headSymbol, Nil) ++ index.getOrElse("_VAR_", Nil) ++ index.getOrElse("_META_", Nil)
+    val candidates = index.getOrElse(e.headSymbol, Nil) ++ index.getOrElse("_VAR_", Nil) ++ index.getOrElse("_META_", Nil) ++
+                     dynamicRules.values.filter(r => (if (isGoal) r.rhs else r.lhs).headSymbol == e.headSymbol)
+    
     candidates.flatMap { rule =>
       val (instRule, _) = Prover.instantiate(rule, () => freshMeta(depth))
       val (m, r) = if (isGoal) (instRule.rhs, instRule.lhs) else (instRule.lhs, instRule.rhs)

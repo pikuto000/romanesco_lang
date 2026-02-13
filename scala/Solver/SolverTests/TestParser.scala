@@ -17,6 +17,65 @@ object TestParser:
     val tokens = tokenize(input)
     parseExpr(tokens, variables)._1
 
+  def parseHIT(input: String): InitialAlgebra =
+    val tokens = tokenize(input)
+    tokens match
+      case "HIT" :: name :: "{" :: rest =>
+        val (ctors, _) = parseConstructors(rest)
+        InitialAlgebra(name, ctors, name.take(1).toLowerCase)
+      case _ => throw new Exception("Invalid HIT definition syntax. Expected: HIT Name { ... }")
+
+  private def parseConstructors(tokens: List[String]): (List[ConstructorDef], List[String]) =
+    def loop(t: List[String]): (List[ConstructorDef], List[String]) = t match
+      case "}" :: rest => (Nil, rest)
+      case "," :: rest => loop(rest)
+      case name :: "(" :: rest =>
+        val (args, rest2) = parseArgTypes(rest)
+        rest2 match
+          case ":" :: rest3 =>
+            val (from, rest4) = parseExpr(rest3, Set.empty)
+            rest4 match
+              case "=" :: rest5 =>
+                val (to, rest6) = parseExpr(rest5, Set.empty)
+                val (tail, finalRest) = loop(rest6)
+                (ConstructorDef(name, args, ConstructorType.Path(from, to)) :: tail, finalRest)
+              case _ => throw new Exception(s"Expected '=' in path constructor $name at ${rest4.take(5).mkString(" ")}")
+          case _ =>
+            val (tail, rest3) = loop(rest2)
+            (ConstructorDef(name, args, ConstructorType.Point) :: tail, rest3)
+      case name :: ":" :: rest =>
+        val (from, rest2) = parseExpr(rest, Set.empty)
+        rest2 match
+          case ("→" | "->") :: rest3 =>
+            val (to, rest4) = parseExpr(rest3, Set.empty)
+            val (tail, finalRest) = loop(rest4)
+            (ConstructorDef(name, Nil, ConstructorType.Path(from, to)) :: tail, finalRest)
+          case _ =>
+            // Probably just a point with a type, skip for now or treat as point
+            val (tail, finalRest) = loop(rest2)
+            (ConstructorDef(name, Nil, ConstructorType.Point) :: tail, finalRest)
+      case name :: rest =>
+        val (tail, rest2) = loop(rest)
+        (ConstructorDef(name, Nil, ConstructorType.Point) :: tail, rest2)
+      case Nil => (Nil, Nil)
+
+    loop(tokens)
+
+  private def parseArgTypes(tokens: List[String]): (List[ArgType], List[String]) =
+    tokens match
+      case ")" :: rest => (Nil, rest)
+      case name :: ":" :: typeName :: rest =>
+        val argType = if (typeName == "Recursive" || typeName == "Self") ArgType.Recursive else ArgType.Constant
+        val nextTokens = if (rest.headOption.contains(",")) rest.tail else rest
+        val (tail, finalRest) = parseArgTypes(nextTokens)
+        (argType :: tail, finalRest)
+      case name :: rest =>
+        // Default to Constant if no type specified
+        val nextTokens = if (rest.headOption.contains(",")) rest.tail else rest
+        val (tail, finalRest) = parseArgTypes(nextTokens)
+        (ArgType.Constant :: tail, finalRest)
+      case _ => throw new Exception("Invalid constructor argument syntax")
+
   private def tokenize(s: String): List[String] =
     val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', ':', '⇒', '⊃', '×', '⊥', '⊤', '∘', '□', '◇', 'K', 'O', '⊸', '!', '?', '⊗', '⊕', '&', 'G', 'F', 'X', 'U', '*', '↦', 'λ', '¬')
     

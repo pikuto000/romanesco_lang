@@ -59,8 +59,6 @@ object Unifier:
               Expr.App(Expr.Sym(LogicSymbols.Type), args1),
               Expr.App(Expr.Sym(LogicSymbols.Type), args2)
             ) =>
-          // 型宇宙のレベル構造が異なる場合は単一化しない（パラドックス回避）
-          // Type(L1) = Type(L2) only if L1 == L2 structurally (same level depth)
           def getLevelDepth(e: Expr): Int = e match {
             case Expr.Meta(id) => id.ids.length
             case _             => -1 // Unknown/Var
@@ -70,7 +68,6 @@ object Unifier:
 
           if (l1 != -1 && l2 != -1 && l1 != l2) LazyList.empty
           else {
-            // Standard decomposition if levels match or are variables
             unify(
               Expr.Sym(LogicSymbols.Type),
               Expr.Sym(LogicSymbols.Type),
@@ -115,34 +112,7 @@ object Unifier:
 
         case _ => LazyList.empty
 
-      // if (res.nonEmpty) logger.log(s"Unify Success: $r1 = $r2 with ${res.head}")
       res
-
-  // 項tの中にあるtermToReplaceをreplacementに置き換える
-  private def substTerm(
-      t: Expr,
-      termToReplace: Expr,
-      replacement: Expr
-  ): Expr = {
-    if (t == termToReplace) replacement
-    else
-      t match
-        case Expr.App(f, args) =>
-          Expr.App(
-            substTerm(f, termToReplace, replacement),
-            args.map(substTerm(_, termToReplace, replacement))
-          )
-        case Expr.Lam(v, b) =>
-          // termToReplaceの中にvが含まれている場合は置換しない（キャプチャ回避）？
-          // 今回の用途ではargsは現在のスコープの項なので、ラムダ内部の変数は別物とみなす
-          // ただし構造的一致を見るので、偶発的に同じ変数名だとマッチしてしまうリスクはある
-          // ここでは単純な構造置換を行う
-          Expr.App(
-            Expr.Sym("λ"),
-            List(Expr.Var(v), substTerm(b, termToReplace, replacement))
-          )
-        case _ => t
-  }
 
   private def solveHigherOrder(
       id: MetaId,
@@ -150,30 +120,84 @@ object Unifier:
       target: Expr,
       subst: Subst
   ): LazyList[Subst] = {
-    // 引数を抽象化するための変数名を生成
     val vars = args.indices.map(i => s"v_$i").toList
+    val argFreeVars = args.flatMap(collectFreeVars).toSet
 
-    // target内のargs[i]をvars[i]に置換する
-    // 置換順序は引数の順序通りとする (前から順に置換)
-    // 注意: args同士が重複する場合、前の引数が優先して置換される
-
-    var currentBody = target
-    args.zip(vars).foreach { case (arg, v) =>
-      currentBody = substTerm(currentBody, arg, Expr.Var(v))
+    // 1. まずターゲット内のメタ変数をPruningする
+    def performPruning(t: Expr, s: Subst): LazyList[Subst] = {
+      val freeVars = collectFreeVars(applySubst(t, s))
+      val outOfScope = freeVars -- argFreeVars
+      if (outOfScope.isEmpty) LazyList(s)
+      else {
+        def findAndPrune(e: Expr, currentS: Subst): LazyList[Subst] = applySubst(e, currentS) match {
+          case Expr.App(Expr.Meta(mid), mArgs) =>
+            val invalidIndices = mArgs.indices.filter(i => collectFreeVars(applySubst(mArgs(i), currentS)).exists(outOfScope.contains))
+            if (invalidIndices.nonEmpty) {
+              val mVars = mArgs.indices.map(i => s"mv_$i").toList
+              val prunedBody = Expr.App(Expr.Meta(MetaId(mid.ids :+ 999)), 
+                mArgs.indices.filterNot(invalidIndices.contains).map(i => Expr.Var(mVars(i))).toList)
+              val lambda = mVars.foldRight(prunedBody) { (name, b) =>
+                Expr.App(Expr.Sym("λ"), List(Expr.Var(name), b))
+              }
+              val nextS = currentS + (mid -> lambda)
+              performPruning(t, nextS)
+            } else {
+              mArgs.foldLeft(LazyList(currentS)) { (sl, arg) => sl.flatMap(s2 => findAndPrune(arg, s2)) }
+            }
+          case Expr.App(f, as) =>
+            (f :: as).foldLeft(LazyList(currentS)) { (sl, child) => sl.flatMap(s2 => findAndPrune(child, s2)) }
+          case _ => LazyList(currentS)
+        }
+        findAndPrune(t, s)
+      }
     }
 
-    val lambda = vars.foldRight(currentBody) { (name, body) =>
-      Expr.App(Expr.Sym("λ"), List(Expr.Var(name), body))
-    }
+    // 2. Pruningを実行してから抽象化を行う
+    performPruning(target, subst).flatMap { s =>
+      val currentTarget = applySubst(target, s)
+      
+      def abstractAll(t: Expr): LazyList[Expr] = {
+        val matchingIndices = args.indices.filter(i => args(i) == t)
+        val replacements = matchingIndices.to(LazyList).map(i => Expr.Var(vars(i)))
+        
+        val recursive = t match {
+          case Expr.App(f, as) =>
+            for {
+              nextF <- abstractAll(f)
+              nextArgs <- as.foldRight(LazyList(List.empty[Expr])) { (a, acc) =>
+                for {
+                  nextA <- abstractAll(a)
+                  rest <- acc
+                } yield nextA :: rest
+              }
+            } yield Expr.App(nextF, nextArgs)
+          case Expr.Meta(_) => LazyList(t)
+          case _ => LazyList(t)
+        }
+        (replacements #::: recursive).distinct
+      }
 
-    // 生成された解を追加
-    // 注意: 厳密なHOUでは複数の解がありうるが、ここでは「最大抽象化」の1つのみを返す
-    LazyList(subst + (id -> lambda))
+      abstractAll(currentTarget).flatMap { body =>
+        val freeInBody = collectFreeVars(body) -- vars.toSet
+        if (freeInBody.subsetOf(argFreeVars)) {
+          val lambda = vars.foldRight(body) { (name, b) =>
+            Expr.App(Expr.Sym("λ"), List(Expr.Var(name), b))
+          }
+          LazyList(s + (id -> lambda))
+        } else {
+          LazyList.empty
+        }
+      }
+    }
   }
 
-  /** 高次path対応の出現チェック metaId が expr 内に出現するか、または expr 内に metaId の引数 args
-    * に含まれない自由変数が出現するかをチェックします。
-    */
+  private def collectFreeVars(e: Expr): Set[String] = e match {
+    case Expr.Var(n) => Set(n)
+    case Expr.App(Expr.Sym("λ"), List(Expr.Var(v), body)) => collectFreeVars(body) - v
+    case Expr.App(f, as) => collectFreeVars(f) ++ as.flatMap(collectFreeVars)
+    case _ => Set.empty
+  }
+
   private def occursCheckHigher(
       metaId: MetaId,
       expr: Expr,
@@ -185,28 +209,20 @@ object Unifier:
       case _               => Set.empty
     }
 
-    // メタ変数の循環参照チェック
     if (collectMetaVars(expr).contains(metaId)) return true
 
-    // 高階の場合の依存性チェック:
-    // args が空でない場合、expr 内に出現する変数が args に含まれているかを確認する
     if (args.nonEmpty) {
-      def collectFreeVars(e: Expr): Set[String] = e match {
-        case Expr.Var(n) => Set(n)
-        case Expr.App(f, as) => e match {
-          case Expr.App(Expr.Sym("λ"), List(Expr.Var(v), body)) =>
-            collectFreeVars(body) - v
-          case _ => collectFreeVars(f) ++ as.flatMap(collectFreeVars)
-        }
-        case _ => Set.empty
-      }
-      
       val exprVars = collectFreeVars(expr)
       val argVars = args.flatMap(collectFreeVars).toSet
       
-      // expr に args に含まれない自由変数がある場合は失敗
-      if (exprVars.exists(v => !argVars.contains(v))) {
-        logger.log(s"[OCCUR CHECK] Free variables in expr not in args: ${exprVars -- argVars}")
+      // Pruningが可能な場合（メタ変数アプリケーションを含む場合）は失敗させない
+      def canPrune(e: Expr): Boolean = e match {
+        case Expr.App(Expr.Meta(_), _) => true
+        case Expr.App(f, as) => canPrune(f) || as.exists(canPrune)
+        case _ => false
+      }
+
+      if (exprVars.exists(v => !argVars.contains(v)) && !canPrune(expr)) {
         return true
       }
     }
@@ -214,7 +230,6 @@ object Unifier:
     false
   }
 
-  // Expr.Var用のoccur check
   private def occursCheckVar(varName: String, expr: Expr): Boolean = expr match
     case Expr.Var(n) => n == varName
     case Expr.App(h, args) =>

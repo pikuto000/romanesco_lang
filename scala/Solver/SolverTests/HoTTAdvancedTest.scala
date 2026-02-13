@@ -70,5 +70,27 @@ object HoTTAdvancedTest {
         case e: Exception => println(s"Error: ${e.getMessage}")
       }
     }
+
+    println("\n=== Phase 5: Proof Mining Test ===")
+    val miningGoal = TestParser.parse("∀n. ∀m. ∀k. plus(n, plus(m, k)) = plus(m, plus(n, k))")
+    prover.prove(miningGoal, maxDepth = 20) match {
+      case Right(_) => println("✓ OK: Complex arithmetic solved with dynamic lemmas")
+      case Left(trace) => println(s"✗ FAIL: Still too hard - Reason: ${trace.reason}")
+    }
+
+    println("\n=== Phase 6: HIT DSL Test ===")
+    try {
+      val circleDSL = "HIT Circle { base, loop: base -> base }"
+      val circleAlgebra = TestParser.parseHIT(circleDSL)
+      prover.addHIT(circleAlgebra)
+      
+      val circleGoal = TestParser.parse("∀c:Circle. P(base) → P(c)")
+      prover.prove(circleGoal, maxDepth = 10) match {
+        case Right(_) => println("✓ OK: Circle defined via DSL and induction proved")
+        case Left(trace) => println(s"✗ FAIL: Circle induction failed - Reason: ${trace.reason}")
+      }
+    } catch {
+      case e: Exception => println(s"Error in HIT DSL: ${e.getMessage}")
+    }
   }
 }

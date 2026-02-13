@@ -26,6 +26,24 @@ trait PersistentLogicSearch { self: Prover =>
 
   def recordLemma(goal: Expr, context: Set[Expr], linear: List[Expr], tree: ProofTree): Unit = {
     globalLemmaCache.putIfAbsent((goal, context, linear), tree)
+
+    // Proof Mining: ゴールが等式であり、かつ文脈に依存しない（一般的な）性質であれば、動的ルールとして登録
+    if (context.isEmpty && linear.isEmpty) {
+      goal match {
+        case Expr.App(Expr.Sym(Eq | Path), args) if args.length >= 2 =>
+          val (lhs, rhs) = args match {
+            case List(_, l, r) if goal.headSymbol == Path => (l, r)
+            case List(l, r) => (l, r)
+            case _ => (null, null)
+          }
+          if (lhs != null && rhs != null && goal.complexity > 5) {
+            val vars = Prover.collectVars(goal).toList.map(Expr.Var(_))
+            val rule = CatRule(s"mined_${java.util.UUID.randomUUID().toString.take(4)}", lhs, rhs, vars)
+            self.addDynamicRule(rule)
+          }
+        case _ =>
+      }
+    }
   }
 
   def checkGlobalFailure(goal: Expr, context: Set[Expr], linear: List[Expr], guarded: Boolean, remainingDepth: Int): Boolean = {

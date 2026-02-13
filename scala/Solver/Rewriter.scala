@@ -189,6 +189,9 @@ object Rewriter {
       Expr.App(Expr.Sym("bind_maybe"), List(m, Expr.App(Expr.Sym("λ"), List(Expr.Var("x"), Expr.App(Expr.Sym("bind_maybe"), List(Expr.App(f, List(Expr.Var("x"))), g))))))
 
     case Expr.App(Expr.Sym("id"), List(x)) => x
+    case Expr.App(Expr.Sym("vmap"), List(_, Expr.Sym("vnil"))) => Expr.Sym("vnil")
+    case Expr.App(Expr.Sym("vmap"), List(f, Expr.App(Expr.Sym("vcons"), List(x, xs, n)))) =>
+      Expr.App(Expr.Sym("vcons"), List(Expr.App(f, List(x)), Expr.App(Expr.Sym("vmap"), List(f, xs)), n))
     case Expr.App(Expr.App(Expr.Sym("compose"), List(f, g)), List(x)) =>
       Expr.App(f, List(Expr.App(g, List(x))))
     case Expr.App(Expr.Sym(Concat), List(Expr.App(Expr.Sym(Concat), List(p, q)), r)) =>

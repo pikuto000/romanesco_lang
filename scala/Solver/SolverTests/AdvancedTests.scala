@@ -59,7 +59,19 @@ object DependentTypeTests {
           App(Sym("vcons"), List(Var("x"), Var("xs"), Var("n")))
         )),
         App(Sym("S"), List(Var("n"))),
-        List(Var("x"), Var("xs"), Var("n")))
+        List(Var("x"), Var("xs"), Var("n"))),
+
+      CatRule("vmap_nil",
+        App(Sym("vmap"), List(Var("f"), Sym("vnil"))),
+        Sym("vnil"),
+        List(Var("f"))),
+
+      CatRule("vmap_cons",
+        App(Sym("vmap"), List(Var("f"), App(Sym("vcons"), List(Var("x"), Var("xs"), Var("n"))))),
+        App(Sym("vcons"), List(App(Var("f"), List(Var("x"))), App(Sym("vmap"), List(Var("f"), Var("xs"))), Var("n"))),
+        List(Var("f"), Var("x"), Var("xs"), Var("n"))),
+
+      CatRule("id_rule", App(Sym("id"), List(Var("x"))), Var("x"), List(Var("x")))
     )
     
     val config = ProverConfig(
@@ -76,7 +88,10 @@ object DependentTypeTests {
        10),
       ("Vector length preservation",
        "∀v. ∀w. vlength(vappend(v, w)) = plus(vlength(v), vlength(w))",
-       25)
+       25),
+      ("Vector map identity",
+       "∀v:Vec. ∀n. vmap(id, v) = v",
+       20)
     )
     
     runTestCases(cases, prover, "Dependent Vectors")
