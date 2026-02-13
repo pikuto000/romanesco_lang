@@ -54,7 +54,57 @@ object Rewriter {
         if (op == Compose || op == Concat) && r == Refl => p
     case Expr.App(Expr.Sym(op), List(p, Expr.App(Expr.Sym(r), _))) 
         if (op == Compose || op == Concat) && r == Refl => p
+    
+    // Transport computation
+    case Expr.App(Expr.Sym(t), List(pred, p, v)) if t == Transport =>
+      (pred, v) match {
+        // Refl case
+        case (_, _) if p match { case Expr.App(Expr.Sym(r), _) if r == Refl => true; case _ => false } => v
+        
+        // Product: transport(λz. A(z) × B(z), p, pair(u, v)) -> pair(transport(λz. A(z), p, u), transport(λz. B(z), p, v))
+        case (Expr.App(Expr.Sym("λ"), List(Expr.Var(z), Expr.App(Expr.Sym(prod), List(a, b)))), Expr.App(Expr.Sym(pair), List(u, v2)))
+            if (prod == Product || prod == "×") && pair == Pair =>
+          Expr.App(Expr.Sym(Pair), List(
+            Expr.App(Expr.Sym(Transport), List(Expr.App(Expr.Sym("λ"), List(Expr.Var(z), a)), p, u)),
+            Expr.App(Expr.Sym(Transport), List(Expr.App(Expr.Sym("λ"), List(Expr.Var(z), b)), p, v2))
+          ))
+        
+        // Coproduct: transport(λz. A(z) + B(z), p, inl(u)) -> inl(transport(λz. A(z), p, u))
+        case (Expr.App(Expr.Sym("λ"), List(Expr.Var(z), Expr.App(Expr.Sym(coprod), List(a, b)))), Expr.App(Expr.Sym(inl), List(u)))
+            if coprod == Coproduct && inl == Inl =>
+          Expr.App(Expr.Sym(Inl), List(Expr.App(Expr.Sym(Transport), List(Expr.App(Expr.Sym("λ"), List(Expr.Var(z), a)), p, u))))
+        
+        case (Expr.App(Expr.Sym("λ"), List(Expr.Var(z), Expr.App(Expr.Sym(coprod), List(a, b)))), Expr.App(Expr.Sym(inr), List(u)))
+            if coprod == Coproduct && inr == Inr =>
+          Expr.App(Expr.Sym(Inr), List(Expr.App(Expr.Sym(Transport), List(Expr.App(Expr.Sym("λ"), List(Expr.Var(z), b)), p, u))))
+
+        // Function: transport(λz. A(z) → B(z), p, f) -> λx. transport(λz. B(z), p, f(transport(λz. A(z), inv(p), x)))
+        case (Expr.App(Expr.Sym("λ"), List(Expr.Var(z), Expr.App(Expr.Sym(arr), List(a, b)))), f)
+            if arr == Implies || arr == "→" =>
+          val x = Expr.Var("x_trans")
+          Expr.App(Expr.Sym("λ"), List(x,
+            Expr.App(Expr.Sym(Transport), List(
+              Expr.App(Expr.Sym("λ"), List(Expr.Var(z), b)),
+              p,
+              Expr.App(f, List(Expr.App(Expr.Sym(Transport), List(
+                Expr.App(Expr.Sym("λ"), List(Expr.Var(z), a)),
+                Expr.App(Expr.Sym("inv"), List(p)),
+                x
+              ))))
+            ))
+          ))
+
+        case _ => expr
+      }
+
     case Expr.App(Expr.Sym(t), List(_, Expr.App(Expr.Sym(r), _), x)) if t == Transport && r == Refl => x
+    
+    // --- Cubical Kan Operations ---
+    // comp(A, refl, u0) -> u0
+    case Expr.App(Expr.Sym(c), List(_, Expr.App(Expr.Sym(r), _), u0)) if c == Comp && r == Refl => u0
+    // fill(A, refl, u0) -> refl (approximation)
+    case Expr.App(Expr.Sym(f), List(a, Expr.App(Expr.Sym(r), List(x)), _)) if f == Fill && r == Refl =>
+      Expr.App(Expr.Sym(Refl), List(x))
 
     // --- ラムダ計算 (β簡約) ---
     case Expr.App(Expr.App(Expr.Sym("λ"), List(Expr.Var(v), body)), args) if args.nonEmpty =>

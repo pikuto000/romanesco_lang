@@ -530,10 +530,15 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
         case c :: tail =>
           val ct = if (c.argTypes.isEmpty) Expr.Sym(c.symbol) else Expr.App(Expr.Sym(c.symbol), c.argTypes.zipWithIndex.map { case (ArgType.Recursive, i) => Expr.Var(s"${vn}_$i"); case (ArgType.Constant, i) => Expr.Var(s"a_$i") })
           val ihs = ct match { case Expr.App(_, argsC) => c.argTypes.zip(argsC).collect { case (ArgType.Recursive, arg) => (s"IH_${arg}", Prover.substVar(body, vn, arg)) }; case _ => Nil }
-          val currentIndGoal = c.ctorType match {
+          val currentIndGoalBase = c.ctorType match {
             case ConstructorType.Point => Prover.substVar(body, vn, ct)
             case ConstructorType.Path(from, to) =>
               Expr.App(Expr.Sym(Path), List(Expr.Sym("Type"), Prover.substVar(body, vn, from), Prover.substVar(body, vn, to)))
+          }
+          // Wrap in Forall for each argument (e.g., ∀a:A. north = south)
+          val currentIndGoal = c.argTypes.zipWithIndex.foldRight(currentIndGoalBase) {
+            case ((ArgType.Constant, i), acc) => Expr.App(Expr.Sym(Forall), List(Expr.Var(s"a_$i"), acc))
+            case ((ArgType.Recursive, i), acc) => Expr.App(Expr.Sym(Forall), List(Expr.Var(s"${vn}_$i"), acc))
           }
           search(currentIndGoal, rules, ihs ++ context, l, s, depth + 1, limit, visited, raaCount, inductionCount + 1, guarded, history).flatMap { case (t, ns, nl) => solve(tail, ns, nl, solved :+ t) }
       }

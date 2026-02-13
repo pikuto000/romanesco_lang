@@ -11,15 +11,19 @@ Romanesco 証明エンジン 開発ロードマップ
 - [x] リバース・Map融合の証明: `reverse(reverse(xs)) = xs` 等の自動証明達成 (Phase 1)
 - [x] 依存型の基本証明: `vlength(vappend(v, w))` の自動証明達成 (Advanced Suite)
 - [x] 共帰納法の安定化: ストリームの自己シミュレーション (`bisim`) の高速解決達成
+- [x] モナド三則 (Left/Right Identity, Associativity) の検証成功
+- [x] HoTT 完全実装ロードマップ (Phase 1-4) の達成:
+    - [x] transport の計算化 (Prod, Pi, Sigma 型対応)
+    - [x] h-levels (isProp, isSet) の導入と論理的推論の自動化
+    - [x] 一般化された HITs (Interval, Suspension) の帰納法対応
+    - [x] 幾何学的 Kan 演算 (comp, fill) の基礎実装
 
 2. 短期的な課題 (Priority: High) ⏳
 - [ ] 依存型の高度な定理: `∀n. ∀v:Vec(A, n). vmap(id, v) = v` のような、型と値が密接に絡む定理の検証
-- [ ] モナド則の検証: `bind(return(x), f) = f(x)` 等のモナド三則を Rewriter と Tactic 両面から強化
 - [ ] 補題の自動発見 (Proof Mining): 探索中に頻出する中間形式を自動的に補題として抽出する仕組みの検討
 
 3. 中長期的な研究・開発項目 (Priority: Medium) 🚀
 - [ ] Hoare論理の実装: プログラムコードの事前/事後条件を検証する `getGoalHooks` の追加
-- [ ] 高次帰納型 (HIT) の深化: 円周 $S^1$ 以外の、より複雑な形状（商集合、基本群など）への応用
 - [ ] 分離論理のフレーム自動生成: `P * ?Frame ⊸ Q` を解く際の `?Frame` の自動推論
 
 4. 目標 (Vision) 🎯

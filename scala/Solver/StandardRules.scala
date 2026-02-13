@@ -76,10 +76,18 @@ object StandardRules:
   val pathInv = CatRule("path-inv", sym("inv")(sym(Path)(v("A"), v("a"), v("b"))), sym(Path)(v("A"), v("b"), v("a")))
   val univalence = CatRule("univalence", sym("equiv")(v("A"), v("B")), sym(Path)(sym(Type), v("A"), v("B")))
   val pathToEquiv = CatRule("path-to-equiv", sym(Path)(sym(Type), v("A"), v("B")), sym("equiv")(v("A"), v("B")))
-  val pathConcatRule = CatRule("path-concat", sym(Concat)(sym(Path)(v("A"), v("a"), v("b")), sym(Path)(v("A"), v("b"), v("c"))), sym(Path)(v("A"), v("a"), v("c")))
-  val cubeApprox = CatRule("cube-approx", sym(Cube)(v("A"), v("p"), v("q"), v("r"), v("s")), sym(Path)(sym(Path)(v("A"), v("x"), v("y")), v("p"), v("r")), List(v("A"), v("p"), v("q"), v("r"), v("s"), v("x"), v("y")))
+    val pathConcatRule = CatRule("path-concat", sym(Concat)(sym(Path)(v("A"), v("a"), v("b")), sym(Path)(v("A"), v("b"), v("c"))), sym(Path)(v("A"), v("a"), v("c")))
+    val concatToComp = CatRule("concat-to-comp", sym(Concat)(v("p"), v("q")), sym(Comp)(v("A"), v("p"), v("q")), List(v("A"), v("p"), v("q")))
+    
+    val cubeApprox = CatRule("cube-approx", sym(Cube)(v("A"), v("p"), v("q"), v("r"), v("s")), sym(Path)(sym(Path)(v("A"), v("x"), v("y")), v("p"), v("r")), List(v("A"), v("p"), v("q"), v("r"), v("s"), v("x"), v("y")))
   
-  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, pathToEquiv, cubeApprox)
+  
+  val propPath = CatRule("prop-path", sym("isProp")(v("A")), sym(Implies)(sym(True), sym(Path)(v("A"), v("x"), v("y"))), List(v("A"), v("x"), v("y")))
+  val setPath = CatRule("set-path", sym("isSet")(v("A")), sym(Implies)(sym(True), sym(Path)(sym(Path)(v("A"), v("x"), v("y")), v("p"), v("q"))), List(v("A"), v("x"), v("y"), v("p"), v("q")))
+  val propToSet = CatRule("prop-to-set", sym("isProp")(v("A")), sym("isSet")(v("A")), List(v("A")))
+  val propProd = CatRule("prop-prod", sym(And)(sym("isProp")(v("A")), sym("isProp")(v("B"))), sym("isProp")(sym(Product)(v("A"), v("B"))), List(v("A"), v("B")))
+
+  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, pathToEquiv, cubeApprox, propPath, setPath, propToSet, propProd)
 
   val natPlusRules = List(
     CatRule("plus_0", sym("plus")(sym("0"), v("n")), v("n"), List(v("n"))),
@@ -104,7 +112,17 @@ object StandardRules:
     InitialAlgebra("List", List(ConstructorDef("nil", Nil), ConstructorDef("cons", List(ArgType.Constant, ArgType.Recursive))), "xs"),
     InitialAlgebra("Tree", List(ConstructorDef("leaf", Nil), ConstructorDef("node", List(ArgType.Recursive, ArgType.Constant, ArgType.Recursive))), "t"),
     InitialAlgebra("S1", List(ConstructorDef("base", Nil), ConstructorDef("loop", Nil, ConstructorType.Path(sym("base"), sym("base")))), "s"),
-    InitialAlgebra("Maybe", List(ConstructorDef("nothing", Nil), ConstructorDef("just", List(ArgType.Constant))), "m")
+    InitialAlgebra("Maybe", List(ConstructorDef("nothing", Nil), ConstructorDef("just", List(ArgType.Constant))), "m"),
+    InitialAlgebra("Interval", List(
+      ConstructorDef("zero", Nil),
+      ConstructorDef("one", Nil),
+      ConstructorDef("seg", Nil, ConstructorType.Path(sym("zero"), sym("one")))
+    ), "i"),
+    InitialAlgebra("Susp", List(
+      ConstructorDef("north", Nil),
+      ConstructorDef("south", Nil),
+      ConstructorDef("merid", List(ArgType.Constant), ConstructorType.Path(sym("north"), sym("south")))
+    ), "s")
   )
 
   val natAlgebra = defaultAlgebras(0)

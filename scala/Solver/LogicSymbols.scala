@@ -73,6 +73,8 @@ object LogicSymbols {
   val Transport = "transport"
   val Concat = "concat" // パスの合成演算子
   val Cube = "cube" // 立方体モデル近似
+  val Comp = "comp" // 幾何学的合成 (Kan composition)
+  val Fill = "fill" // 幾何学的充填 (Kan filling)
 
   // その他の表記揺れ
   val ImpliesAlt1 = "⊃"
