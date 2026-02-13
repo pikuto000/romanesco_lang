@@ -115,6 +115,13 @@ enum Expr:
     loop(this)
   }
 
+  def toJson: String = this match {
+    case Var(n) => s"{\"type\":\"Var\",\"name\":\"$n\"}"
+    case Sym(n) => s"{\"type\":\"Sym\",\"name\":\"$n\"}"
+    case Meta(id) => s"{\"type\":\"Meta\",\"id\":\"$id\"}"
+    case App(f, args) => s"{\"type\":\"App\",\"f\":${f.toJson},\"args\":[${args.map(_.toJson).mkString(",")}]}"
+  }
+
 object Expr:
   def sym(name: String): Expr = Sym(name)
   def v(name: String): Expr = Var(name)
@@ -161,6 +168,11 @@ enum ProofTree:
       case Node(g, r, cs) =>
         val childrenStr = cs.map(_.format(indent + 1)).mkString("\n")
         s"$childrenStr\n$sp└─ $g  {$r}"
+
+  def toJson: String = this match {
+    case Leaf(g, r) => s"{\"nodeType\":\"Leaf\",\"goal\":\"$g\",\"rule\":\"$r\"}"
+    case Node(g, r, cs) => s"{\"nodeType\":\"Node\",\"goal\":\"$g\",\"rule\":\"$r\",\"children\":[${cs.map(_.toJson).mkString(",")}]}"
+  }
 
 type Proof = ProofTree
 

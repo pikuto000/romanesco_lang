@@ -120,6 +120,22 @@ object Repl:
         println("\n--- Session Lemmas ---")
         sessionLemmas.foreach(println)
         Right(s)
+      case "viz" :: Nil =>
+        if (s.completedProofs.nonEmpty) {
+          val json = s.completedProofs.head.toJson
+          val file = new java.io.File("visualizer/proof.json")
+          val pw = new java.io.PrintWriter(file)
+          pw.write(json)
+          pw.close()
+          println("\n[Visualization] Proof JSON exported to visualizer/proof.json")
+          println("To view the proof:")
+          println("1. Open visualizer/index.html in your browser.")
+          println("2. Copy the content of visualizer/proof.json.")
+          println("3. Paste it into the text area and click 'Visualize'.")
+        } else {
+          println("No completed proofs to visualize yet. Use 'auto' or solve the goal first.")
+        }
+        Right(s)
       case _ => Left(s"Unknown tactic or invalid arguments: $input")
 
   def showGeneralHelp(): Unit =
@@ -143,6 +159,7 @@ Tactics:
   exact <hyp>     - Solve goal by exact match with hypothesis
   assumption      - Try to solve goal using any hypothesis
   auto            - Automatically prove the current subgoal
+  viz             - Export the current proof to the visualizer
   lemmas          - List loaded and session lemmas
   save <file>     - Save session lemmas to file
   load <file>     - Load lemmas from file

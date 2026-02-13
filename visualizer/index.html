@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Romanesco Proof Visualizer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; overflow: hidden; background: #f8f9fa; }
+        .node circle { fill: #fff; stroke: #007bff; stroke-width: 3px; }
+        .node text { font-size: 14px; }
+        .link { fill: none; stroke: #ccc; stroke-width: 2px; }
+        .controls { position: absolute; top: 20px; left: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 100; }
+        textarea { width: 300px; height: 100px; margin-bottom: 10px; display: block; border: 1px solid #ddd; border-radius: 4px; padding: 8px; }
+        button { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .tooltip { position: absolute; padding: 10px; background: rgba(0,0,0,0.8); color: #fff; border-radius: 4px; font-size: 12px; pointer-events: none; opacity: 0; }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <h3>Proof Tree JSON</h3>
+        <textarea id="json-input" placeholder="Paste proof JSON here..."></textarea>
+        <button onclick="visualize()">Visualize</button>
+    </div>
+    <div id="canvas"></div>
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        const svg = d3.select("#canvas").append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .call(d3.zoom().on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            }))
+            .append("g");
+
+        const g = svg.append("g");
+
+        function visualize() {
+            const input = document.getElementById('json-input').value;
+            if (!input) return;
+            const data = JSON.parse(input);
+            render(data);
+        }
+
+        function render(treeData) {
+            g.selectAll("*").remove();
+
+            const root = d3.hierarchy(treeData, d => d.children);
+            const treeLayout = d3.tree().nodeSize([100, 300]);
+            treeLayout(root);
+
+            const links = g.selectAll(".link")
+                .data(root.links())
+                .enter().append("path")
+                .attr("class", "link")
+                .attr("d", d3.linkHorizontal()
+                    .x(d => d.y)
+                    .y(d => d.x));
+
+            const nodes = g.selectAll(".node")
+                .data(root.descendants())
+                .enter().append("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${d.y},${d.x})`);
+
+            nodes.append("circle").attr("r", 10);
+
+            nodes.append("text")
+                .attr("dy", "-1.5em")
+                .attr("x", 0)
+                .attr("text-anchor", "middle")
+                .text(d => d.data.rule);
+
+            nodes.append("text")
+                .attr("dy", "1.5em")
+                .attr("x", 0)
+                .attr("text-anchor", "middle")
+                .style("font-weight", "bold")
+                .text(d => {
+                    const goal = d.data.goal;
+                    return goal.length > 40 ? goal.substring(0, 37) + "..." : goal;
+                })
+                .on("mouseover", (event, d) => {
+                    const tooltip = d3.select("#tooltip");
+                    tooltip.style("opacity", 1)
+                        .html(d.data.goal)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", () => {
+                    d3.select("#tooltip").style("opacity", 0);
+                });
+        }
+
+        // 初期状態でキャンバスを中央に
+        g.attr("transform", `translate(100, ${height/2})`);
+    </script>
+</body>
+</html>

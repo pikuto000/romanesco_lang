@@ -76,6 +76,14 @@ object LogicSymbols {
   val Comp = "comp" // 幾何学的合成 (Kan composition)
   val Fill = "fill" // 幾何学的充填 (Kan filling)
 
+  // Hoare Logic
+  val Triple = "triple" // {P} C {Q}
+  val Assign = ":="
+  val Seq = ";"
+  val If = "if"
+  val While = "while"
+  val Skip = "skip"
+
   // その他の表記揺れ
   val ImpliesAlt1 = "⊃"
   val ImpliesAlt2 = "⇒"
