@@ -8,7 +8,7 @@ import romanesco.Utils.Debug.logger
 
 object UnificationAdvancedTest {
   def main(args: Array[String]): Unit = {
-    logger.switch(true)
+    logger.switch(false)
 
     println("=== Advanced Unification Test ===")
 
@@ -39,79 +39,49 @@ object UnificationAdvancedTest {
       App(Sym("S"), List(App(Sym("S"), List(Var("x")))))
     )
 
-        // Test 4: Nested Meta-applications
+    // Test 4: Nested Meta-applications
 
-        // ?P(x) = f(?Q(x))
+    // ?P(x) = f(?Q(x))
 
-        // This is a flex-rigid case, should solve ?P -> λv0. f(?Q(v0))
+    // This is a flex-rigid case, should solve ?P -> λv0. f(?Q(v0))
 
-        test("Nested Meta",
+    test(
+      "Nested Meta",
 
-          App(Meta(MetaId(4)), List(Var("x"))),
+      App(Meta(MetaId(4)), List(Var("x"))),
 
-          App(Sym("f"), List(App(Meta(MetaId(5)), List(Var("x"))))))
+      App(Sym("f"), List(App(Meta(MetaId(5)), List(Var("x")))))
+    )
 
-    
+    // Test 5: Non-deterministic abstraction
 
-            // Test 5: Non-deterministic abstraction
+    // ?P(x, x) = f(x, x)
 
-    
+    // Multiple valid abstractions exist.
 
-            // ?P(x, x) = f(x, x)
+    test(
+      "Non-deterministic Abstraction",
 
-    
+      App(Meta(MetaId(6)), List(Var("x"), Var("x"))),
 
-            // Multiple valid abstractions exist.
+      App(Sym("f"), List(Var("x"), Var("x")))
+    )
 
-    
+    // Test 6: Pruning (Meta-variable dependency reduction)
 
-            test("Non-deterministic Abstraction",
+    // ?P(x) = f(?Q(x, y))
 
-    
+    // Should succeed by pruning ?Q to not depend on y.
 
-              App(Meta(MetaId(6)), List(Var("x"), Var("x"))),
+    test(
+      "Pruning",
 
-    
+      App(Meta(MetaId(7)), List(Var("x"))),
 
-              App(Sym("f"), List(Var("x"), Var("x"))))
+      App(Sym("f"), List(App(Meta(MetaId(8)), List(Var("x"), Var("y")))))
+    )
 
-    
-
-        
-
-    
-
-            // Test 6: Pruning (Meta-variable dependency reduction)
-
-    
-
-            // ?P(x) = f(?Q(x, y))
-
-    
-
-            // Should succeed by pruning ?Q to not depend on y.
-
-    
-
-            test("Pruning",
-
-    
-
-              App(Meta(MetaId(7)), List(Var("x"))),
-
-    
-
-              App(Sym("f"), List(App(Meta(MetaId(8)), List(Var("x"), Var("y"))))))
-
-    
-
-          }
-
-    
-
-        
-
-    
+  }
 
   def test(name: String, e1: Expr, e2: Expr): Unit = {
     println(s"[Case: $name]")

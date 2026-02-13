@@ -46,12 +46,11 @@ object TestParser:
       case name :: ":" :: rest =>
         val (from, rest2) = parseExpr(rest, Set.empty)
         rest2 match
-          case ("→" | "->") :: rest3 =>
+          case ("→" | "->" | "⇒") :: rest3 =>
             val (to, rest4) = parseExpr(rest3, Set.empty)
             val (tail, finalRest) = loop(rest4)
             (ConstructorDef(name, Nil, ConstructorType.Path(from, to)) :: tail, finalRest)
           case _ =>
-            // Probably just a point with a type, skip for now or treat as point
             val (tail, finalRest) = loop(rest2)
             (ConstructorDef(name, Nil, ConstructorType.Point) :: tail, finalRest)
       case name :: rest =>
@@ -70,14 +69,13 @@ object TestParser:
         val (tail, finalRest) = parseArgTypes(nextTokens)
         (argType :: tail, finalRest)
       case name :: rest =>
-        // Default to Constant if no type specified
         val nextTokens = if (rest.headOption.contains(",")) rest.tail else rest
         val (tail, finalRest) = parseArgTypes(nextTokens)
         (ArgType.Constant :: tail, finalRest)
       case _ => throw new Exception("Invalid constructor argument syntax")
 
   private def tokenize(s: String): List[String] =
-    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '.', ',', ':', '⇒', '⊃', '×', '⊥', '⊤', '∘', '□', '◇', 'K', 'O', '⊸', '!', '?', '⊗', '⊕', '&', 'G', 'F', 'X', 'U', '*', '↦', 'λ', '¬')
+    val symbols = Set('→', '∧', '∨', '∀', '∃', '=', '(', ')', '[', ']', '.', ',', ':', '⇒', '⊃', '×', '⊥', '⊤', '∘', '□', '◇', 'K', 'O', '⊸', '!', '?', '⊗', '⊕', '&', 'G', 'F', 'X', 'U', '*', '↦', 'λ', '¬', '{', '}', ';')
     
     val sb = new StringBuilder
     val tokens = mutable.ListBuffer.empty[String]
@@ -100,11 +98,27 @@ object TestParser:
     parseImplication(tokens, vars)
 
   private def parseImplication(tokens: List[String], vars: Set[String]): (Expr, List[String]) =
-    val (left, rest1) = parseLinearImplication(tokens, vars)
+    val (left, rest1) = parseSeq(tokens, vars)
     rest1 match
       case (Implies | ImpliesAlt1 | ImpliesAlt2) :: rest2 =>
         val (right, rest3) = parseImplication(rest2, vars)
-        (left → right, rest3)
+        (sym(Implies)(left, right), rest3)
+      case _ => (left, rest1)
+
+  private def parseSeq(tokens: List[String], vars: Set[String]): (Expr, List[String]) =
+    val (left, rest1) = parseAssign(tokens, vars)
+    rest1 match
+      case ";" :: rest2 =>
+        val (right, rest3) = parseSeq(rest2, vars)
+        (sym(";")(left, right), rest3)
+      case _ => (left, rest1)
+
+  private def parseAssign(tokens: List[String], vars: Set[String]): (Expr, List[String]) =
+    val (left, rest1) = parseLinearImplication(tokens, vars)
+    rest1 match
+      case ":" :: "=" :: rest2 =>
+        val (right, rest3) = parseAssign(rest2, vars)
+        (sym(":=")(left, right), rest3)
       case _ => (left, rest1)
 
   private def parseLinearImplication(tokens: List[String], vars: Set[String]): (Expr, List[String]) =
@@ -128,7 +142,7 @@ object TestParser:
     rest1 match
       case Or :: rest2 =>
         val (right, rest3) = parseOr(rest2, vars)
-        (left ∨ right, rest3)
+        (sym(Or)(left, right), rest3)
       case _ => (left, rest1)
 
   private def parseLPlus(tokens: List[String], vars: Set[String]): (Expr, List[String]) =
@@ -169,7 +183,7 @@ object TestParser:
     rest1 match
       case Eq :: rest2 =>
         val (right, rest3) = parseEquality(rest2, vars)
-        (left === right, rest3)
+        (sym(Eq)(left, right), rest3)
       case _ => (left, rest1)
 
   private def parsePointsTo(tokens: List[String], vars: Set[String]): (Expr, List[String]) =
@@ -213,11 +227,46 @@ object TestParser:
 
   private def parseAtom(tokens: List[String], vars: Set[String]): (Expr, List[String]) =
     tokens match
+      case "{" :: rest =>
+        val (p, rest2) = parseExpr(rest, vars)
+        rest2 match
+          case "}" :: rest3 =>
+            val (c, rest4) = parseExpr(rest3, vars)
+            rest4 match
+              case "{" :: rest5 =>
+                val (q, rest6) = parseExpr(rest5, vars)
+                rest6 match
+                  case "}" :: rest7 => (sym("triple")(p, c, q), rest7)
+                  case _ => throw new Exception("Expected '}' at the end of triple")
+              case _ => (p, rest2) // Just a block {P}
+          case _ => throw new Exception("Expected '}' after precondition")
       case "(" :: rest =>
         val (expr, rest2) = parseExpr(rest, vars)
         rest2 match
           case ")" :: rest3 => (expr, rest3)
           case _            => throw new Exception(s"Unmatched parenthesis at ${rest2.take(5).mkString(" ")}")
+      case "if" :: rest =>
+        val (b, rest2) = parseExpr(rest, vars)
+        val (c1, rest3) = parseExpr(rest2, vars)
+        rest3 match
+          case "else" :: rest4 =>
+            val (c2, rest5) = parseExpr(rest4, vars)
+            (sym("if")(b, c1, c2), rest5)
+          case _ => (sym("if")(b, c1, sym("skip")), rest3)
+      case "while" :: rest =>
+        rest match
+          case "[" :: rest2 =>
+            val (inv, rest3) = parseExpr(rest2, vars)
+            rest3 match
+              case "]" :: rest4 =>
+                val (b, rest5) = parseExpr(rest4, vars)
+                val (c, rest6) = if (rest5.headOption.contains("do")) parseExpr(rest5.tail, vars) else parseExpr(rest5, vars)
+                (Expr.App(Expr.Sym("while"), List(b, c, inv)), rest6)
+              case _ => throw new Exception("Expected ']' after loop invariant")
+          case _ =>
+            val (b, rest2) = parseExpr(rest, vars)
+            val (c, rest3) = if (rest2.headOption.contains("do")) parseExpr(rest2.tail, vars) else parseExpr(rest2, vars)
+            (sym("while")(b, c), rest3)
       case (True | "⊤") :: rest => (sym(True), rest)
       case (False | "⊥") :: rest => (sym(False), rest)
       case name :: "(" :: rest =>

@@ -4,16 +4,14 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-/**
- * 拡張デバッグユーティリティ
- * 投機的並列探索や複雑な帰納法に対応した高度なロガー
- */
+/** 拡張デバッグユーティリティ 投機的並列探索や複雑な帰納法に対応した高度なロガー
+  */
 object Debug {
   object logger {
     private var enabled = false
     private var maxDepth = 10
     private val currentDepth = ThreadLocal.withInitial(() => 0)
-    
+
     // スレッドごとの識別子（並列探索の追跡用）
     private val threadId = ThreadLocal.withInitial(() => {
       val id = Thread.currentThread().getName
@@ -25,9 +23,9 @@ object Debug {
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
 
     enum Level:
-      case DEBUG, INFO, WARN, ERROR, TRACE
+      case TRACE, INFO, DEBUG, WARN, ERROR
 
-    private var minLevel = Level.INFO
+    private var minLevel = Level.DEBUG
 
     def switch(b: Boolean) = {
       enabled = b
@@ -56,9 +54,8 @@ object Debug {
       currentDepth.set(0)
     }
 
-    /** 
-     * 基本的なログ出力
-     */
+    /** 基本的なログ出力
+      */
     def log(s: => String): Unit = log(Level.DEBUG, s)
 
     def info(s: => String): Unit = log(Level.INFO, s)
@@ -74,18 +71,17 @@ object Debug {
           val tid = threadId.get()
           val indent = "  " * depth
           val levelStr = f"${level.toString}%-5s"
-          
+
           // 並列実行時はスレッドIDを表示
           val threadInfo = if (tid.length > 0) s"[$tid] " else ""
-          
+
           println(s"$time $levelStr $threadInfo$indent$s")
         }
       }
     }
 
-    /**
-     * 処理時間の計測
-     */
+    /** 処理時間の計測
+      */
     def time[T](name: String)(block: => T): T = {
       if (enabled) {
         val start = System.nanoTime()

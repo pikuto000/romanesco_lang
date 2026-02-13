@@ -173,34 +173,28 @@ trait PersistentLogicSearch { self: Prover =>
       guarded: Boolean,
       history: List[Expr]
   ): SolveTree[(ProofTree, Subst, Context)] = {
-    val persistent = context.zipWithIndex.flatMap {
+    val options = context.zipWithIndex.flatMap {
       case ((name, Expr.App(Expr.Sym(And | Product), List(a, b))), i) =>
         val newCtx = context.patch(i, List((s"$name.1", a), (s"$name.2", b)), 1)
         List(
-          search(
-            goal,
-            rules,
-            newCtx,
-            linearContext,
-            subst,
-            depth + 1,
-            limit,
-            visited,
-            raaCount,
-            inductionCount,
-            guarded,
-            history
-          ).map { case (t, s, restL) =>
-            (
-              ProofTree.Node(applySubst(goal, s), s"destruct[$name]", List(t)),
-              s,
-              restL
-            )
+          search(goal, rules, newCtx, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded, history).map { case (t, s, restL) =>
+            (ProofTree.Node(applySubst(goal, s), s"destruct[$name]", List(t)), s, restL)
           }
         )
+      case ((name, Expr.App(Expr.Sym(Or | Coproduct), List(a, b))), i) =>
+        // Branching search for OR decomposition in context
+        val branch1 = search(goal, rules, context.patch(i, List((s"$name.left", a)), 1), linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded, history)
+        val branch2 = search(goal, rules, context.patch(i, List((s"$name.right", b)), 1), linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded, history)
+        
+        List(branch1.flatMap { case (t1, s1, l1) =>
+          branch2.map { case (t2, s2, l2) =>
+            // Combine both branches (subst merging might be needed in complex cases, but here we assume independence)
+            (ProofTree.Node(applySubst(goal, s2), s"cases[$name]", List(t1, t2)), s2, l2)
+          }
+        })
       case _ => Nil
     }
-    SolveTree.merge(persistent)
+    SolveTree.merge(options)
   }
 
   private[core] def searchRulesInContext(
@@ -249,7 +243,7 @@ trait PersistentLogicSearch { self: Prover =>
                     restL
                   )
                 }
-            } else SolveTree.Failure
+            } else SolveTree.Failure()
         }
     }
     SolveTree.merge(ctxRuleTrees)
@@ -300,7 +294,7 @@ trait PersistentLogicSearch { self: Prover =>
                   restL
                 )
               }
-          } else SolveTree.Failure
+          } else SolveTree.Failure()
       }
     }
     SolveTree.merge(ctxRuleTrees)

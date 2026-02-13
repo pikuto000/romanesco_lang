@@ -105,7 +105,7 @@ object StandardRules:
     CatRule("append_nil_r", sym("append")(v("xs"), sym("nil")), v("xs"), List(v("xs")))
   )
 
-  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ logicMapping ++ modal ++ linear ++ separation ++ hott ++ natPlusRules ++ listAppendRules
+  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ modal ++ linear ++ separation ++ hott ++ natPlusRules ++ listAppendRules
 
   val defaultAlgebras = List(
     InitialAlgebra("Nat", List(ConstructorDef(Zero, Nil), ConstructorDef(Succ, List(ArgType.Recursive))), "n"),

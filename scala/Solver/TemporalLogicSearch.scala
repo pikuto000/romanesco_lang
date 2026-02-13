@@ -104,7 +104,7 @@ trait TemporalLogicSearch { self: Prover =>
               restL
             )
           }
-      case _ => SolveTree.Failure
+      case _ => SolveTree.Failure()
     }
   }
 }

@@ -16,6 +16,7 @@ else {
         "runMain romanesco.Solver.SolverTests.SeparationLogicTest" `
         "runMain romanesco.Solver.SolverTests.TemporalLogicTest" `
         "runMain romanesco.Solver.SolverTests.TypeLevelTest" `
+        "runMain romanesco.Solver.SolverTests.HoareLogicTest" `
         "runMain romanesco.Solver.testGeneralizedUnification" `
         "runMain romanesco.Solver.testLinearLogic" `
         "runMain romanesco.Solver.testMapFusion" `

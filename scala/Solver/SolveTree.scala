@@ -9,11 +9,13 @@ import scala.collection.mutable
 import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicInteger
 
+case class FailureReason(message: String, isFatal: Boolean = false)
+
 /** 公平な探索（speculative parallel search）を表現するデータ構造
   */
 enum SolveTree[+T]:
   case Success(value: T)
-  case Failure
+  case Failure(reason: Option[FailureReason] = None)
   case Choice(branches: List[SolveTree[T]])
   case Step(thunk: () => SolveTree[T])
   case DeepStep(thunk: () => SolveTree[T]) 
@@ -21,22 +23,17 @@ enum SolveTree[+T]:
 
   def map[U](f: T => U): SolveTree[U] = this match
     case Success(v) => Success(f(v))
-    case Failure    => Failure
+    case Failure(r) => Failure(r)
     case Choice(bs) => Choice(bs.map(_.map(f)))
     case Step(t)    => Step(() => t().map(f))
     case DeepStep(t) => DeepStep(() => t().map(f))
     case m: Memo[v] => 
-      // Mapping a Memo node is tricky because the callback expects the original type.
-      // We wrap the tree but the original callback remains tied to the original result type.
-      // Since map is covariant, we can treat this as SolveTree[U].
       val mappedTree = m.tree.map(f)
-      // Note: the original onComplete won't receive the mapped result.
-      // This is acceptable as long as caching happens at the source.
       Memo(mappedTree, (res: Option[U]) => ())
 
   def flatMap[U](f: T => SolveTree[U]): SolveTree[U] = this match
     case Success(v) => f(v)
-    case Failure    => Failure
+    case Failure(r) => Failure(r)
     case Choice(bs) => Choice(bs.map(_.flatMap(f)))
     case Step(t)    => Step(() => t().flatMap(f))
     case DeepStep(t) => DeepStep(() => t().flatMap(f))
@@ -66,7 +63,12 @@ enum SolveTree[+T]:
             trackers.foreach(_.result = Some(v))
             trackers.foreach(_.finishNode())
             v.asInstanceOf[T] #:: loop()
-          case Failure =>
+          case Failure(Some(FailureReason(msg, true))) =>
+            // Fatal failure: prune all other branches for this node's trackers
+            trackers.foreach(_.activeNodes = 1) // Force finish
+            trackers.foreach(_.finishNode())
+            loop()
+          case Failure(_) =>
             trackers.foreach(_.finishNode())
             loop()
           case Choice(bs) =>
@@ -136,7 +138,10 @@ enum SolveTree[+T]:
         case Success(v) => 
           trackers.foreach(_.setResult(v))
           resultQueue.put(Some(v.asInstanceOf[T]))
-        case Failure => // End
+        case Failure(Some(FailureReason(_, true))) =>
+          isCancelled.set(true)
+          resultQueue.put(None)
+        case Failure(_) => // End
         case Choice(bs) =>
           if (bs.nonEmpty) {
             trackers.foreach(t => for (_ <- 1 until bs.length) t.increment())
@@ -175,7 +180,7 @@ object SolveTree:
   )
 
   def fromLazyList[T](ll: LazyList[T]): SolveTree[T] =
-    if (ll.isEmpty) Failure
+    if (ll.isEmpty) Failure()
     else Choice(List(Success(ll.head), Step(() => fromLazyList(ll.tail))))
 
   /** 複数の探索ツリーを公平に結合します */

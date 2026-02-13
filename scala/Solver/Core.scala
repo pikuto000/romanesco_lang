@@ -147,13 +147,15 @@ case class CatRule(
     name: String,
     lhs: Expr,
     rhs: Expr,
-    universals: List[Expr] = Nil
+    universals: List[Expr] = Nil,
+    priority: Int = 10,
+    domain: String = "general"
 ):
   override def toString: String =
     val cond =
       if universals.isEmpty then ""
       else s" where ${universals.mkString(", ")}"
-    s"$name: $lhs ⟹ $rhs$cond"
+    s"[$domain] $name: $lhs ⟹ $rhs$cond (prio: $priority)"
 
 /** 証明のツリー構造
   */
@@ -240,12 +242,13 @@ case class ProverConfig(
     algebras: List[InitialAlgebra] = Nil,
     maxRaa: Int = 2,
     maxInduction: Int = 2,
-    maxPathLevel: Int = 5, // 高次pathの最大階層
-    maxComplexity: Int = 200, // 項の最大複雑度（大きめに設定）
+    maxPathLevel: Int = 5,
+    maxComplexity: Int = 200,
     maxParallelism: Int = 8,
     generateLemmas: Boolean = true,
     lemmaMode: LemmaGenerationMode = LemmaGenerationMode.EqualityOnly,
-    excludeTrivialLemmas: Boolean = true
+    excludeTrivialLemmas: Boolean = true,
+    enabledDomains: Option[Set[String]] = None
 )
 
 object ProverConfig {

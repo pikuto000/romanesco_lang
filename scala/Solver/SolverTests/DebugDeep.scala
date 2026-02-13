@@ -8,7 +8,7 @@ import romanesco.Utils.Debug.logger
 
 object DebugDeep {
   def main(args: Array[String]): Unit = {
-    logger.switch(true)
+    logger.switch(false)
     logger.setMaxDepth(10)
 
     val monadRules = List(

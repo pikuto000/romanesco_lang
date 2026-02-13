@@ -64,7 +64,7 @@ trait LinearLogicSearch { self: Prover =>
       linearContext: Context,
       subst: Subst
   ): SolveTree[(ProofTree, Subst, Context)] = {
-    if (linearContext.isEmpty) return SolveTree.Failure
+    if (linearContext.isEmpty) return SolveTree.Failure()
     
     // 線形文脈のリソースを全て結合 (A * B * C ...)
     val resources = linearContext.map(_._2)
@@ -174,7 +174,7 @@ trait LinearLogicSearch { self: Prover =>
           } else None
         }
         SolveTree.merge(cancelOptions)
-      case _ => SolveTree.Failure
+      case _ => SolveTree.Failure()
     }
   }
 
@@ -256,9 +256,9 @@ trait LinearLogicSearch { self: Prover =>
                     Nil
                   )
                 )
-              else SolveTree.Failure
+              else SolveTree.Failure()
             }
-          } else SolveTree.Failure
+          } else SolveTree.Failure()
         }
       }
     }
@@ -333,7 +333,7 @@ trait LinearLogicSearch { self: Prover =>
                 restL
               )
             }
-          else SolveTree.Failure
+          else SolveTree.Failure()
         }
       }
     }

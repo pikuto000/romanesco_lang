@@ -43,7 +43,7 @@ trait HoTTSearch { self: Prover =>
       guarded: Boolean,
       history: List[Expr]
   ): SolveTree[(ProofTree, Subst, Context)] = {
-    if (inductionCount >= config.maxInduction) SolveTree.Failure
+    if (inductionCount >= config.maxInduction) SolveTree.Failure()
     else {
       val piOptions = context.indices.flatMap { i =>
         context(i) match {

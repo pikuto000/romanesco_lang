@@ -37,10 +37,10 @@ object Unifier:
     val r2 = applySubst(e2, subst)
 
     if r1 == r2 then
-      logger.log(s"Unify Success: $r1 = $r2")
+      // logger.log(s"Unify Success: $r1 = $r2")
       LazyList(subst)
     else
-      logger.log(s"Unifying: $r1 with $r2")
+      // logger.log(s"Unifying: $r1 with $r2")
       val res = (r1, r2) match
         // --- ラムダ抽象の単一化 (App構造) ---
         case (Expr.Lam(v1, b1), Expr.Lam(v2, b2)) =>
@@ -66,7 +66,10 @@ object Unifier:
           val l1 = args1.headOption.map(getLevelDepth).getOrElse(-1)
           val l2 = args2.headOption.map(getLevelDepth).getOrElse(-1)
 
-          if (l1 != -1 && l2 != -1 && l1 != l2) LazyList.empty
+          if (l1 != -1 && l2 != -1 && l1 != l2) {
+            logger.log(s"[UNIFY FAIL] Universe level mismatch: Type$l1 != Type$l2")
+            LazyList.empty
+          }
           else {
             unify(
               Expr.Sym(LogicSymbols.Type),
@@ -85,13 +88,19 @@ object Unifier:
           if (t == Expr.App(Expr.Meta(id), args)) LazyList(subst)
           else if (!occursCheckHigher(id, t, args))
             solveHigherOrder(id, args, t, subst)
-          else LazyList.empty
+          else {
+            logger.log(s"[UNIFY FAIL] Occurs check failed for ?$id in $t")
+            LazyList.empty
+          }
 
         case (t, Expr.App(Expr.Meta(id), args)) =>
           if (t == Expr.App(Expr.Meta(id), args)) LazyList(subst)
           else if (!occursCheckHigher(id, t, args))
             solveHigherOrder(id, args, t, subst)
-          else LazyList.empty
+          else {
+            logger.log(s"[UNIFY FAIL] Occurs check failed for ?$id in $t")
+            LazyList.empty
+          }
 
         // --- 基本的なメタ変数の単一化 ---
         case (Expr.Meta(id), t) if !occursCheckHigher(id, t, Nil) =>
@@ -101,6 +110,14 @@ object Unifier:
 
         // --- 変数の単一化 ---
         case (Expr.Var(n1), Expr.Var(n2)) if n1 == n2 => LazyList(subst)
+        case (Expr.Var(n1), Expr.Var(n2)) => 
+          logger.log(s"[UNIFY FAIL] Variable mismatch: $n1 != $n2")
+          LazyList.empty
+
+        // --- シンボルの不一致 ---
+        case (Expr.Sym(s1), Expr.Sym(s2)) if s1 != s2 =>
+          logger.log(s"[UNIFY FAIL] Symbol mismatch: $s1 != $s2")
+          LazyList.empty
 
         // --- アプリケーションの単一化 (分解) ---
         case (Expr.App(h1, a1), Expr.App(h2, a2)) if a1.length == a2.length =>
@@ -109,8 +126,14 @@ object Unifier:
               sList.flatMap(unify(arg1, arg2, _))
             }
           }
+        
+        case (Expr.App(h1, a1), Expr.App(h2, a2)) =>
+          logger.log(s"[UNIFY FAIL] Argument length mismatch: $r1 vs $r2")
+          LazyList.empty
 
-        case _ => LazyList.empty
+        case _ => 
+          logger.log(s"[UNIFY FAIL] Incompatible structures: $r1 vs $r2")
+          LazyList.empty
 
       res
 

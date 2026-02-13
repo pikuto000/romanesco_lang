@@ -47,7 +47,6 @@ object Repl:
           println("\n🎉 Goal solved successfully!")
           if (s.completedProofs.nonEmpty) {
             println("\nFinal Proof Tree:")
-            // サブゴールが複数ある場合、正しい順序で表示するのは複雑なので最新のものを表示
             println(s.completedProofs.head.format(0))
           }
           println("\nExiting to main loop.")
@@ -101,25 +100,9 @@ object Repl:
         val prover = new Prover(ProverConfig(rules = StandardRules.all ++ loadedLemmas ++ sessionLemmas))
         Tactics.auto(s, prover) match {
           case Right(newState) =>
-            // 補題生成機能との連携（もし必要ならTactics.auto側で戻り値を拡張する）
             Right(newState)
           case Left(err) => Left(err)
         }
-      case "save" :: filename :: Nil =>
-        LemmaManager.saveLemmas(filename, sessionLemmas)
-        println(s"Saved ${sessionLemmas.size} session lemmas to $filename")
-        Right(s)
-      case "load" :: filename :: Nil =>
-        val newLemmas = LemmaManager.loadLemmas(filename)
-        loadedLemmas = loadedLemmas ++ newLemmas
-        println(s"Loaded ${newLemmas.size} lemmas from $filename")
-        Right(s)
-      case "lemmas" :: Nil =>
-        println("\n--- Loaded Lemmas ---")
-        loadedLemmas.foreach(println)
-        println("\n--- Session Lemmas ---")
-        sessionLemmas.foreach(println)
-        Right(s)
       case "viz" :: Nil =>
         if (s.completedProofs.nonEmpty) {
           val json = s.completedProofs.head.toJson
@@ -135,6 +118,21 @@ object Repl:
         } else {
           println("No completed proofs to visualize yet. Use 'auto' or solve the goal first.")
         }
+        Right(s)
+      case "save" :: filename :: Nil =>
+        LemmaManager.saveLemmas(filename, sessionLemmas)
+        println(s"Saved ${sessionLemmas.size} session lemmas to $filename")
+        Right(s)
+      case "load" :: filename :: Nil =>
+        val newLemmas = LemmaManager.loadLemmas(filename)
+        loadedLemmas = loadedLemmas ++ newLemmas
+        println(s"Loaded ${newLemmas.size} lemmas from $filename")
+        Right(s)
+      case "lemmas" :: Nil =>
+        println("\n--- Loaded Lemmas ---")
+        loadedLemmas.foreach(println)
+        println("\n--- Session Lemmas ---")
+        sessionLemmas.foreach(println)
         Right(s)
       case _ => Left(s"Unknown tactic or invalid arguments: $input")
 

@@ -34,11 +34,24 @@ object Rewriter {
         case other => List(acNormalize(other))
       }
       val flattened = args.flatMap(collect)
-      val sorted = flattened.sortBy(_.toString)
-      if (sorted.isEmpty) {
-        if (op == Tensor) Expr.Sym(LPlus) else Expr.Sym(True)
+      
+      // Idempotency & Short-circuit (Only for non-linear operators)
+      var processed = if (op == And || op == Or) flattened.distinct.sortBy(_.toString) else flattened.sortBy(_.toString)
+      
+      if (op == And) {
+        if (processed.contains(Expr.Sym(False)) || processed.contains(Expr.Sym("⊥"))) return Expr.Sym(False)
+        processed = processed.filterNot(e => e == Expr.Sym(True) || e == Expr.Sym("⊤"))
+      } else if (op == Or) {
+        if (processed.contains(Expr.Sym(True)) || processed.contains(Expr.Sym("⊤"))) return Expr.Sym(True)
+        processed = processed.filterNot(e => e == Expr.Sym(False) || e == Expr.Sym("⊥"))
+      }
+
+      if (processed.isEmpty) {
+        if (op == Tensor) Expr.Sym(LPlus) else if (op == SepAnd) Expr.Sym(LOne) else if (op == Or) Expr.Sym(False) else Expr.Sym(True)
+      } else if (processed.length == 1) {
+        processed.head
       } else {
-        sorted.reduceLeft((acc, e) => Expr.App(Expr.Sym(op), List(acc, e)))
+        processed.reduceLeft((acc, e) => Expr.App(Expr.Sym(op), List(acc, e)))
       }
     
     case Expr.App(f, args) => Expr.App(acNormalize(f), args.map(acNormalize))
@@ -196,6 +209,9 @@ object Rewriter {
       Expr.App(f, List(Expr.App(g, List(x))))
     case Expr.App(Expr.Sym(Concat), List(Expr.App(Expr.Sym(Concat), List(p, q)), r)) =>
       Expr.App(Expr.Sym(Concat), List(p, Expr.App(Expr.Sym(Concat), List(q, r))))
+
+    // --- 否定の展開 ---
+    case Expr.App(Expr.Sym(Not), List(a)) => Expr.App(Expr.Sym(Implies), List(a, Expr.Sym(False)))
 
     // --- 論理的簡約 ---
     case Expr.App(Expr.Sym(Eq), List(l, r)) if l == r => Expr.Sym(True)
