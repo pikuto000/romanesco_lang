@@ -1,6 +1,6 @@
 // ==========================================
 // Prover.scala
-// 証明探索エンジン（モジュール化・高機能版）
+// 証明探索エンジン（モジュール化・高機能版・非局所return排除）
 // ==========================================
 
 package romanesco.Solver.core
@@ -23,7 +23,6 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
   private val metaCounter = new AtomicInteger(0)
   private val bestFail = new AtomicReference[Option[FailTrace]](None)
 
-  // 訪問済み状態の記録（反復深化内での冗長探索防止）
   private val visitedGlobal =
     TrieMap[(Expr, Set[Expr], List[Expr], Boolean), Int]()
   private[core] var deadline: Long = 0
@@ -32,7 +31,6 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     if (config.algebras.nonEmpty) config.algebras
     else StandardRules.defaultAlgebras
 
-  // 推論用インデックス
   private val forwardRuleIndex: Map[String, List[CatRule]] = {
     val allRules = if (config.classical) config.rules ++ StandardRules.classical else config.rules
     allRules.groupBy(_.lhs.headSymbol)
@@ -94,7 +92,6 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
 
   type Context = List[(String, Expr)]
 
-  /** メインの証明メソッド */
   def prove(
       goal: Expr,
       rules: List[CatRule] = Nil,
@@ -109,7 +106,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     logger.log(s"prove begin. goal: $goal (maxDepth: $maxDepth)")
     
     bestFail.set(None)
-    clearCaches() // PersistentLogicSearch 提供のキャッシュクリア
+    clearCaches() 
     visitedGlobal.clear()
     deadline = System.currentTimeMillis() + timeoutMs
 
@@ -189,7 +186,6 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     case _ => Expr.Sym("?")
   }
 
-  /** 探索の統合エントリーポイント */
   private[core] def search(
       goal: Expr,
       rules: List[CatRule],
@@ -216,57 +212,54 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
         val stateKey = (currentGoalCan, contextExprs, linearExprs, guarded)
         val remainingDepth = limit - depth
 
-        // 成功キャッシュの確認
         checkLemma(currentGoalCan, contextExprs, linearExprs.toList) match {
-          case Some(cachedTree) => return SolveTree.Success((cachedTree, subst, linearContext))
+          case Some(cachedTree) => SolveTree.Success((cachedTree, subst, linearContext))
           case None =>
-        }
-
-        // 循環検知・余帰納
-        if (visited.contains((currentGoalCan, contextExprs, linearExprs))) {
-          if (guarded) SolveTree.Success((ProofTree.Leaf(goal, "co-induction"), subst, linearContext))
-          else SolveTree.Failure
-        }
-        else if (history.exists(h => h.headSymbol == currentGoalCan.headSymbol && h.complexity < currentGoalCan.complexity && romanesco.Utils.Misc.isEmbedding(h, currentGoalCan))) {
-          SolveTree.Failure
-        }
-        else if (history.count(h => h.getStructuralPattern == currentGoalCan.getStructuralPattern) > 2) {
-          SolveTree.Failure
-        }
-        else if (visitedGlobal.get(stateKey).exists(_ <= depth)) SolveTree.Failure
-        else if (checkGlobalFailure(currentGoalCan, contextExprs, linearExprs.toList, guarded, remainingDepth)) SolveTree.Failure
-        else if (depth > limit) SolveTree.Failure
-        else {
-          visitedGlobal.put(stateKey, depth)
-          val nextVisited = visited + ((currentGoalCan, contextExprs, linearExprs))
-          val nextHistory = currentGoalCan :: history
-
-          val extensionGoalBranches = getGoalHooks(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)
-          val extensionContextBranches = getContextHooks(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)
-
-          val branches = List(
-            SolveTree.fromLazyList(searchAxiom(currentGoalRaw, context, linearContext, subst, depth)),
-            SolveTree.fromLazyList(searchReflexivity(currentGoalRaw, linearContext, subst, depth)),
-            searchDecomposeGoal(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory),
-            SolveTree.merge(extensionGoalBranches),
-            searchContext(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory),
-            SolveTree.merge(extensionContextBranches),
-            SolveTree.DeepStep(() => searchRules(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)),
-            SolveTree.DeepStep(() => searchInduction(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)),
-            SolveTree.DeepStep(() => searchClassical(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory))
-          )
-
-          SolveTree.Memo(
-            SolveTree.Choice(branches),
-            resultOpt => {
-              resultOpt match {
-                case Some((proof, _, _)) =>
-                  recordLemma(currentGoalCan, contextExprs, linearExprs.toList, proof)
-                case None =>
-                  recordGlobalFailure(currentGoalCan, contextExprs, linearExprs.toList, guarded, remainingDepth)
-              }
+            if (visited.contains((currentGoalCan, contextExprs, linearExprs))) {
+              if (guarded) SolveTree.Success((ProofTree.Leaf(goal, "co-induction"), subst, linearContext))
+              else SolveTree.Failure
             }
-          )
+            else if (history.exists(h => h.headSymbol == currentGoalCan.headSymbol && h.complexity < currentGoalCan.complexity && romanesco.Utils.Misc.isEmbedding(h, currentGoalCan))) {
+              SolveTree.Failure
+            }
+            else if (history.count(h => h.getStructuralPattern == currentGoalCan.getStructuralPattern) > 2) {
+              SolveTree.Failure
+            }
+            else if (visitedGlobal.get(stateKey).exists(_ <= depth)) SolveTree.Failure
+            else if (checkGlobalFailure(currentGoalCan, contextExprs, linearExprs.toList, guarded, remainingDepth)) SolveTree.Failure
+            else if (depth > limit) SolveTree.Failure
+            else {
+              visitedGlobal.put(stateKey, depth)
+              val nextVisited = visited + ((currentGoalCan, contextExprs, linearExprs))
+              val nextHistory = currentGoalCan :: history
+
+              val extensionGoalBranches = getGoalHooks(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)
+              val extensionContextBranches = getContextHooks(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)
+
+              val branches = List(
+                SolveTree.fromLazyList(searchAxiom(currentGoalRaw, context, linearContext, subst, depth)),
+                SolveTree.fromLazyList(searchReflexivity(currentGoalRaw, linearContext, subst, depth)),
+                searchDecomposeGoal(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory),
+                SolveTree.merge(extensionGoalBranches),
+                searchContext(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory),
+                SolveTree.merge(extensionContextBranches),
+                SolveTree.DeepStep(() => searchRules(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)),
+                SolveTree.DeepStep(() => searchInduction(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)),
+                SolveTree.DeepStep(() => searchClassical(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory))
+              )
+
+              SolveTree.Memo(
+                SolveTree.Choice(branches),
+                resultOpt => {
+                  resultOpt match {
+                    case Some((proof, _, _)) =>
+                      recordLemma(currentGoalCan, contextExprs, linearExprs.toList, proof)
+                    case None =>
+                      recordGlobalFailure(currentGoalCan, contextExprs, linearExprs.toList, guarded, remainingDepth)
+                  }
+                }
+              )
+            }
         }
       }
     }
@@ -282,18 +275,21 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     val goalCan = goal.canonicalize
     def tryHyp(h: Expr, n: String, isL: Boolean): LazyList[(ProofTree, Subst, Context)] = {
       val hn = Rewriter.normalize(applySubst(h, subst))
-      if (hn.canonicalize == goalCan) return LazyList((ProofTree.Leaf(applySubst(goal, subst), if (isL) s"linear:$n" else n), subst, if (isL) Nil else linearContext))
-      unify(hn, goal, subst).map(s => (ProofTree.Leaf(applySubst(goal, s), if (isL) s"linear:$n" else n), s, if (isL) Nil else linearContext)) #::: {
-        hn match {
-          case Expr.App(Expr.Sym(Forall), args) =>
-            val inst = args match {
-              case List(Expr.Var(v), b) => Prover.substVar(b, v, freshMeta(depth))
-              case List(Expr.Var(v), _, b) => Prover.substVar(b, v, freshMeta(depth))
-              case _ => null
-            }
-            if (inst != null) tryHyp(inst, n, isL) else LazyList.empty
-          case Expr.App(Expr.Sym(Globally), List(a)) => tryHyp(a, n, isL)
-          case _ => LazyList.empty
+      if (hn.canonicalize == goalCan) {
+        LazyList((ProofTree.Leaf(applySubst(goal, subst), if (isL) s"linear:$n" else n), subst, if (isL) Nil else linearContext))
+      } else {
+        unify(hn, goal, subst).map(s => (ProofTree.Leaf(applySubst(goal, s), if (isL) s"linear:$n" else n), s, if (isL) Nil else linearContext)) #::: {
+          hn match {
+            case Expr.App(Expr.Sym(Forall), args) =>
+              val inst = args match {
+                case List(Expr.Var(v), b) => Prover.substVar(b, v, freshMeta(depth))
+                case List(Expr.Var(v), _, b) => Prover.substVar(b, v, freshMeta(depth))
+                case _ => null
+              }
+              if (inst != null) tryHyp(inst, n, isL) else LazyList.empty
+            case Expr.App(Expr.Sym(Globally), List(a)) => tryHyp(a, n, isL)
+            case _ => LazyList.empty
+          }
         }
       }
     }
@@ -311,10 +307,12 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
         val l = args match {
           case List(t, x, y) if goal.headSymbol == Path => x
           case List(x, y) => x
-          case _ => return LazyList.empty
+          case _ => null
         }
-        val r = args.last
-        unify(Rewriter.normalize(l), Rewriter.normalize(r), subst).map(s => (ProofTree.Leaf(applySubst(goal, s), "reflexivity"), s, linearContext))
+        if (l != null) {
+          val r = args.last
+          unify(Rewriter.normalize(l), Rewriter.normalize(r), subst).map(s => (ProofTree.Leaf(applySubst(goal, s), "reflexivity"), s, linearContext))
+        } else LazyList.empty
       case _ => LazyList.empty
     }
   }
@@ -335,29 +333,31 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
   ): SolveTree[(ProofTree, Subst, Context)] = {
     goal match {
       case Expr.App(Expr.Sym(Forall), args) =>
-        boundary {
-          val (vName, body, typeOpt) = args match {
-            case List(Expr.Var(v), b) => (v, b, None)
-            case List(Expr.Var(v), t, b) => (v, b, Some(t))
-            case _ => boundary.break(SolveTree.Failure)
-          }
+        val (vName, body, typeOpt) = args match {
+          case List(Expr.Var(v), b) => (v, b, None)
+          case List(Expr.Var(v), t, b) => (v, b, Some(t))
+          case _ => (null, null, None)
+        }
+        if (vName != null) {
           val freshVar = s"${vName}_$depth"
           val instantiated = Prover.substVar(body, vName, Expr.Var(freshVar))
           val newCtx = (freshVar, typeOpt.map(Prover.substVar(_, vName, Expr.Var(freshVar))).getOrElse(Expr.Sym("Type"))) :: context
           search(instantiated, rules, newCtx, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded, history).map { case (p, s, rl) =>
             (ProofTree.Node(applySubst(goal, s), "forall-intro", List(p)), s, rl)
           }
-        }
+        } else SolveTree.Failure
       case Expr.App(Expr.Sym(Exists), args) =>
         val (vName, body) = args match {
           case List(Expr.Var(v), b) => (v, b)
           case List(Expr.Var(v), _, b) => (v, b)
-          case _ => return SolveTree.Failure
+          case _ => (null, null)
         }
-        val meta = freshMeta(depth)
-        search(Prover.substVar(body, vName, meta), rules, context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded, history).map { case (p, s, rl) =>
-          (ProofTree.Node(applySubst(goal, s), "exists-intro", List(p)), s, rl)
-        }
+        if (vName != null) {
+          val meta = freshMeta(depth)
+          search(Prover.substVar(body, vName, meta), rules, context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded, history).map { case (p, s, rl) =>
+            (ProofTree.Node(applySubst(goal, s), "exists-intro", List(p)), s, rl)
+          }
+        } else SolveTree.Failure
       case Expr.App(Expr.Sym(Implies | Exp | ImpliesAlt1 | ImpliesAlt2), List(a, b)) =>
         val (ant, cons) = if (goal.headSymbol == Exp) (b, a) else (a, b)
         search(cons, rules, (s"h$depth", ant) :: context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded, history).map { case (t, s, rl) =>
@@ -433,20 +433,20 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       case Expr.App(Expr.Sym(Implies | ImpliesAlt1 | ImpliesAlt2), List(a, b)) =>
         searchApply(name, goal, a, b, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history)
       case Expr.App(Expr.Sym(Forall | Globally), args) =>
-        boundary {
-          val inst = if (curH.headSymbol == Globally) args(0) else args match {
-            case List(Expr.Var(v), b) => Prover.substVar(b, v, freshMeta(depth))
-            case List(Expr.Var(v), _, b) => Prover.substVar(b, v, freshMeta(depth))
-            case _ => boundary.break(SolveTree.Failure)
-          }
-          useHypothesis(name, inst, goal, rules, context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, isL, guarded, history)
+        val inst = if (curH.headSymbol == Globally) args(0) else args match {
+          case List(Expr.Var(v), b) => Prover.substVar(b, v, freshMeta(depth))
+          case List(Expr.Var(v), _, b) => Prover.substVar(b, v, freshMeta(depth))
+          case _ => null
         }
+        if (inst != null) {
+          useHypothesis(name, inst, goal, rules, context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, isL, guarded, history)
+        } else SolveTree.Failure
       case _ => SolveTree.Failure
     }
     SolveTree.merge(List(basic, advanced))
   }
 
-  private def searchRules(
+  protected[core] def searchRules(
       goal: Expr,
       rules: List[CatRule],
       context: Context,
@@ -486,7 +486,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     SolveTree.merge(ruleTrees)
   }
 
-  private def searchInduction(
+  protected[core] def searchInduction(
       goal: Expr,
       rules: List[CatRule],
       context: Context,
@@ -504,16 +504,16 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     else {
       val options = goal match {
         case Expr.App(Expr.Sym(Forall), args) =>
-          boundary {
-            val (vn, body, topt) = args match {
-              case List(Expr.Var(v), b) => (v, b, None)
-              case List(Expr.Var(v), t, b) => (v, b, Some(t))
-              case _ => boundary.break(Nil)
-            }
+          val (vn, body, topt) = args match {
+            case List(Expr.Var(v), b) => (v, b, None)
+            case List(Expr.Var(v), t, b) => (v, b, Some(t))
+            case _ => (null, null, None)
+          }
+          if (vn != null) {
             algebras.filter(a => topt.contains(Expr.Sym(a.name)) || vn.startsWith(a.varPrefix)).flatMap(algebra =>
               solveInduction(vn, body, goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history, Some(algebra))
             )
-          }
+          } else Nil
         case _ => Nil
       }
       SolveTree.merge(options)
@@ -527,21 +527,18 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
         case c :: tail =>
           val ct = if (c.argTypes.isEmpty) Expr.Sym(c.symbol) else Expr.App(Expr.Sym(c.symbol), c.argTypes.zipWithIndex.map { case (ArgType.Recursive, i) => Expr.Var(s"${vn}_$i"); case (ArgType.Constant, i) => Expr.Var(s"a_$i") })
           val ihs = ct match { case Expr.App(_, argsC) => c.argTypes.zip(argsC).collect { case (ArgType.Recursive, arg) => (s"IH_${arg}", Prover.substVar(body, vn, arg)) }; case _ => Nil }
-          
           val currentIndGoal = c.ctorType match {
             case ConstructorType.Point => Prover.substVar(body, vn, ct)
             case ConstructorType.Path(from, to) =>
-              // HIT induction: path between applied results
               Expr.App(Expr.Sym(Path), List(Expr.Sym("Type"), Prover.substVar(body, vn, from), Prover.substVar(body, vn, to)))
           }
-
           search(currentIndGoal, rules, ihs ++ context, l, s, depth + 1, limit, visited, raaCount, inductionCount + 1, guarded, history).flatMap { case (t, ns, nl) => solve(tail, ns, nl, solved :+ t) }
       }
       solve(algebra.constructors, subst, linearContext, Nil).map { case (ts, fs, fl) => (ProofTree.Node(applySubst(og, fs), s"induction[${algebra.name}]", ts), fs, fl) }
     }
   }
 
-  private def searchClassical(
+  protected[core] def searchClassical(
       goal: Expr,
       rules: List[CatRule],
       context: Context,

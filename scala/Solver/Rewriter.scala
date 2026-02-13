@@ -125,8 +125,8 @@ object Rewriter {
     case Expr.App(Expr.Sym(Concat), List(Expr.App(Expr.Sym(Concat), List(p, q)), r)) =>
       Expr.App(Expr.Sym(Concat), List(p, Expr.App(Expr.Sym(Concat), List(q, r))))
 
-    // --- 論理の簡約 ---
-    case Expr.App(Expr.Sym(Eq | Path), args) if args.length >= 2 && args.head == args.last => Expr.Sym(True)
+    case Expr.App(Expr.Sym(Eq), List(l, r)) if l == r => Expr.Sym(True)
+    case Expr.App(Expr.Sym(Path), List(_, l, r)) if l == r => Expr.Sym(True)
     case Expr.App(Expr.Sym(op), List(Expr.Sym(True), p)) if op == And || op == Product => p
     case Expr.App(Expr.Sym(op), List(p, Expr.Sym(True))) if op == And || op == Product => p
     case Expr.App(Expr.Sym(op), List(Expr.Sym(False), _)) if op == And || op == Product => Expr.Sym(False)
