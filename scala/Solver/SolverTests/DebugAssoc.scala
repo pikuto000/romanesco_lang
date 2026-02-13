@@ -25,7 +25,7 @@ object DebugAssoc {
         println("✓ Solved!")
         println(res.tree.format())
       case Left(trace) =>
-        println("✗ Failed")
+        println(s"✗ Failed. reason: ${trace.reason}")
       // println(trace.format())
     }
   }

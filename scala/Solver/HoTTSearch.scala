@@ -12,6 +12,23 @@ trait HoTTSearch { self: Prover =>
   import Expr._
   import Unifier._
 
+  override def getGoalHooks(
+      goal: Expr,
+      rules: List[CatRule],
+      context: Context,
+      linearContext: Context,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr])],
+      raaCount: Int,
+      inductionCount: Int,
+      guarded: Boolean,
+      history: List[Expr]
+  ): List[SolveTree[(ProofTree, Subst, Context)]] = {
+    List(searchPathInduction(goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history))
+  }
+
   /** パス誘導 (Path Induction / J-rule) の探索 */
   private[core] def searchPathInduction(
       goal: Expr,

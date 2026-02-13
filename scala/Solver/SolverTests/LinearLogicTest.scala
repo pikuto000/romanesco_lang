@@ -30,7 +30,9 @@ import romanesco.Utils.Debug.logger
           println(s"✓ Solved:\n${result.tree.format(1)}")
           result.generatedLemma.foreach(l => println(s"  Generated Lemma: $l"))
         case Left(trace) =>
-          println("✗ Failed to prove. should be solved.")
+          println(
+            s"✗ Failed to prove. should be solved. reason:${trace.reason}"
+          )
           println(trace.format(1))
       }
     } catch {

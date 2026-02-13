@@ -1,49 +1,36 @@
+// ==========================================
+// Misc.scala
+// ユーティリティ関数（循環検知・項の比較）
+// ==========================================
+
 package romanesco.Utils
-import scala.collection.immutable.Map
-import scala.util.matching.Regex
-import Debug.logger
-import romanesco.Parser._
-import romanesco.Utils.Debug
-import romanesco.Registory
+
+import romanesco.Solver.core.Expr
+
 object Misc {
-  object Prelude {
-    def setup: Registory = {
-      logger.log("Prelude.setup begin")
-      val toknizerule: Map[String, Regex] = Map(
-        // TODO:トークナイズルールを考える
-        "hello" -> "hello".r,
-        "world" -> "world".r,
-        "space" -> "\\s+".r
-      )
-      logger.log(s"toknizerule:$toknizerule")
-      val parserule: Map[String, ParseRule] = Map(
-        // TODO:パースルールを考える
-        "Greeting" -> new StandardRule(
-          name = "Greeting",
-          pattern = Vector(
-            Predicates.matches {
-              case (_, _, reg: Regex, content: String) =>
-                content == "hello" && reg.toString == "hello".r.toString
-              case null => false
-            },
-            Predicates.matches {
-              case (_, _, reg: Regex, content: String) =>
-                content == "world" && reg.toString == "world".r.toString
-              case null => false
-            }
-          ),
-          build = { children =>
-            // children(0) is hello, children(1) is world
-            ("GreetingMatched", Vector.empty) // New node
-          }
-        )
-      )
-      logger.log(s"parserule:$parserule")
-      val registory = new Registory
-      registory.pushTokenizer(toknizerule)
-      registory.pushParser(parserule)
-      logger.log("Prelude.setup end")
-      registory
+  
+  /** 項の「埋め込み」判定（Homeomorphic Embedding）
+    * 
+    * 式 e1 が e2 に埋め込まれている (e1 ⊴ e2) とは、
+    * e2 の一部を削除して e1 に変形できることを指します。
+    */
+  def isEmbedding(e1: Expr, e2: Expr): Boolean = {
+    // 1. カップリング規則
+    def coupling: Boolean = (e1, e2) match {
+      case (Expr.Sym(s1), Expr.Sym(s2)) => s1 == s2
+      case (Expr.Var(v1), Expr.Var(v2)) => v1 == v2
+      case (Expr.Meta(m1), Expr.Meta(m2)) => m1 == m2
+      case (Expr.App(f1, a1), Expr.App(f2, a2)) if a1.length == a2.length =>
+        isEmbedding(f1, f2) && a1.zip(a2).forall((x, y) => isEmbedding(x, y))
+      case _ => false
     }
+
+    // 2. ダイビング規則
+    def diving: Boolean = e2 match {
+      case Expr.App(f, args) => isEmbedding(e1, f) || args.exists(a => isEmbedding(e1, a))
+      case _ => false
+    }
+
+    coupling || diving
   }
 }

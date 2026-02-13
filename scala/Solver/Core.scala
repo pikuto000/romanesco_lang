@@ -98,6 +98,23 @@ enum Expr:
     case Sym(_)     => 1
     case App(f, as) => f.complexity + as.map(_.complexity).sum + 1
 
+  /** 構造的パターンの抽象化（循環検知用） */
+  def getStructuralPattern: String = {
+    var varCounter = 0
+    val varMap = scala.collection.mutable.Map[String, String]()
+    def loop(e: Expr): String = e match {
+      case Var(_) =>
+        val n = s"V$varCounter"
+        varCounter += 1
+        n
+      case Sym(n)  => s"S($n)"
+      case Meta(_) => "M"
+      case App(f, args) =>
+        s"A(${loop(f)},${args.map(loop).mkString(",")})"
+    }
+    loop(this)
+  }
+
 object Expr:
   def sym(name: String): Expr = Sym(name)
   def v(name: String): Expr = Var(name)
@@ -212,7 +229,7 @@ case class ProverConfig(
     maxRaa: Int = 2,
     maxInduction: Int = 2,
     maxPathLevel: Int = 5, // 高次pathの最大階層
-    maxComplexity: Int = 100, // 項の最大複雑度（大きめに設定）
+    maxComplexity: Int = 200, // 項の最大複雑度（大きめに設定）
     maxParallelism: Int = 8,
     generateLemmas: Boolean = true,
     lemmaMode: LemmaGenerationMode = LemmaGenerationMode.EqualityOnly,

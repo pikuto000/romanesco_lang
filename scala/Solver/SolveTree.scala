@@ -1,11 +1,13 @@
 // ==========================================
 // SolveTree.scala
-// 優先度を持たせない公平な探索実行のための器
+// 優先度を持たせない公平な探索実行のための器（並列化・成果物キャッシング対応版）
 // ==========================================
 
 package romanesco.Solver.core
 
 import scala.collection.mutable
+import java.util.concurrent._
+import java.util.concurrent.atomic.AtomicInteger
 
 /** 公平な探索（speculative parallel search）を表現するデータ構造
   */
@@ -14,38 +16,44 @@ enum SolveTree[+T]:
   case Failure
   case Choice(branches: List[SolveTree[T]])
   case Step(thunk: () => SolveTree[T])
-  case Memo(tree: SolveTree[T], onComplete: Boolean => Unit)
+  case DeepStep(thunk: () => SolveTree[T]) 
+  case Memo[V](tree: SolveTree[V], onComplete: Option[V] => Unit) extends SolveTree[V]
 
   def map[U](f: T => U): SolveTree[U] = this match
     case Success(v) => Success(f(v))
     case Failure    => Failure
     case Choice(bs) => Choice(bs.map(_.map(f)))
     case Step(t)    => Step(() => t().map(f))
-    case Memo(t, c) => Memo(t.map(f), c)
+    case DeepStep(t) => DeepStep(() => t().map(f))
+    case m: Memo[v] => 
+      // Mapping a Memo node is tricky because the callback expects the original type.
+      // We wrap the tree but the original callback remains tied to the original result type.
+      // Since map is covariant, we can treat this as SolveTree[U].
+      val mappedTree = m.tree.map(f)
+      // Note: the original onComplete won't receive the mapped result.
+      // This is acceptable as long as caching happens at the source.
+      Memo(mappedTree, (res: Option[U]) => ())
 
   def flatMap[U](f: T => SolveTree[U]): SolveTree[U] = this match
     case Success(v) => f(v)
     case Failure    => Failure
     case Choice(bs) => Choice(bs.map(_.flatMap(f)))
     case Step(t)    => Step(() => t().flatMap(f))
-    case Memo(t, c) => Memo(t.flatMap(f), c)
+    case DeepStep(t) => DeepStep(() => t().flatMap(f))
+    case m: Memo[v] => 
+      Memo(m.tree.flatMap(f), _ => ())
 
   /** 各ブランチを公平に1ステップずつ進め、成功した結果をLazyListとして返します */
   def solveFair: LazyList[T] = {
-    val queue = mutable.Queue[SolveTree[T]](this)
-    // Memoノードの追跡用: 各Memoノードの下で成功が見つかったかどうかを管理
-    // 本来はスタック構造が必要だが、公平な探索（キュー）では各ノードがどのMemoに属するかを保持する必要がある
-    
-    // (Node, ParentMemoContext)
-    val stateQueue = mutable.Queue[(SolveTree[T], List[MemoTracker])]()
+    val stateQueue = mutable.Queue[(SolveTree[Any], List[MemoTracker[Any]])]()
     stateQueue.enqueue((this, Nil))
 
-    class MemoTracker(val onComplete: Boolean => Unit) {
-      var successFound = false
+    class MemoTracker[V](val onComplete: Option[V] => Unit) {
+      var result: Option[V] = None
       var activeNodes = 1
       def finishNode(): Unit = {
         activeNodes -= 1
-        if (activeNodes == 0) onComplete(successFound)
+        if (activeNodes == 0) onComplete(result)
       }
     }
 
@@ -55,9 +63,9 @@ enum SolveTree[+T]:
         val (tree, trackers) = stateQueue.dequeue()
         tree match {
           case Success(v) => 
-            trackers.foreach(_.successFound = true)
+            trackers.foreach(_.result = Some(v))
             trackers.foreach(_.finishNode())
-            v #:: loop()
+            v.asInstanceOf[T] #:: loop()
           case Failure =>
             trackers.foreach(_.finishNode())
             loop()
@@ -72,9 +80,12 @@ enum SolveTree[+T]:
           case Step(t) =>
             stateQueue.enqueue((t(), trackers))
             loop()
+          case DeepStep(t) =>
+            stateQueue.enqueue((t(), trackers))
+            loop()
           case Memo(t, c) =>
             val tracker = new MemoTracker(c)
-            stateQueue.enqueue((t, tracker :: trackers))
+            stateQueue.enqueue((t, tracker.asInstanceOf[MemoTracker[Any]] :: trackers))
             loop()
         }
       }
@@ -82,65 +93,87 @@ enum SolveTree[+T]:
     loop()
   }
 
-    /** 各ブランチを並行して探索し、最初に見つかった成功結果を返します */
-    def solveParallel(maxParallelism: Int = 8): LazyList[T] = {
-      import java.util.concurrent._
-      
-      // 共有スレッドプールの取得（肥大化を防ぐため）
-      val executor = SolveTree.sharedExecutor
+  /** 各ブランチを並行して探索し、最初に見つかった成功結果を返します。
+    */
+  def solveParallel(maxParallelism: Int = 8): LazyList[T] = {
+    val executor = SolveTree.sharedExecutor
+    val resultQueue = new LinkedBlockingQueue[Option[T]]()
+    val activeTasks = new AtomicInteger(0)
+    val isCancelled = new java.util.concurrent.atomic.AtomicBoolean(false)
 
-      this match {
-        case Choice(bs) if bs.nonEmpty =>
-          val queue = new LinkedBlockingQueue[Option[T]]()
-          val activeCount = new java.util.concurrent.atomic.AtomicInteger(bs.length)
-          
-          bs.foreach { b =>
-            executor.submit(new Runnable {
-              def run(): Unit = {
-                try {
-                  // ブランチ内でも並行性を維持するため、必要に応じて solveParallel を再帰呼び出し可能
-                  // ここではまず公平な探索を実行
-                  b.solveFair.foreach { v => 
-                    queue.put(Some(v))
-                  }
-                } catch {
-                  case _: InterruptedException => // cancelled
-                  case e: Exception => 
-                } finally {
-                  if (activeCount.decrementAndGet() == 0) {
-                    queue.put(None)
-                  }
-                }
-              }
-            })
-          }
-          
-          def results(): LazyList[T] = {
-            queue.take() match {
-              case Some(v) => v #:: results()
-              case None    => LazyList.empty
-            }
-          }
-          results()
-
-        case _ => this.solveFair
+    class ParallelMemoTracker[V](val onComplete: Option[V] => Unit) {
+      private val count = new AtomicInteger(1)
+      private val result = new java.util.concurrent.atomic.AtomicReference[Option[V]](None)
+      def increment(): Unit = count.incrementAndGet()
+      def setResult(v: V): Unit = result.compareAndSet(None, Some(v))
+      def decrement(): Unit = {
+        if (count.decrementAndGet() == 0) {
+          onComplete(result.get())
+        }
       }
     }
+
+    def submitTask(tree: SolveTree[Any], trackers: List[ParallelMemoTracker[Any]]): Unit = {
+      if (isCancelled.get()) return
+      activeTasks.incrementAndGet()
+      executor.submit(new Runnable {
+        def run(): Unit = {
+          try {
+            process(tree, trackers)
+          } finally {
+            trackers.foreach(_.decrement())
+            if (activeTasks.decrementAndGet() == 0) {
+              resultQueue.put(None)
+            }
+          }
+        }
+      })
+    }
+
+    def process(node: SolveTree[Any], trackers: List[ParallelMemoTracker[Any]]): Unit = {
+      if (isCancelled.get()) return
+      node match {
+        case Success(v) => 
+          trackers.foreach(_.setResult(v))
+          resultQueue.put(Some(v.asInstanceOf[T]))
+        case Failure => // End
+        case Choice(bs) =>
+          if (bs.nonEmpty) {
+            trackers.foreach(t => for (_ <- 1 until bs.length) t.increment())
+            bs.foreach(b => submitTask(b, trackers))
+          }
+        case DeepStep(t) =>
+          submitTask(t(), trackers)
+        case Step(t) =>
+          process(t(), trackers)
+        case Memo(t, c) =>
+          val tracker = new ParallelMemoTracker(c)
+          process(t, tracker.asInstanceOf[ParallelMemoTracker[Any]] :: trackers)
+      }
+    }
+
+    submitTask(this, Nil)
+
+    def results(): LazyList[T] = {
+      resultQueue.take() match {
+        case Some(v) => v #:: results()
+        case None    => LazyList.empty
+      }
+    }
+    results()
+  }
 
 object SolveTree:
   import java.util.concurrent._
   
-  // 証明器全体で共有するスレッドプール
-  private[core] val sharedExecutor = Executors.newFixedThreadPool(
+  // 証明器全体で共有するスレッドプール (ForkJoinPool はワークスティーリングに適している)
+  private[core] val sharedExecutor = new ForkJoinPool(
     Runtime.getRuntime().availableProcessors(),
-    new ThreadFactory {
-      def newThread(r: Runnable) = {
-        val t = new Thread(r)
-        t.setDaemon(true) // JVM終了を妨げない
-        t
-      }
-    }
+    ForkJoinPool.defaultForkJoinWorkerThreadFactory,
+    null,
+    true 
   )
+
   def fromLazyList[T](ll: LazyList[T]): SolveTree[T] =
     if (ll.isEmpty) Failure
     else Choice(List(Success(ll.head), Step(() => fromLazyList(ll.tail))))

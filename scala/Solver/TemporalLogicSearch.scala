@@ -11,6 +11,31 @@ trait TemporalLogicSearch { self: Prover =>
   import Expr._
   import Unifier._
 
+  override def getGoalHooks(
+      goal: Expr,
+      rules: List[CatRule],
+      context: Context,
+      linearContext: Context,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr])],
+      raaCount: Int,
+      inductionCount: Int,
+      guarded: Boolean,
+      history: List[Expr]
+  ): List[SolveTree[(ProofTree, Subst, Context)]] = {
+    goal.headSymbol match {
+      case Globally | Next =>
+        val a = goal match {
+          case Expr.App(_, List(p)) => p
+          case _ => return Nil
+        }
+        List(searchTemporalGoal(goal, a, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history))
+      case _ => Nil
+    }
+  }
+
   /** 時相論理の目標分解 (Globally / Next) */
   private[core] def searchTemporalGoal(
       goal: Expr,

@@ -20,7 +20,7 @@ object DebugLinear {
         println("✓ Solved!")
         println(res.tree.format())
       case Left(trace) =>
-        println("✗ Failed")
+        println(s"✗ failed. reason: ${trace.reason}")
         println(trace.format())
     }
   }

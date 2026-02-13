@@ -12,6 +12,92 @@ trait LinearLogicSearch { self: Prover =>
   import Expr._
   import Unifier._
 
+  override def getGoalHooks(
+      goal: Expr,
+      rules: List[CatRule],
+      context: Context,
+      linearContext: Context,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr])],
+      raaCount: Int,
+      inductionCount: Int,
+      guarded: Boolean,
+      history: List[Expr]
+  ): List[SolveTree[(ProofTree, Subst, Context)]] = {
+    goal match {
+      case Expr.App(Expr.Sym(LImplies), List(a, b)) =>
+        List(searchLinearImpliesGoal(goal, a, b, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history))
+      case Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)) =>
+        List(searchLinearGoal(goal, a, b, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history))
+      case _ => Nil
+    }
+  }
+
+  override def getContextHooks(
+      goal: Expr,
+      rules: List[CatRule],
+      context: Context,
+      linearContext: Context,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr])],
+      raaCount: Int,
+      inductionCount: Int,
+      guarded: Boolean,
+      history: List[Expr]
+  ): List[SolveTree[(ProofTree, Subst, Context)]] = {
+    List(
+      searchCancellation(goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history),
+      searchLinearDecomposeContext(goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history)
+    )
+  }
+
+  /** 線形含意 (⊸) の導入 */
+  private[core] def searchLinearImpliesGoal(
+      goal: Expr,
+      a: Expr,
+      b: Expr,
+      rules: List[CatRule],
+      context: Context,
+      linearContext: Context,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr])],
+      raaCount: Int,
+      inductionCount: Int,
+      guarded: Boolean,
+      history: List[Expr]
+  ): SolveTree[(ProofTree, Subst, Context)] = {
+    search(
+      b,
+      rules,
+      context,
+      (s"lh$depth", a) :: linearContext,
+      subst,
+      depth + 1,
+      limit,
+      visited,
+      raaCount,
+      inductionCount,
+      guarded,
+      history
+    ).map { case (t, s, restL) =>
+      (
+        ProofTree.Node(
+          applySubst(goal, s),
+          "linear-implies-intro",
+          List(t)
+        ),
+        s,
+        restL
+      )
+    }
+  }
+
   /** 線形論理・分離論理の相殺（Cancellation）規則の適用
     * A * C ⊸ B * C  => A ⊸ B
     */
@@ -102,8 +188,6 @@ trait LinearLogicSearch { self: Prover =>
       guarded: Boolean,
       history: List[Expr]
   ): SolveTree[(ProofTree, Subst, Context)] = {
-    if (config.maxParallelism <= 1)
-      logger.log(s"[TENSOR SPLIT] Goal: $goal, Linear Context: $linearContext")
     val indexedLinear = linearContext.zipWithIndex
     val options = (0 to indexedLinear.length).toList.flatMap { n =>
       indexedLinear.combinations(n).toList.map { leftIndexed =>
@@ -111,9 +195,7 @@ trait LinearLogicSearch { self: Prover =>
         val rightPart =
           indexedLinear.filterNot(x => leftIndices.contains(x._2)).map(_._1)
         val leftPart = leftIndexed.map(_._1)
-        if (config.maxParallelism <= 1)
-          logger.log(s"  Trying split - Left: $leftPart, Right: $rightPart")
-        // Step で包んで公平性を維持しつつ、flatMap 内で search を実行
+        
         search(
           a,
           rules,
@@ -163,7 +245,7 @@ trait LinearLogicSearch { self: Prover =>
     }
     // コンテキスト分割の選択肢を並列に探索
     if (options.length > 1 && config.maxParallelism > 1) {
-      SolveTree.fromLazyList(SolveTree.Choice(options).solveParallel(config.maxParallelism))
+      SolveTree.Choice(options.map(o => SolveTree.DeepStep(() => o)))
     } else {
       SolveTree.merge(options)
     }

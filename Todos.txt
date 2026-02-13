@@ -1,83 +1,16 @@
 現在のTODOリスト（新しく生まれたもの中心・優先度順）
 
-【最優先：未解決の高度な論理推論】
-- [DONE] Separation Logic / Linear Logic: `(A ⊸ B) ⊸ (A * C ⊸ B * C)` (含意の単調性) の証明成功。
-- [DONE] Temporal Logic: `G(A → B) → G(A) → G(B)` (時相論理の分配則) の証明成功。
-
-【ロマネスク・エンジンの洗練と次なる強化】
-
 1. コード構造の整理（モジュール化）
-- [DONE] Prover.scala の肥大化解消: 論理体系ごとの探索ロジックを分離（trait LinearLogicSearch, TemporalLogicSearch 等）
 - [ ] 共通インターフェースの確立: 各論理拡張が search() の各フェーズ（目標分解、仮定適用）にフックできる構造にする
 
 2. 推論能力とパフォーマンスの強化
-- [ ] 投機的並列探索の深化: `SolveTree.Choice` 内の深い分岐も `Future` で並列実行可能にする
+- [ ] 投機的並列探索の深化: `SolveTree.Choice` 内の深い分岐も `scala.concurrent.Future` で並列実行可能にする
 - [ ] 分離論理の Frame Rule (Cancellation): ヒープ項の共通部分を自動的に相殺し、探索空間を劇的に削減する
 - [ ] 永続的な failureCache: co-induction と整合性を取りつつ、イテレーション間で失敗情報を共有して重複探索を防ぐ
+- [ ] lemmaのキャッシング: 成功した証明・部分証明をlemmaとしてグローバルにキャッシュして、探索・証明を最適化する。
 
-3. タクティクスシステムと利用環境の整備
-- [ ] `auto` タクティクス: 証明の途中で全自動探索を呼び出し、自明な部分目標を即座に解決する
-- [ ] `simpl` タクティクス: 特定の状態での項の書き換え・正規化を強制的に実行する
-- [ ] LogicManual.md の作成: 多体系証明器としての使い方、標準ルール、各論理の記法をドキュメント化する
+3. 安全性の強化
+- [ ] 循環の検知: 式の変化を記録し、同じパターンが続くようなら循環とみなすことで、ウォッチドッグよりも高速に不可能な証明を打ち切る
 
-【★ 高優先：すぐに実装すると全体の使い勝手が劇的に向上】
-- [DONE] ProofResult を導入し、prove() の返り値に ProofTree + generatedLemma（Option[CatRule]）を含める
-- [DONE] ProverConfig を新設し、algebras / extraRules / initialLemmas を外部から注入可能にする（Prover本体から初期代数・規則・lemmaを切り離す）
-- [DONE] generateLemma 関数を実装（goal → proved の形から CatRule を生成、universals を自動抽出）
-
-【★★ 中優先：lemmaの連鎖・再利用性を高める】
-- [DONE] lemma生成条件の調整オプション（例: 等式のみ / induction成功時のみ / すべての成功goal / ユーザーフラグで制御）
-- [DONE] lemmaの重複チェック（同じlhs/rhsのものが既にある場合はスキップ）
-- [DONE] lemmaの保存・読み込み機能（JSONまたはテキストファイルでエクスポート/インポート対応）
-- [DONE] lemma名の自動生成を改善（内容から意味のある名前を付ける、例: "lemma_map_fusion_xs" など）
-
-【★★★ 低優先：将来的に欲しいもの】
-- lemmaの使用履歴・優先度管理（どのlemmaがよく使われたか記録）
-- lemmaのスコープ/バージョン管理（セッションごと・プロジェクトごと）
-- [DONE] lemma生成時の簡約形抽出（ProofTreeから最終的な正規形をrhsに設定）
-- lemmaの自動分類・タグ付け（例: "fusion", "induction", "high-order" などのタグ付け）
-
-【★★★★ 新規追加：特殊論理対応】
-- [DONE] Modal logic の基本演算子（□, ◇, K, O など）を Sym で追加し、Kripkeフレーム風の規則を定義可能にする
-- [DONE] Linear logic の演算子（⊸, !, ?, ⊗ など）を Sym で表現し、リソース消費・線形含意をunifyで追跡できるようにする
-- [DONE] Temporal logic の演算子（G, F, X, U など）を Sym で追加し、時間的性質（常に・いつか・次に）を扱える規則を追加
-- [DONE] Separation logic の演算子（*, ↦, frame rule など）を Sym で表現し、メモリ領域分離・所有権を証明できるようにする
-
-これで一旦、現在の「生まれたTODO」はこの形です。
-特に最後の特殊論理対応は、システムプログラミングを視野に入れた新しい方向性として追加されています。
-
-【強化：高度な論理推論の深化】
-- [DONE] Linear Logic: リソース管理の厳密化。Prover に `linearContext` を導入し、使用済み仮定の消費・コンテキスト分割を実装する。
-- [DONE] Temporal Logic: 余帰納法（Co-induction）の実装。Cycle Detection を拡張し、G(A) などの安全性を証明可能にする。
-- [DONE] Separation Logic: Frame Rule の自動適用と、AC書き換え（Associative-Commutative）によるヒープ項の相殺（Cancellation）機能を実装する。
-- [DONE] HoTT: パス誘導（Path Induction / J-rule）の自動化。パスの結合法則や随伴等価性の体系的な証明テスト。
-
---------------------------------------------------------------------------------------------------------------------------------
-HoTT（Homotopy Type Theory）と完全に同じ能力を目指すためのTODOリスト（型なし近似版・優先度順）
-
-【★ 高優先：基盤を整える】
-- [DONE] path型をSym("path") で追加し、等式 = を path(A, B) に置き換えるルールを定義（等式を道として扱うための基盤）
-- [DONE] Univalence公理をCatRuleで追加（equiv(A, B) → path(A, B)）。unifyで同型をpathに自動変換
-- [DONE] MetaIdのリスト長さを型宇宙階層に利用（例: MetaId([]) = Type₀, MetaId([0]) = Type₁）。TypeをSym("Type") + MetaIdで表現
-
-【★★ 中優先：高次構造を扱えるようにする】
-- [DONE] 高次pathをネストで表現（path(path(p, q), r)）。unifyを高次path対応に調整（occursCheckHigher導入）
-- [DONE] 高次帰納型（HIT）をalgebras拡張で追加（例: S¹ = base + loop : path(base, base)）。searchInductionをpathコンストラクタ対応に
-- [DONE] pathの簡約規則を追加（pathの合成・逆・変形をCatRuleで定義）。Rewriter.normalizeをpath対応に
-
-【★★★ 低優先：安定性・自動化を強化】
-- [DONE] maxPathLevel（高次pathの最大階層制限）をProverConfigに追加（探索爆発防止）
-- [DONE] HoTT風の証明テストケース追加（例: Path(Type, a, a), Univalence, Path reduction）
-- [DONE] lemma生成をHoTT対応に調整（生成された lemma が高次 path を含む場合の簡約形抽出強化）
-- [DONE] 高次pathのformat表示を改善（ツリーで「pathレベル」を視覚化）
-
-【★★★★ 将来的拡張：完全HoTTに近づける】
-- [DONE] cubical model近似（立方体pathをSym("cube") で表現。path簡約を立方体変形で扱う）
-- [DONE] Russellパラドックス回避の厳密化（MetaIdリストの長さ制限を動的に調整、矛盾検出ルール追加）
-- [DONE] HoTTライブラリ風の標準規則セット作成（空間定義用の初期algebras + Univalence関連規則）
----------------------------------------------------------------------------------------------
-【安全性の向上】
-- [DONE]循環の検知 (直前直後の状態だけでなく、全体で循環小数的なループ/繰り返しを観測できるようにする。)
-- [DONE]Watchdog実装
-- [DONE]探索の投機的並行処理化(順序を持たない、並行・再帰的探索によって、ループしない選択肢を効率的に見つけられるようにする。ループする分岐は即座に破棄。)
------------------------------------------------------------------------------------
+4. テストを全てパスする
+- 全部成功させる。これは絶対。
