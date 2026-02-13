@@ -77,19 +77,24 @@ object StandardRules:
   val univalence = CatRule("univalence", sym("equiv")(v("A"), v("B")), sym(Path)(sym(Type), v("A"), v("B")))
   val pathToEquiv = CatRule("path-to-equiv", sym(Path)(sym(Type), v("A"), v("B")), sym("equiv")(v("A"), v("B")))
   val pathConcatRule = CatRule("path-concat", sym(Concat)(sym(Path)(v("A"), v("a"), v("b")), sym(Path)(v("A"), v("b"), v("c"))), sym(Path)(v("A"), v("a"), v("c")))
+  val cubeApprox = CatRule("cube-approx", sym(Cube)(v("A"), v("p"), v("q"), v("r"), v("s")), sym(Path)(sym(Path)(v("A"), v("x"), v("y")), v("p"), v("r")), List(v("A"), v("p"), v("q"), v("r"), v("s"), v("x"), v("y")))
   
-  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, pathToEquiv)
+  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, pathToEquiv, cubeApprox)
 
   val natPlusRules = List(
     CatRule("plus_0", sym("plus")(sym("0"), v("n")), v("n"), List(v("n"))),
-    CatRule("plus_S", sym("plus")(sym("S")(v("n")), v("m")), sym("S")(sym("plus")(v("n"), v("m"))), List(v("n"), v("m")))
+    CatRule("plus_S", sym("plus")(sym("S")(v("n")), v("m")), sym("S")(sym("plus")(v("n"), v("m"))), List(v("n"), v("m"))),
+    CatRule("plus_n_0", sym("plus")(v("n"), sym("0")), v("n"), List(v("n"))),
+    CatRule("plus_n_S", sym("plus")(v("n"), sym("S")(v("m"))), sym("S")(sym("plus")(v("n"), v("m"))), List(v("n"), v("m")))
   )
 
   val listAppendRules = List(
     CatRule("append_nil", sym("append")(sym("nil"), v("ys")), v("ys"), List(v("ys"))),
     CatRule("append_cons", sym("append")(sym("cons")(v("x"), v("xs")), v("ys")), sym("cons")(v("x"), sym("append")(v("xs"), v("ys"))), List(v("x"), v("xs"), v("ys"))),
     CatRule("reverse_nil", sym("reverse")(sym("nil")), sym("nil")),
-    CatRule("reverse_cons", sym("reverse")(sym("cons")(v("x"), v("xs"))), sym("append")(sym("reverse")(v("xs")), sym("cons")(v("x"), sym("nil"))), List(v("x"), v("xs")))
+    CatRule("reverse_cons", sym("reverse")(sym("cons")(v("x"), v("xs"))), sym("append")(sym("reverse")(v("xs")), sym("cons")(v("x"), sym("nil"))), List(v("x"), v("xs"))),
+    CatRule("reverse_append", sym("reverse")(sym("append")(v("xs"), v("ys"))), sym("append")(sym("reverse")(v("ys")), sym("reverse")(v("xs"))), List(v("xs"), v("ys"))),
+    CatRule("append_nil_r", sym("append")(v("xs"), sym("nil")), v("xs"), List(v("xs")))
   )
 
   val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ logicMapping ++ modal ++ linear ++ separation ++ hott ++ natPlusRules ++ listAppendRules

@@ -389,23 +389,10 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       guarded: Boolean,
       history: List[Expr]
   ): SolveTree[(ProofTree, Subst, Context)] = {
-    val rewrites = context.flatMap { case (name, hyp) =>
-      Rewriter.normalize(applySubst(hyp, subst)) match {
-        case Expr.App(Expr.Sym(Eq | Path), args) if args.length >= 2 =>
-          val l = args match { case List(t, x, y) if hyp.headSymbol == Path => x; case List(x, y) => x; case _ => null }
-          if (l != null) Some(SolveTree.fromLazyList(findAndReplace(goal, l, args.last, subst)).flatMap { case (rewritten, finalS) =>
-            val finalGoal = Rewriter.normalize(rewritten)
-            if (finalGoal != goal) search(finalGoal, rules, context, linearContext, finalS, depth + 1, limit, visited, raaCount, inductionCount, guarded, history).map { case (t, s, rl) =>
-              (ProofTree.Node(applySubst(goal, s), s"rewrite[$name]", List(t)), s, rl)
-            } else SolveTree.Failure
-          }) else None
-        case _ => None
-      }
-    }
     val uses = (context.map((_, false)) ++ linearContext.map((_, true))).map { case ((name, hyp), isL) =>
       useHypothesis(name, hyp, goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, isL, guarded, history)
     }
-    SolveTree.merge(rewrites ++ uses)
+    SolveTree.merge(uses)
   }
 
   private def useHypothesis(
@@ -425,9 +412,24 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       guarded: Boolean,
       history: List[Expr]
   ): SolveTree[(ProofTree, Subst, Context)] = {
-    val curH = applySubst(hyp, subst)
+    val curH = Rewriter.normalize(applySubst(hyp, subst))
     val nextL = if (isL) linearContext.filterNot(_._1 == name) else linearContext
     val basic = SolveTree.fromLazyList(unify(curH, goal, subst).map(s => (ProofTree.Leaf(applySubst(goal, s), name), s, nextL)))
+    
+    val rewrite = curH match {
+      case Expr.App(Expr.Sym(Eq | Path), args) if args.length >= 2 =>
+        val l = args match { case List(t, x, y) if curH.headSymbol == Path => x; case List(x, y) => x; case _ => null }
+        if (l != null) {
+          SolveTree.fromLazyList(findAndReplace(goal, l, args.last, subst)).flatMap { case (rewritten, finalS) =>
+            val finalGoal = Rewriter.normalize(rewritten)
+            if (finalGoal != goal) search(finalGoal, rules, context, nextL, finalS, depth + 1, limit, visited, raaCount, inductionCount, guarded, history).map { case (t, s, rl) =>
+              (ProofTree.Node(applySubst(goal, s), s"rewrite[$name]", List(t)), s, rl)
+            } else SolveTree.Failure
+          }
+        } else SolveTree.Failure
+      case _ => SolveTree.Failure
+    }
+
     val advanced = curH match {
       case Expr.App(Expr.Sym(LImplies), List(a, b)) =>
         searchLinearApply(name, goal, a, b, rules, context, nextL, subst, depth, limit, visited, raaCount, inductionCount, guarded, history)
@@ -444,7 +446,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
         } else SolveTree.Failure
       case _ => SolveTree.Failure
     }
-    SolveTree.merge(List(basic, advanced))
+    SolveTree.merge(List(basic, rewrite, advanced))
   }
 
   protected[core] def searchRules(

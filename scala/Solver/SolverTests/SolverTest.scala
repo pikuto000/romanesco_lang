@@ -90,9 +90,11 @@ import romanesco.Utils.Debug.logger
     printState(state)
 
     // 5. reflexivity
-    state = Tactics
-      .reflexivity(state)
-      .getOrElse(throw Exception("Final reflexivity failed"))
+    if (!state.isSolved) {
+      state = Tactics
+        .reflexivity(state)
+        .getOrElse(throw Exception("Final reflexivity failed"))
+    }
     println("\n✓ Manual induction goal solved successfully!")
   } catch {
     case e: Exception =>

@@ -131,7 +131,7 @@ object TestParser:
 
   private def parseUnary(tokens: List[String], vars: Set[String]): (Expr, List[String]) =
     tokens match
-      case (Box | Diamond | Knowledge | Obligation | Bang | Question | Globally | Finally | Next | Not) :: rest =>
+      case (Box | Diamond | Knowledge | Obligation | Bang | Question | Globally | Finally | Next | Not) :: rest if !vars.contains(tokens.head) =>
         val op = tokens.head
         val (body, rest2) = parseUnary(rest, vars)
         (sym(op)(body), rest2)

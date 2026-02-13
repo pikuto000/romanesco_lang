@@ -27,7 +27,12 @@ object SeparationLogicTest {
       ("A ⊸ A * A", false, 5), // Fail fast
       ("(∀v. (x ↦ v ⊸ P(v))) ⊸ (x ↦ 5 ⊸ P(5))", true, 8),
       ("A * B * C ⊸ C * A * B", true, 8),
-      ("(∀v. (x ↦ v * R)) ⊸ (x ↦ 5 * R)", true, 8)
+      ("(∀v. (x ↦ v * R)) ⊸ (x ↦ 5 * R)", true, 8),
+      
+      // Frame Inference Tests
+      ("∃F. (A * B ⊸ A * F)", true, 10),
+      ("∃F. (x ↦ 1 * y ↦ 2 ⊸ x ↦ 1 * F)", true, 10),
+      ("∃F. (A * B * C ⊸ B * F)", true, 10)
     )
 
     testCases.foreach { case (input, expected, depth) =>

@@ -28,7 +28,7 @@ object Rewriter {
     * 分離論理 (*) やテンソル積 (⊗) などの可換・結合的演算子を正規化（ソート）する
     */
   private def acNormalize(expr: Expr): Expr = expr match {
-    case Expr.App(Expr.Sym(op), args) if op == SepAnd || op == Tensor || op == And || op == Or || op == "plus" || op == "times" =>
+    case Expr.App(Expr.Sym(op), args) if op == SepAnd || op == Tensor || op == And || op == Or =>
       def collect(e: Expr): List[Expr] = e match {
         case Expr.App(Expr.Sym(`op`), List(a, b)) => collect(a) ++ collect(b)
         case other => List(acNormalize(other))
@@ -81,6 +81,9 @@ object Rewriter {
     case Expr.App(Expr.Sym("plus"), List(Expr.Sym(z), m)) if z == Zero || z == Initial => m
     case Expr.App(Expr.Sym("plus"), List(Expr.App(Expr.Sym(s), List(n)), m)) if s == Succ =>
       Expr.App(Expr.Sym(Succ), List(Expr.App(Expr.Sym("plus"), List(n, m))))
+    case Expr.App(Expr.Sym("plus"), List(n, Expr.Sym(z))) if z == Zero || z == Initial => n
+    case Expr.App(Expr.Sym("plus"), List(n, Expr.App(Expr.Sym(s), List(m)))) if s == Succ =>
+      Expr.App(Expr.Sym(Succ), List(Expr.App(Expr.Sym("plus"), List(n, m))))
     case Expr.App(Expr.Sym("plus"), List(Expr.App(Expr.Sym("plus"), List(a, b)), c)) =>
       Expr.App(Expr.Sym("plus"), List(a, Expr.App(Expr.Sym("plus"), List(b, c))))
 
@@ -95,6 +98,8 @@ object Rewriter {
     case Expr.App(Expr.Sym("reverse"), List(Expr.Sym("nil"))) => Expr.Sym("nil")
     case Expr.App(Expr.Sym("reverse"), List(Expr.App(Expr.Sym("cons"), List(x, xs)))) =>
       Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("reverse"), List(xs)), Expr.App(Expr.Sym("cons"), List(x, Expr.Sym("nil")))))
+    case Expr.App(Expr.Sym("reverse"), List(Expr.App(Expr.Sym("append"), List(xs, ys)))) =>
+      Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("reverse"), List(ys)), Expr.App(Expr.Sym("reverse"), List(xs))))
 
     case Expr.App(Expr.Sym("map"), List(_, Expr.Sym("nil"))) => Expr.Sym("nil")
     case Expr.App(Expr.Sym("map"), List(f, Expr.App(Expr.Sym("cons"), List(x, xs)))) =>

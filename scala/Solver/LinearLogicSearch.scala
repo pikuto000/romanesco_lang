@@ -31,6 +31,9 @@ trait LinearLogicSearch { self: Prover =>
         List(searchLinearImpliesGoal(goal, a, b, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history))
       case Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)) =>
         List(searchLinearGoal(goal, a, b, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history))
+      case Expr.Meta(_) =>
+        // Frame Inference Hook
+        List(searchFrameInference(goal, linearContext, subst))
       case _ => Nil
     }
   }
@@ -53,6 +56,28 @@ trait LinearLogicSearch { self: Prover =>
       searchCancellation(goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history),
       searchLinearDecomposeContext(goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history)
     )
+  }
+
+  /** フレーム推論: ゴールがメタ変数で、線形文脈が残っている場合、それらを全てメタ変数に割り当てる */
+  private def searchFrameInference(
+      goal: Expr,
+      linearContext: Context,
+      subst: Subst
+  ): SolveTree[(ProofTree, Subst, Context)] = {
+    if (linearContext.isEmpty) return SolveTree.Failure
+    
+    // 線形文脈のリソースを全て結合 (A * B * C ...)
+    val resources = linearContext.map(_._2)
+    val frame = resources.reduceLeft((acc, e) => Expr.App(Expr.Sym(SepAnd), List(acc, e)))
+    
+    // ゴール（メタ変数）とフレームを単一化
+    SolveTree.fromLazyList(unify(frame, goal, subst).map { s =>
+      (
+        ProofTree.Leaf(applySubst(goal, s), "frame-inference"),
+        s,
+        Nil // リソースは全て消費されたとみなす
+      )
+    })
   }
 
   private[core] def searchLinearImpliesGoal(
