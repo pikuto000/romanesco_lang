@@ -28,5 +28,7 @@ else {
         "runMain romanesco.Solver.SolverTests.CombinedLogicTest" `
         "runMain romanesco.Solver.SolverTests.runAllAdditionalTestsSuite" `
         "runMain romanesco.Solver.SolverTests.runPhase1TestsSuite" `
-        "runMain romanesco.Solver.SolverTests.runAdvancedTestsSuite"
+        "runMain romanesco.Solver.SolverTests.runAdvancedTestsSuite" `
+        "runMain romanesco.Solver.SolverTests.HoTTAdvancedTest" `
+        "runMain romanesco.Solver.SolverTests.UnificationAdvancedTest"
 }
