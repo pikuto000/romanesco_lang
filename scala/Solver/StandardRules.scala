@@ -415,7 +415,30 @@ object StandardRules:
   // --- リストの演算 ---
   val appendNil = CatRule("append_nil", sym("append")(sym("nil"), v("ys")), v("ys"), List(v("ys")))
   val appendCons = CatRule("append_cons", sym("append")(sym("cons")(v("x"), v("xs")), v("ys")), sym("cons")(v("x"), sym("append")(v("xs"), v("ys"))), List(v("x"), v("xs"), v("ys")))
-  val listAppendRules = List(appendNil, appendCons)
+  
+  val reverseNil = CatRule("reverse_nil", sym("reverse")(sym("nil")), sym("nil"))
+  val reverseCons = CatRule("reverse_cons", sym("reverse")(sym("cons")(v("x"), v("xs"))), sym("append")(sym("reverse")(v("xs")), sym("cons")(v("x"), sym("nil"))), List(v("x"), v("xs")))
+  
+  // Advanced List Lemmas
+  val reverseAppend = CatRule("lemma_rev_append", 
+    sym("reverse")(sym("append")(v("xs"), v("ys"))), 
+    sym("append")(sym("reverse")(v("ys")), sym("reverse")(v("xs"))), 
+    List(v("xs"), v("ys")))
+  
+  val reverseReverse = CatRule("lemma_rev_rev", 
+    sym("reverse")(sym("reverse")(v("xs"))), 
+    v("xs"), 
+    List(v("xs")))
+
+  val mapNil = CatRule("map_nil", sym("map")(v("f"), sym("nil")), sym("nil"), List(v("f")))
+  val mapCons = CatRule("map_cons", sym("map")(v("f"), sym("cons")(v("x"), v("xs"))), sym("cons")(v("f")(v("x")), sym("map")(v("f"), v("xs"))), List(v("f"), v("x"), v("xs")))
+  
+  val mapCompose = CatRule("lemma_map_compose",
+    sym("map")(v("f"), sym("map")(v("g"), v("xs"))),
+    sym("map")(sym("∘")(v("f"), v("g")), v("xs")),
+    List(v("f"), v("g"), v("xs")))
+
+  val listAppendRules = List(appendNil, appendCons, reverseNil, reverseCons, reverseAppend, reverseReverse, mapNil, mapCons, mapCompose)
 
   // 全ての標準規則を populate
   val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ logicMapping ++ modal ++ linear ++ separation ++ hott ++ natPlusRules ++ listAppendRules

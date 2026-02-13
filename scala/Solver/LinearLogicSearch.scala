@@ -12,7 +12,7 @@ trait LinearLogicSearch { self: Prover =>
   import Expr._
   import Unifier._
 
-  override def getGoalHooks(
+  def getGoalHooks(
       goal: Expr,
       rules: List[CatRule],
       context: Context,
@@ -35,7 +35,7 @@ trait LinearLogicSearch { self: Prover =>
     }
   }
 
-  override def getContextHooks(
+  def getContextHooks(
       goal: Expr,
       rules: List[CatRule],
       context: Context,
@@ -55,7 +55,6 @@ trait LinearLogicSearch { self: Prover =>
     )
   }
 
-  /** 線形含意 (⊸) の導入 */
   private[core] def searchLinearImpliesGoal(
       goal: Expr,
       a: Expr,
@@ -98,9 +97,6 @@ trait LinearLogicSearch { self: Prover =>
     }
   }
 
-  /** 線形論理・分離論理の相殺（Cancellation）規則の適用
-    * A * C ⊸ B * C  => A ⊸ B
-    */
   private[core] def searchCancellation(
       goal: Expr,
       rules: List[CatRule],
@@ -115,7 +111,6 @@ trait LinearLogicSearch { self: Prover =>
       guarded: Boolean,
       history: List[Expr]
   ): SolveTree[(ProofTree, Subst, Context)] = {
-    // 目標が A * B または A ⊗ B の場合に、線形文脈との共通項を探す
     goal match {
       case Expr.App(Expr.Sym(op), List(a, b)) if op == Tensor || op == SepAnd =>
         val goalTerms = collectTerms(goal, op)
@@ -125,7 +120,7 @@ trait LinearLogicSearch { self: Prover =>
           if (common.nonEmpty) {
             val remainingGoal = buildTerm(goalTerms.diff(common), op)
             val remainingHyp = buildTerm(hypTerms.diff(common), op)
-            val nextLinear = if (remainingHyp == Expr.Sym(Terminal) || remainingHyp == Expr.Sym(LOne)) {
+            val nextLinear = if (remainingHyp == Expr.Sym(Terminal) || remainingHyp == Expr.Sym(LPlus)) {
               linearContext.patch(idx, Nil, 1)
             } else {
               linearContext.patch(idx, List((s"$name.c", remainingHyp)), 1)
@@ -165,13 +160,12 @@ trait LinearLogicSearch { self: Prover =>
 
   private def buildTerm(terms: List[Expr], op: String): Expr = {
     if (terms.isEmpty) {
-      if (op == Tensor) Expr.Sym(LOne) else Expr.Sym(Terminal)
+      if (op == Tensor) Expr.Sym(LPlus) else Expr.Sym(Terminal)
     } else {
       terms.reduceLeft((acc, t) => Expr.App(Expr.Sym(op), List(acc, t)))
     }
   }
 
-  /** 線形論理のテンソル(⊗)・分離論理の積(*)の分解 */
   private[core] def searchLinearGoal(
       goal: Expr,
       a: Expr,
@@ -243,7 +237,6 @@ trait LinearLogicSearch { self: Prover =>
         }
       }
     }
-    // コンテキスト分割の選択肢を並列に探索
     if (options.length > 1 && config.maxParallelism > 1) {
       SolveTree.Choice(options.map(o => SolveTree.DeepStep(() => o)))
     } else {
@@ -251,7 +244,6 @@ trait LinearLogicSearch { self: Prover =>
     }
   }
 
-  /** 線形含意(⊸)の適用 */
   private[core] def searchLinearApply(
       name: String,
       goal: Expr,
@@ -323,7 +315,6 @@ trait LinearLogicSearch { self: Prover =>
     SolveTree.merge(options)
   }
 
-  /** 線形文脈の分解 */
   private[core] def searchLinearDecomposeContext(
       goal: Expr,
       rules: List[CatRule],

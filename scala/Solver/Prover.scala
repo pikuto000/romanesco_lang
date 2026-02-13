@@ -1,6 +1,6 @@
 // ==========================================
 // Prover.scala
-// 証明探索エンジン（モジュール化・高機能版・非局所return排除）
+// 証明探索エンジン（モジュール化・高機能版・非局所return排除・安定版・visited修正完了）
 // ==========================================
 
 package romanesco.Solver.core
@@ -102,7 +102,6 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     val effectiveRules = if (rules.nonEmpty) rules else config.rules
 
     logger.resetDepth()
-    logger.setMaxDepth(3)
     logger.log(s"prove begin. goal: $goal (maxDepth: $maxDepth)")
     
     bestFail.set(None)
@@ -200,13 +199,15 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       guarded: Boolean,
       history: List[Expr]
   ): SolveTree[(ProofTree, Subst, Context)] = SolveTree.Step { () =>
-    if (System.currentTimeMillis() > deadline) SolveTree.Failure
+    logger.increaseDepth()
+    val res = if (System.currentTimeMillis() > deadline) SolveTree.Failure
     else {
       val currentGoalRaw = Rewriter.normalize(applySubst(goal, subst))
       if (currentGoalRaw.complexity > config.maxComplexity || getPathLevel(currentGoalRaw) > config.maxPathLevel) {
         SolveTree.Failure
       } else {
         val currentGoalCan = currentGoalRaw.canonicalize
+        val currentGoalStruct = currentGoalRaw.getStructuralPattern
         val contextExprs = context.map(h => Rewriter.normalize(applySubst(h._2, subst)).canonicalize).toSet
         val linearExprs = linearContext.map(h => Rewriter.normalize(applySubst(h._2, subst)).canonicalize).sortBy(_.toString)
         val stateKey = (currentGoalCan, contextExprs, linearExprs, guarded)
@@ -215,14 +216,15 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
         checkLemma(currentGoalCan, contextExprs, linearExprs.toList) match {
           case Some(cachedTree) => SolveTree.Success((cachedTree, subst, linearContext))
           case None =>
-            if (visited.contains((currentGoalCan, contextExprs, linearExprs))) {
+            // 循環検知：α同値または構造的同値
+            if (visited.exists(v => (v._1.canonicalize == currentGoalCan || v._1.getStructuralPattern == currentGoalStruct) && v._2 == contextExprs && v._3 == linearExprs)) {
               if (guarded) SolveTree.Success((ProofTree.Leaf(goal, "co-induction"), subst, linearContext))
               else SolveTree.Failure
             }
             else if (history.exists(h => h.headSymbol == currentGoalCan.headSymbol && h.complexity < currentGoalCan.complexity && romanesco.Utils.Misc.isEmbedding(h, currentGoalCan))) {
               SolveTree.Failure
             }
-            else if (history.count(h => h.getStructuralPattern == currentGoalCan.getStructuralPattern) > 2) {
+            else if (history.count(h => h.getStructuralPattern == currentGoalStruct) > 2) {
               SolveTree.Failure
             }
             else if (visitedGlobal.get(stateKey).exists(_ <= depth)) SolveTree.Failure
@@ -231,18 +233,15 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
             else {
               visitedGlobal.put(stateKey, depth)
               val nextVisited = visited + ((currentGoalCan, contextExprs, linearExprs))
-              val nextHistory = currentGoalCan :: history
-
-              val extensionGoalBranches = getGoalHooks(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)
-              val extensionContextBranches = getContextHooks(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)
+              val nextHistory = currentGoalRaw :: history
 
               val branches = List(
                 SolveTree.fromLazyList(searchAxiom(currentGoalRaw, context, linearContext, subst, depth)),
                 SolveTree.fromLazyList(searchReflexivity(currentGoalRaw, linearContext, subst, depth)),
                 searchDecomposeGoal(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory),
-                SolveTree.merge(extensionGoalBranches),
+                SolveTree.merge(getGoalHooks(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)),
                 searchContext(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory),
-                SolveTree.merge(extensionContextBranches),
+                SolveTree.merge(getContextHooks(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)),
                 SolveTree.DeepStep(() => searchRules(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)),
                 SolveTree.DeepStep(() => searchInduction(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory)),
                 SolveTree.DeepStep(() => searchClassical(currentGoalRaw, rules, context, linearContext, subst, depth, limit, nextVisited, raaCount, inductionCount, guarded, nextHistory))
@@ -263,6 +262,8 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
         }
       }
     }
+    logger.decreaseDepth()
+    res
   }
 
   private def searchAxiom(
@@ -564,9 +565,11 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     candidates.flatMap { rule =>
       val (instRule, _) = Prover.instantiate(rule, () => freshMeta(depth))
       val (m, r) = if (isGoal) (instRule.rhs, instRule.lhs) else (instRule.lhs, instRule.rhs)
-      unify(e, m, subst).map(s => (applySubst(r, s), instRule.universals, rule.name, s)).filter { case (next, _, _, _) =>
-        if (isGoal) Rewriter.normalize(next).complexity <= e.complexity || rule.name.matches(".*(dist|mapping|is|expansion|unfold|step|lemma).*")
-        else Rewriter.normalize(next) != e
+      unify(e, m, subst).map(s => (applySubst(r, s), instRule.universals, rule.name, s)).filter { case (next, _, rname, _) =>
+        if (isGoal) {
+          val nextN = Rewriter.normalize(next)
+          nextN.complexity < e.complexity || rname.matches(".*(dist|mapping|is|expansion|unfold|step|lemma|G-|bisim).*")
+        } else Rewriter.normalize(next) != e
       }.toList
     } ++ (e match {
       case Expr.App(f, args) => args.indices.flatMap(i => applyRules(args(i), subst, depth, isGoal).map { case (na, us, rn, ns) =>

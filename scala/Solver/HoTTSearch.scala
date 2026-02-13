@@ -12,7 +12,7 @@ trait HoTTSearch { self: Prover =>
   import Expr._
   import Unifier._
 
-  override def getGoalHooks(
+  def getGoalHooks(
       goal: Expr,
       rules: List[CatRule],
       context: Context,
@@ -29,7 +29,6 @@ trait HoTTSearch { self: Prover =>
     List(searchPathInduction(goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history))
   }
 
-  /** パス誘導 (Path Induction / J-rule) の探索 */
   private[core] def searchPathInduction(
       goal: Expr,
       rules: List[CatRule],
@@ -95,7 +94,6 @@ trait HoTTSearch { self: Prover =>
     }
   }
 
-  /** 高次パスの階層レベルを計算 */
   private[core] def getPathLevel(e: Expr): Int = e match {
     case Expr.App(Expr.Sym(Path), List(_, x, y)) => 1 + getPathLevel(x)
     case _                                       => 0

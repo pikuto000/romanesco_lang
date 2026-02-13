@@ -25,5 +25,8 @@ else {
         "runMain romanesco.Solver.testTreeInduction" `
         "runMain romanesco.Solver.SolverTests.RecursiveInductionTest" `
         "runMain romanesco.testSomeCases" `
-        "runMain romanesco.Solver.SolverTests.CombinedLogicTest"
+        "runMain romanesco.Solver.SolverTests.CombinedLogicTest" `
+        "runMain romanesco.Solver.SolverTests.runAllAdditionalTestsSuite" `
+        "runMain romanesco.Solver.SolverTests.runPhase1TestsSuite" `
+        "runMain romanesco.Solver.SolverTests.runAdvancedTestsSuite"
 }

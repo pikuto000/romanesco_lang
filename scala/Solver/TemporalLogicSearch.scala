@@ -11,7 +11,7 @@ trait TemporalLogicSearch { self: Prover =>
   import Expr._
   import Unifier._
 
-  override def getGoalHooks(
+  def getGoalHooks(
       goal: Expr,
       rules: List[CatRule],
       context: Context,
@@ -36,7 +36,6 @@ trait TemporalLogicSearch { self: Prover =>
     }
   }
 
-  /** 時相論理の目標分解 (Globally / Next) */
   private[core] def searchTemporalGoal(
       goal: Expr,
       a: Expr,

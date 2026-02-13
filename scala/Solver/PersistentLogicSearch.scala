@@ -1,6 +1,6 @@
 // ==========================================
 // PersistentLogicSearch.scala
-// 標準論理・持続的文脈の探索ロジック（インターフェース強化版）
+// 標準論理・持続的文脈の探索ロジック（ベース実装版）
 // ==========================================
 
 package romanesco.Solver.core
@@ -12,10 +12,7 @@ trait PersistentLogicSearch { self: Prover =>
   import Expr._
   import Unifier._
 
-  /** 永続的な失敗キャッシュ (Todo 2.3) */
   private val globalFailureCache = TrieMap[(Expr, Set[Expr], List[Expr], Boolean), Int]()
-
-  /** 成功した証明のキャッシュ (Todo 2.4 - Lemma Caching) */
   private val globalLemmaCache = TrieMap[(Expr, Set[Expr], List[Expr]), ProofTree]()
 
   def clearCaches(): Unit = {
@@ -50,7 +47,6 @@ trait PersistentLogicSearch { self: Prover =>
     update()
   }
 
-  /** 各論理拡張が提供する探索ブランチの取得 */
   def getGoalHooks(
       goal: Expr,
       rules: List[CatRule],
@@ -87,7 +83,6 @@ trait PersistentLogicSearch { self: Prover =>
     )
   }
 
-  /** 標準的な含意(→)の適用 */
   private[core] def searchApply(
       name: String,
       goal: Expr,
@@ -146,7 +141,6 @@ trait PersistentLogicSearch { self: Prover =>
     }
   }
 
-  /** 持続的文脈の分解 (∧ / ∨) */
   private[core] def searchPersistentDecomposeContext(
       goal: Expr,
       rules: List[CatRule],

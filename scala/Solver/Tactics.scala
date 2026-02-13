@@ -124,14 +124,19 @@ object Tactics {
     */
   def reflexivity(state: ProofState): TacticResult = {
     state.currentGoal match {
-      case Some(Goal(ctx, lin, App(Sym(Eq), List(l, r)))) =>
-        if (Rewriter.normalize(l) == Rewriter.normalize(r))
+      case Some(Goal(_, _, Sym(True))) =>
+        // すでに Simpl などで True に簡約されている場合
+        Right(state.copy(goals = state.goals.tail))
+      case Some(Goal(_, _, App(Sym(Eq | Path), args))) if args.length >= 2 =>
+        val l = args match { case List(_, x, _) if args.length == 3 => x; case List(x, _) => x; case _ => null }
+        val r = args.last
+        if (l != null && Rewriter.normalize(l) == Rewriter.normalize(r))
           Right(state.copy(goals = state.goals.tail))
         else
           Left(
             s"reflexivity: ${Rewriter.normalize(l)} and ${Rewriter.normalize(r)} are not equal"
           )
-      case _ => Left("reflexivity: Goal is not an equality")
+      case _ => Left("reflexivity: Goal is not an equality or True")
     }
   }
 
@@ -140,6 +145,12 @@ object Tactics {
   def rewrite(state: ProofState, hypName: String): TacticResult = {
     state.currentGoal match {
       case Some(goal @ Goal(ctx, lin, target)) =>
+        val normTarget = Rewriter.normalize(target)
+        if (normTarget == Sym(True)) {
+          // 目標がすでに解決されている場合
+          return Right(state.copy(goals = state.goals.tail))
+        }
+
         (ctx ++ lin).find(_._1 == hypName) match {
           case Some((_, hypExpr)) =>
             // 1. 仮定をインスタンス化
@@ -153,10 +164,11 @@ object Tactics {
               case _ => expr
             }
 
-            val instHyp = instantiate(hypExpr)
+            val instHyp = Rewriter.normalize(instantiate(hypExpr))
             instHyp match {
-              case App(Sym(Eq), List(l, r)) =>
-                val normTarget = Rewriter.normalize(target)
+              case App(Sym(Eq | Path), args) if args.length >= 2 =>
+                val l = args match { case List(_, x, _) if args.length == 3 => x; case List(x, _) => x; case _ => null }
+                val r = args.last
 
                 // 2. 単一化を伴う部分式書き換え
                 def findAndReplace(expr: Expr): Option[(Expr, Subst)] = {
@@ -164,14 +176,14 @@ object Tactics {
                     .map(s => (applySubst(r, s), s))
                     .orElse {
                       expr match {
-                        case App(f, args) =>
-                          args.indices
+                        case App(f, as) =>
+                          as.indices
                             .to(LazyList)
                             .flatMap { idx =>
-                              findAndReplace(args(idx)).map {
+                              findAndReplace(as(idx)).map {
                                 case (newArg, s) =>
                                   val nextF = applySubst(f, s)
-                                  val nextArgs = args
+                                  val nextArgs = as
                                     .patch(idx, List(newArg), 1)
                                     .map(applySubst(_, s))
                                   (App(nextF, nextArgs), s)
@@ -187,18 +199,24 @@ object Tactics {
                   case Some((rewritten, subst)) =>
                     val finalTarget =
                       Rewriter.normalize(applySubst(rewritten, subst))
-                    Right(
-                      state.copy(goals =
-                        goal.copy(target = finalTarget) :: state.goals.tail
+                    if (finalTarget == Sym(True))
+                      Right(state.copy(goals = state.goals.tail))
+                    else
+                      Right(
+                        state.copy(goals =
+                          goal.copy(target = finalTarget) :: state.goals.tail
+                        )
                       )
-                    )
                   case None =>
                     Left(
-                      s"rewrite: Hypothesis '$hypName' not applicable to goal"
+                      s"rewrite: Hypothesis '$hypName' ($instHyp) not applicable to goal: $normTarget"
                     )
                 }
+              case Sym(True) => 
+                // 仮定自体が True なら、書き換えには使えないがエラーにもしない
+                Right(state)
               case _ =>
-                Left(s"rewrite: Hypothesis '$hypName' is not an equality")
+                Left(s"rewrite: Hypothesis '$hypName' ($instHyp) is not an equality")
             }
           case None => Left(s"rewrite: Hypothesis '$hypName' not found")
         }
@@ -285,12 +303,18 @@ object Tactics {
   def simpl(state: ProofState): TacticResult = {
     state.currentGoal match {
       case Some(goal) =>
-        val nextGoal = Goal(
-          goal.context.map((n, e) => (n, Rewriter.normalize(e))),
-          goal.linearContext.map((n, e) => (n, Rewriter.normalize(e))),
-          Rewriter.normalize(goal.target)
-        )
-        Right(state.copy(goals = nextGoal :: state.goals.tail))
+        val nextTarget = Rewriter.normalize(goal.target)
+        if (nextTarget == Sym(True)) {
+          // 簡約の結果 True になったら、そのゴールを解決したとみなす
+          Right(state.copy(goals = state.goals.tail))
+        } else {
+          val nextGoal = Goal(
+            goal.context.map((n, e) => (n, Rewriter.normalize(e))),
+            goal.linearContext.map((n, e) => (n, Rewriter.normalize(e))),
+            nextTarget
+          )
+          Right(state.copy(goals = nextGoal :: state.goals.tail))
+        }
       case None => Left("No current goal")
     }
   }

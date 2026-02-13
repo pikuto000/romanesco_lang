@@ -1,6 +1,6 @@
 // ==========================================
 // TacticTest.scala
-// タクティクスシステムの動作確認
+// タクティクスシステムの動作確認（自動解決対応版）
 // ==========================================
 
 package romanesco.Solver
@@ -15,20 +15,20 @@ import romanesco.Solver.core.Tactics._
   val goalExpr = TestParser.parse("A ∧ B → B ∧ A")
   val initialState = ProofState(List(Goal(Nil, Nil, goalExpr)), Nil, goalExpr)
 
-  println(s"Initial state:\n${initialState.currentGoal.get}")
+  println(s"Initial state:\n${initialState.currentGoal.getOrElse("Solved")}")
 
   val result = for {
     s1 <- intro(initialState, Some("h0"))
-    _ = println(s"\nAfter intro:\n${s1.currentGoal.get}")
+    _ = println(s"\nAfter intro:\n${s1.currentGoal.getOrElse("Solved")}")
 
     s2 <- destruct(s1, "h0")
-    _ = println(s"\nAfter destruct h0:\n${s2.currentGoal.get}")
+    _ = println(s"\nAfter destruct h0:\n${s2.currentGoal.getOrElse("Solved")}")
 
     s3 <- split(s2)
-    _ = println(s"\nAfter split (Subgoal 1):\n${s3.currentGoal.get}")
+    _ = println(s"\nAfter split (Subgoal 1):\n${s3.currentGoal.getOrElse("Solved")}")
 
     s4 <- exact(s3, "h0.2")
-    _ = println(s"\nAfter solve B (Subgoal 2):\n${s4.currentGoal.get}")
+    _ = println(s"\nAfter solve B (Subgoal 2):\n${s4.currentGoal.getOrElse("Solved")}")
 
     s5 <- exact(s4, "h0.1")
   } yield s5
@@ -45,7 +45,7 @@ import romanesco.Solver.core.Tactics._
   println("\n=== Auto Tactic Test: A ∧ B → B ∧ A ===")
   val autoResult = for {
     s1 <- intro(initialState, Some("h0"))
-    _  = println(s"\nAfter intro, calling auto on goal: ${s1.currentGoal.get}")
+    _  = println(s"\nAfter intro, calling auto on goal: ${s1.currentGoal.getOrElse("Solved")}")
     s2 <- auto(s1, new Prover())
   } yield s2
 
@@ -62,10 +62,11 @@ import romanesco.Solver.core.Tactics._
   val simplState = ProofState(List(Goal(Nil, Nil, simplGoal)), Nil, simplGoal)
   val simplResult = for {
     s1 <- intro(simplState)
-    _  = println(s"\nAfter intro:\n${s1.currentGoal.get}")
+    _  = println(s"\nAfter intro:\n${s1.currentGoal.getOrElse("Solved")}")
     s2 <- simpl(s1)
-    _  = println(s"\nAfter simpl:\n${s2.currentGoal.get}")
-    s3 <- reflexivity(s2)
+    _  = println(s"\nAfter simpl:\n${s2.currentGoal.getOrElse("Solved")}")
+    // simpl で解決済みになる可能性があるため、reflexivity は未解決の場合のみ呼ぶ
+    s3 <- if (s2.isSolved) Right(s2) else reflexivity(s2)
   } yield s3
 
   simplResult match {
@@ -87,19 +88,19 @@ import romanesco.Solver.core.Tactics._
     
     // Base Case を解決 (plus(0, 0) = 0)
     s2 <- reflexivity(s1)
-    _  = println(s"\nBase Case solved! Next goal:\n${s2.currentGoal.get}")
+    _  = println(s"\nBase Case solved! Next goal:\n${s2.currentGoal.getOrElse("Solved")}")
     
     // Inductive Step を解決
     s3 <- intro(s2) // n を導入
-    _  = println(s"\nAfter intro n:\n${s3.currentGoal.get}")
+    _  = println(s"\nAfter intro n:\n${s3.currentGoal.getOrElse("Solved")}")
     
     s4 <- intro(s3, Some("IH")) // IH を導入
-    _  = println(s"\nAfter intro IH:\n${s4.currentGoal.get}")
+    _  = println(s"\nAfter intro IH:\n${s4.currentGoal.getOrElse("Solved")}")
     
     s5 <- rewrite(s4, "IH")
-    _  = println(s"\nAfter rewrite IH:\n${s5.currentGoal.get}")
+    _  = println(s"\nAfter rewrite IH:\n${s5.currentGoal.getOrElse("Solved")}")
     
-    s6 <- reflexivity(s5)
+    s6 <- if (s5.isSolved) Right(s5) else reflexivity(s5)
   } yield s6
 
   indResult match {
