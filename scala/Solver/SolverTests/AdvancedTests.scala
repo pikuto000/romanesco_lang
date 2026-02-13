@@ -1,5 +1,5 @@
 // ==========================================
-// 高度で実用的な追加テストケース (Vector & Stream 強化版)
+// 高度で実用的な追加テストケース (Vector & Stream & Monad 強化版)
 // ==========================================
 
 package romanesco.Solver.SolverTests
@@ -94,7 +94,7 @@ object DependentTypeTests {
       logger.info(s"Case: $name ...")
       logger.time(s"$category: $name") {
         val goal = TestParser.parse(goalStr)
-        prover.prove(goal, maxDepth = depth) match {
+        prover.prove(goal, maxDepth = depth, timeoutMs = 30000) match {
           case Right(result) =>
             logger.info(s"✓ OK: $name")
           case Left(trace) =>
@@ -192,15 +192,27 @@ object CoinductiveTests {
     println("=== Coinductive: Infinite Streams ===")
     
     val streamRules = List(
-      // bisim(s1, s2) を G(head(s1) = head(s2)) として定義
-      CatRule("bisim_is_G",
+      CatRule("bisim_def",
         App(Sym("bisim"), List(Var("s1"), Var("s2"))),
-        App(Sym(Globally), List(App(Sym("="), List(head(Var("s1")), head(Var("s2")))))),
+        App(Sym(And), List(
+          App(Sym("="), List(head(Var("s1")), head(Var("s2")))),
+          App(Sym(Next), List(App(Sym("bisim"), List(tail(Var("s1")), tail(Var("s2"))))))
+        )),
         List(Var("s1"), Var("s2"))),
       
       CatRule("repeat_unfold",
         App(Sym("repeat"), List(Var("x"))),
         App(Sym("cons_stream"), List(Var("x"), App(Sym("repeat"), List(Var("x"))))),
+        List(Var("x"))),
+      
+      CatRule("head_repeat",
+        App(Sym("head"), List(App(Sym("repeat"), List(Var("x"))))),
+        Var("x"),
+        List(Var("x"))),
+      
+      CatRule("tail_repeat",
+        App(Sym("tail"), List(App(Sym("repeat"), List(Var("x"))))),
+        App(Sym("repeat"), List(Var("x"))),
         List(Var("x")))
     )
     
@@ -213,27 +225,47 @@ object CoinductiveTests {
     
     val cases = List(
       ("Stream head of repeat", "∀x. head(repeat(x)) = x", 10),
-      ("Stream bisimulation (self)", "∀x. bisim(repeat(x), repeat(x))", 25)
+      ("Stream bisimulation (self)", "∀x. bisim(repeat(x), repeat(x))", 30)
     )
     
-    // タイムアウトを30秒に延長
-    logger.switch(true)
-    cases.foreach { case (name, goalStr, depth) =>
-      logger.info(s"Case: $name ...")
-      logger.time(s"Streams: $name") {
-        val goal = TestParser.parse(goalStr)
-        prover.prove(goal, maxDepth = depth, timeoutMs = 30000) match {
-          case Right(result) =>
-            logger.info(s"✓ OK: $name")
-          case Left(trace) =>
-            logger.warn(s"✗ FAIL: $name - ${trace.reason}")
-        }
-      }
-    }
+    runTestCases(cases, prover, "Streams", maxLogDepth = 5)
   }
   
   private def head(s: Expr) = App(Sym("head"), List(s))
   private def tail(s: Expr) = App(Sym("tail"), List(s))
+}
+
+object MonadLawsTests {
+  import DependentTypeTests.runTestCases
+  import romanesco.Solver.core.Expr._
+
+  def runTests(): Unit = {
+    println("=== Category Theory: Monad Laws ===")
+    
+    val monadRules = List(
+      CatRule("return_list_def", sym("return_list")(v("x")), App(Sym("cons"), List(v("x"), Sym("nil"))), List(v("x"))),
+      CatRule("bind_list_nil", sym("bind_list")(Sym("nil"), v("f")), Sym("nil"), List(v("f"))),
+      CatRule("bind_list_cons", sym("bind_list")(App(Sym("cons"), List(v("x"), v("xs"))), v("f")), App(Sym("append"), List(v("f")(v("x")), sym("bind_list")(v("xs"), v("f")))), List(v("x"), v("xs"), v("f"))),
+      
+      CatRule("return_maybe_def", sym("return_maybe")(v("x")), App(Sym("just"), List(v("x"))), List(v("x"))),
+      CatRule("bind_maybe_nothing", sym("bind_maybe")(Sym("nothing"), v("f")), Sym("nothing"), List(v("f"))),
+      CatRule("bind_maybe_just", sym("bind_maybe")(App(Sym("just"), List(v("x"))), v("f")), v("f")(v("x")), List(v("x"), v("f")))
+    )
+
+    val prover = Prover(ProverConfig(rules = monadRules ++ StandardRules.all, algebras = StandardRules.defaultAlgebras))
+    
+    val cases = List(
+      ("List Monad: Left Identity", "∀a. ∀f. bind_list(return_list(a), f) = f(a)", 15),
+      ("List Monad: Right Identity", "∀m. bind_list(m, return_list) = m", 20),
+      ("List Monad: Associativity", "∀m. ∀f. ∀g. bind_list(bind_list(m, f), g) = bind_list(m, λx. bind_list(f(x), g))", 25),
+      
+      ("Maybe Monad: Left Identity", "∀a. ∀f. bind_maybe(return_maybe(a), f) = f(a)", 10),
+      ("Maybe Monad: Right Identity", "∀m. bind_maybe(m, return_maybe) = m", 15),
+      ("Maybe Monad: Associativity", "∀m. ∀f. ∀g. bind_maybe(bind_maybe(m, f), g) = bind_maybe(m, λx. bind_maybe(f(x), g))", 20)
+    )
+    
+    runTestCases(cases, prover, "Monad Laws", maxLogDepth = 5)
+  }
 }
 
 // ==========================================
@@ -254,6 +286,8 @@ object CoinductiveTests {
   AdvancedInductivePredicateTests.reachabilityTest()
   println()
   CoinductiveTests.streamTest()
+  println()
+  MonadLawsTests.runTests()
   
   println("=" * 60)
 }

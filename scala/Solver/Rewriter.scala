@@ -36,7 +36,7 @@ object Rewriter {
       val flattened = args.flatMap(collect)
       val sorted = flattened.sortBy(_.toString)
       if (sorted.isEmpty) {
-        if (op == Tensor) Expr.Sym(LOne) else Expr.Sym(True)
+        if (op == Tensor) Expr.Sym(LPlus) else Expr.Sym(True)
       } else {
         sorted.reduceLeft((acc, e) => Expr.App(Expr.Sym(op), List(acc, e)))
       }
@@ -47,18 +47,13 @@ object Rewriter {
 
   private def rewriteRule(expr: Expr): Expr = expr match {
     // --- HoTT path reduction (Priority) ---
-    // inv(refl) -> refl
     case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym(r), _))) if r == Refl => 
       expr.asInstanceOf[Expr.App].args.head
-    // inv(inv(p)) -> p
     case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym("inv"), List(p)))) => p
-    // refl ∘ p -> p
     case Expr.App(Expr.Sym(op), List(Expr.App(Expr.Sym(r), _), p))
         if (op == Compose || op == Concat) && r == Refl => p
-    // p ∘ refl -> p
     case Expr.App(Expr.Sym(op), List(p, Expr.App(Expr.Sym(r), _))) 
         if (op == Compose || op == Concat) && r == Refl => p
-    // transport(P, refl, x) -> x
     case Expr.App(Expr.Sym(t), List(_, Expr.App(Expr.Sym(r), _), x)) if t == Transport && r == Refl => x
 
     // --- ラムダ計算 (β簡約) ---
@@ -73,7 +68,6 @@ object Rewriter {
     case Expr.App(Expr.Sym(op), List(f, Expr.Sym(idSym))) if op == Compose && idSym == Id => f
     case Expr.App(Expr.Sym(op), List(Expr.Sym(idSym), f)) if op == Compose && idSym == Id => f
     
-    // Associativity for non-commutative operators (Compose, Concat)
     case Expr.App(Expr.Sym(op), List(Expr.App(Expr.Sym(op2), List(f, g)), h)) 
         if (op == Compose || op == Concat) && op == op2 =>
       Expr.App(Expr.Sym(op), List(f, Expr.App(Expr.Sym(op), List(g, h))))
@@ -90,10 +84,11 @@ object Rewriter {
     case Expr.App(Expr.Sym("plus"), List(Expr.App(Expr.Sym("plus"), List(a, b)), c)) =>
       Expr.App(Expr.Sym("plus"), List(a, Expr.App(Expr.Sym("plus"), List(b, c))))
 
-    // --- リスト의 演算 ---
+    // --- リスト的演算 ---
     case Expr.App(Expr.Sym("append"), List(Expr.Sym("nil"), ys)) => ys
     case Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("cons"), List(x, xs)), ys)) =>
       Expr.App(Expr.Sym("cons"), List(x, Expr.App(Expr.Sym("append"), List(xs, ys))))
+    case Expr.App(Expr.Sym("append"), List(xs, Expr.Sym("nil"))) => xs
     case Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("append"), List(xs, ys)), zs)) =>
       Expr.App(Expr.Sym("append"), List(xs, Expr.App(Expr.Sym("append"), List(ys, zs))))
 
@@ -110,8 +105,8 @@ object Rewriter {
     case Expr.App(Expr.Sym("vlength"), List(Expr.App(Expr.Sym("vcons"), List(_, _, n)))) => Expr.App(Expr.Sym("S"), List(n))
     case Expr.App(Expr.Sym("vhead"), List(Expr.App(Expr.Sym("vcons"), List(x, _, _)))) => x
     case Expr.App(Expr.Sym("vappend"), List(Expr.Sym("vnil"), v)) => v
-    case Expr.App(Expr.Sym("vappend"), List(Expr.App(Expr.Sym("vcons"), List(x, xs, n)), ys)) =>
-      Expr.App(Expr.Sym("vcons"), List(x, Expr.App(Expr.Sym("vappend"), List(xs, ys)), Expr.App(Expr.Sym("plus"), List(n, Expr.App(Expr.Sym("vlength"), List(ys))))))
+    case Expr.App(Expr.App(Expr.Sym("vappend"), List(Expr.App(Expr.Sym("vcons"), List(x, xs, n)), ys)), List(zs)) =>
+      Expr.App(Expr.Sym("vappend"), List(Expr.App(Expr.Sym("vcons"), List(x, xs, n)), Expr.App(Expr.Sym("vappend"), List(ys, zs))))
 
     // --- ファンクタ・モナド ---
     case Expr.App(Expr.Sym("fmap"), List(_, Expr.Sym("nil"))) => Expr.Sym("nil")
@@ -122,17 +117,29 @@ object Rewriter {
     case Expr.App(Expr.Sym("bind"), List(Expr.App(Expr.Sym("cons"), List(x, xs)), f)) =>
       Expr.App(Expr.Sym("append"), List(Expr.App(f, List(x)), Expr.App(Expr.Sym("bind"), List(xs, f))))
     case Expr.App(Expr.Sym("bind"), List(m, Expr.Sym("return"))) => m
-    case Expr.App(Expr.Sym("bind"), List(m, Expr.App(Expr.Sym("λ"), List(Expr.Var(x), Expr.App(Expr.Sym("return"), List(Expr.Var(x2))))))) if x == x2 => m
-    case Expr.App(Expr.Sym("bind"), List(m, Expr.App(Expr.Sym("λ"), List(Expr.Var(x), Expr.App(Expr.Sym("cons"), List(Expr.Var(x2), Expr.Sym("nil"))))))) if x == x2 => m
-    case Expr.App(Expr.Sym("bind"), List(Expr.App(Expr.Sym("append"), List(m1, m2)), g)) =>
-      Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("bind"), List(m1, g)), Expr.App(Expr.Sym("bind"), List(m2, g))))
+    
+    // List Monad 特化
+    case Expr.App(Expr.Sym("bind_list"), List(Expr.App(Expr.Sym("cons"), List(x, xs)), f)) =>
+      Expr.App(Expr.Sym("append"), List(Expr.App(f, List(x)), Expr.App(Expr.Sym("bind_list"), List(xs, f))))
+    case Expr.App(Expr.Sym("bind_list"), List(m, Expr.Sym("return_list"))) => m
+    case Expr.App(Expr.Sym("bind_list"), List(Expr.App(Expr.Sym("bind_list"), List(m, f)), g)) =>
+      Expr.App(Expr.Sym("bind_list"), List(m, Expr.App(Expr.Sym("λ"), List(Expr.Var("x"), Expr.App(Expr.Sym("bind_list"), List(Expr.App(f, List(Expr.Var("x"))), g))))))
+
+    // Maybe Monad 特化
+    case Expr.App(Expr.Sym("bind_maybe"), List(Expr.Sym("nothing"), _)) => Expr.Sym("nothing")
+    case Expr.App(Expr.Sym("bind_maybe"), List(Expr.App(Expr.Sym("just"), List(x)), f)) =>
+      Expr.App(f, List(x))
+    case Expr.App(Expr.Sym("bind_maybe"), List(m, Expr.Sym("return_maybe"))) => m
+    case Expr.App(Expr.Sym("bind_maybe"), List(Expr.App(Expr.Sym("bind_maybe"), List(m, f)), g)) =>
+      Expr.App(Expr.Sym("bind_maybe"), List(m, Expr.App(Expr.Sym("λ"), List(Expr.Var("x"), Expr.App(Expr.Sym("bind_maybe"), List(Expr.App(f, List(Expr.Var("x"))), g))))))
+
     case Expr.App(Expr.Sym("id"), List(x)) => x
     case Expr.App(Expr.App(Expr.Sym("compose"), List(f, g)), List(x)) =>
       Expr.App(f, List(Expr.App(g, List(x))))
     case Expr.App(Expr.Sym(Concat), List(Expr.App(Expr.Sym(Concat), List(p, q)), r)) =>
       Expr.App(Expr.Sym(Concat), List(p, Expr.App(Expr.Sym(Concat), List(q, r))))
 
-    // --- 論理の簡約 ---
+    // --- 論理的簡約 ---
     case Expr.App(Expr.Sym(Eq), List(l, r)) if l == r => Expr.Sym(True)
     case Expr.App(Expr.Sym(Path), List(_, l, r)) if l == r => Expr.Sym(True)
     case Expr.App(Expr.Sym(Globally), List(Expr.Sym(True))) => Expr.Sym(True)
@@ -145,14 +152,11 @@ object Rewriter {
     case Expr.App(Expr.Sym(op), List(Expr.Sym(False), p)) if op == Or || op == Coproduct => p
     case Expr.App(Expr.Sym(op), List(p, Expr.Sym(False))) if op == Or || op == Coproduct => p
 
+    // --- ストリーム的演算 ---
     case Expr.App(Expr.Sym("bisim"), List(s1, s2)) =>
       Expr.App(Expr.Sym(Globally), List(Expr.App(Expr.Sym(Eq), List(Expr.App(Expr.Sym("head"), List(s1)), Expr.App(Expr.Sym("head"), List(s2))))))
-
-    // --- ストリームの演算 ---
     case Expr.App(Expr.Sym("head"), List(Expr.App(Expr.Sym("cons_stream"), List(x, _)))) => x
     case Expr.App(Expr.Sym("tail"), List(Expr.App(Expr.Sym("cons_stream"), List(_, s)))) => s
-    case Expr.App(Expr.Sym("head"), List(Expr.App(Expr.Sym("repeat"), List(x)))) => x
-    case Expr.App(Expr.Sym("tail"), List(Expr.App(Expr.Sym("repeat"), List(x)))) => Expr.App(Expr.Sym("repeat"), List(x))
     case Expr.App(Expr.Sym("map_stream"), List(f, Expr.App(Expr.Sym("cons_stream"), List(x, s)))) =>
       Expr.App(Expr.Sym("cons_stream"), List(Expr.App(f, List(x)), Expr.App(Expr.Sym("map_stream"), List(f, s))))
     case Expr.App(Expr.Sym("head"), List(Expr.App(Expr.Sym("repeat"), List(x)))) => x

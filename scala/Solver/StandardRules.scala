@@ -1,5 +1,5 @@
 // ==========================================
-// StandardRules.scala (修正版)
+// StandardRules.scala
 // ==========================================
 
 package romanesco.Solver.core
@@ -9,458 +9,107 @@ import romanesco.Solver.core.LogicSymbols._
 object StandardRules:
   import Expr._
 
-  // 等式用のヘルパー
   private def eq(l: Expr, r: Expr): Expr = sym("=")(l, r)
 
-  // --- 恒等射・合成 ---
-  val idLeft = CatRule(
-    "id-left",
-    sym("∘")(sym("id"), v("f")),
-    v("f")
-  )
+  val idLeft = CatRule("id-left", sym("∘")(sym("id"), v("f")), v("f"))
+  val idRight = CatRule("id-right", sym("∘")(v("f"), sym("id")), v("f"))
+  val compAssoc = CatRule("comp-assoc", sym("∘")(sym("∘")(v("f"), v("g")), v("h")), sym("∘")(v("f"), sym("∘")(v("g"), v("h"))))
 
-  val idRight = CatRule(
-    "id-right",
-    sym("∘")(v("f"), sym("id")),
-    v("f")
-  )
+  val fstBeta = CatRule("fst-β", sym("pi1")(sym("pair")(v("a"), v("b"))), v("a"))
+  val sndBeta = CatRule("snd-β", sym("pi2")(sym("pair")(v("a"), v("b"))), v("b"))
+  val productEta = CatRule("product-η", sym("pair")(sym("pi1")(v("p")), sym("pi2")(v("p"))), v("p"))
 
-  val compAssoc = CatRule(
-    "comp-assoc",
-    sym("∘")(sym("∘")(v("f"), v("g")), v("h")),
-    sym("∘")(v("f"), sym("∘")(v("g"), v("h")))
-  )
+  val caseInlBeta = CatRule("case-inl-β", sym("case")(sym("inl")(v("x")), v("f"), v("g")), v("f")(v("x")))
+  val caseInrBeta = CatRule("case-inr-β", sym("case")(sym("inr")(v("y")), v("f"), v("g")), v("g")(v("y")))
 
-  // --- 積 (Product / And) ---
-  val productUniversal = CatRule(
-    "product-universal",
-    sym("pair")(v("f"), v("g")),
-    v("h"),
-    List(
-      eq(sym("∘")(sym("pi1"), v("h")), v("f")),
-      eq(sym("∘")(sym("pi2"), v("h")), v("g"))
-    )
-  )
+  val lambdaEta = CatRule("lambda-η", sym("λ")(v("x"), v("f")(v("x"))), v("f"))
 
-  val fstBeta = CatRule(
-    "fst-β",
-    sym("pi1")(sym("pair")(v("a"), v("b"))),
-    v("a")
-  )
+  val eqRefl = CatRule("eq-refl", sym("refl")(v("a")), eq(v("a"), v("a")))
 
-  val sndBeta = CatRule(
-    "snd-β",
-    sym("pi2")(sym("pair")(v("a"), v("b"))),
-    v("b")
-  )
+  val andIsProd = CatRule("and-is-×", sym(And)(v("A"), v("B")), sym(Product)(v("A"), v("B")))
+  val orIsCoprod = CatRule("or-is-+", sym(Or)(v("A"), v("B")), sym(Coproduct)(v("A"), v("B")))
+  val arrowIsExp = CatRule("→-is-^", sym(Implies)(v("A"), v("B")), sym(Exp)(v("B"), v("A")))
+  val trueIsTerminal = CatRule("⊤-is-1", sym(True), sym(Terminal))
+  val falseIsInitial = CatRule("⊥-is-0", sym(False), sym(Initial))
 
-  val productEta = CatRule(
-    "product-η",
-    sym("pair")(sym("pi1")(v("p")), sym("pi2")(v("p"))),
-    v("p")
-  )
+  val products = List(fstBeta, sndBeta, productEta)
+  val coproducts = List(caseInlBeta, caseInrBeta)
+  val exponentials = List(lambdaEta)
+  val colimits = Nil
+  val equality = List(eqRefl)
 
-  // --- 余積 (Coproduct / Or) ---
-  val coproductUniversal = CatRule(
-    "coproduct-universal",
-    sym("case")(v("s"), v("f"), v("g")),
-    v("h"),
-    List(
-      eq(sym("∘")(v("h"), sym("inl")), v("f")),
-      eq(sym("∘")(v("h"), sym("inr")), v("g"))
-    )
-  )
+  val tensorIsProd = CatRule("tensor-is-×", sym(Tensor)(v("A"), v("B")), sym(Product)(v("A"), v("B")))
+  val lImpliesIsExp = CatRule("⊸-is-^", sym(LImplies)(v("A"), v("B")), sym(Exp)(v("B"), v("A")))
 
-  val caseInlBeta = CatRule(
-    "case-inl-β",
-    sym("case")(sym("inl")(v("x")), v("f"), v("g")),
-    v("f")(v("x"))
-  )
-
-  val caseInrBeta = CatRule(
-    "case-inr-β",
-    sym("case")(sym("inr")(v("y")), v("f"), v("g")),
-    v("g")(v("y"))
-  )
-
-  // --- 指数対象 (Exponential / Arrow) ---
-  val expUniversal = CatRule(
-    "exp-universal",
-    sym("curry")(v("f")),
-    v("g"),
-    List(
-      eq(
-        sym("∘")(sym("eval"), sym("×")(v("g"), sym("id"))),
-        v("f")
-      )
-    )
-  )
-
-  val lambdaEta = CatRule(
-    "lambda-η",
-    sym("λ")(v("x"), v("f")(v("x"))),
-    v("f")
-  )
-
-  // --- 終対象 (Terminal / True) ---
-  val terminalUniversal = CatRule(
-    "terminal-universal",
-    sym("!")(v("A")),
-    v("f"),
-    List( /* ∃! f: A → 1 */ )
-  )
-
-  val terminalUnique = CatRule(
-    "terminal-unique",
-    v("f"),
-    sym("!")(v("A")),
-    List( /* if target is 1 */ )
-  )
-
-  // --- 始対象 (Initial / False) ---
-  val initialUniversal = CatRule(
-    "initial-universal",
-    sym("absurd")(v("f")),
-    v("g"),
-    List( /* ∃! g: 0 → A */ )
-  )
-
-  // --- 等式 ---
-  val eqRefl = CatRule(
-    "eq-refl",
-    sym("refl")(v("a")),
-    eq(v("a"), v("a"))
-  )
-
-  val eqSymm = CatRule(
-    "eq-symm",
-    eq(v("a"), v("b")),
-    eq(v("b"), v("a"))
-  )
-
-  // --- 論理結合子と圏論的構造の対応 ---
-  val andIsProd = CatRule(
-    "and-is-×",
-    sym(And)(v("A"), v("B")),
-    sym(Product)(v("A"), v("B"))
-  )
-
-  val orIsCoprod = CatRule(
-    "or-is-+",
-    sym(Or)(v("A"), v("B")),
-    sym(Coproduct)(v("A"), v("B"))
-  )
-
-  val arrowIsExp = CatRule(
-    "→-is-^",
-    sym(Implies)(v("A"), v("B")),
-    sym(Exp)(v("B"), v("A"))
-  )
-
-  val trueIsTerminal = CatRule(
-    "⊤-is-1",
-    sym(True),
-    sym(Terminal)
-  )
-
-  val falseIsInitial = CatRule(
-    "⊥-is-0",
-    sym(False),
-    sym(Initial)
-  )
-
-  // カテゴリー別
-  val products = List(fstBeta, sndBeta, productEta) // Removed productUniversal
-  val coproducts = List(caseInlBeta, caseInrBeta) // Removed coproductUniversal
-  val exponentials = List(lambdaEta) // Removed expUniversal
-  val colimits = Nil // Removed initialUniversal
-  val equality = List(eqRefl) // eqSymm is removed from automatic rules
-
-  val tensorIsProd = CatRule(
-    "tensor-is-×",
-    sym(Tensor)(v("A"), v("B")),
-    sym(Product)(v("A"), v("B"))
-  )
-
-  val lImpliesIsExp = CatRule(
-    "⊸-is-^",
-    sym(LImplies)(v("A"), v("B")),
-    sym(Exp)(v("B"), v("A"))
-  )
-
-  val logicMapping =
-    List(andIsProd, orIsCoprod, arrowIsExp, trueIsTerminal, falseIsInitial)
-
+  val logicMapping = List(andIsProd, orIsCoprod, arrowIsExp, trueIsTerminal, falseIsInitial)
   val linearMapping = List(tensorIsProd, lImpliesIsExp)
 
-  // --- モーダル論理 ---
-  val modalK = CatRule(
-    "modal-K",
-    sym(Box)(sym(Implies)(v("A"), v("B"))),
-    sym(Implies)(sym(Box)(v("A")), sym(Box)(v("B")))
-  )
+  val modalK = CatRule("modal-K", sym(Box)(sym(Implies)(v("A"), v("B"))), sym(Implies)(sym(Box)(v("A")), sym(Box)(v("B"))))
+  val modalKLinear = CatRule("modal-K-linear", sym(Box)(sym(LImplies)(v("A"), v("B"))), sym(LImplies)(sym(Box)(v("A")), sym(Box)(v("B"))))
+  val modalT = CatRule("modal-T", sym(Box)(v("A")), v("A"))
+  val modal4 = CatRule("modal-4", sym(Box)(v("A")), sym(Box)(sym(Box)(v("A"))))
+  val modal5 = CatRule("modal-5", sym(Diamond)(v("A")), sym(Box)(sym(Diamond)(v("A"))))
+  val modalDuality = CatRule("modal-duality", sym(Diamond)(v("A")), sym(Implies)(sym(Box)(sym(Implies)(v("A"), sym(False))), sym(False)))
+  val modalDistTensor = CatRule("modal-dist-tensor", sym(Box)(sym(Tensor)(v("A"), v("B"))), sym(Tensor)(sym(Box)(v("A")), sym(Box)(v("B"))))
+  val modalDistForall = CatRule("modal-dist-forall", sym(Box)(sym(Forall)(v("x"), v("P")(v("x")))), sym(Forall)(v("x"), sym(Box)(v("P")(v("x")))))
 
-  val modalKLinear = CatRule(
-    "modal-K-linear",
-    sym(Box)(sym(LImplies)(v("A"), v("B"))),
-    sym(LImplies)(sym(Box)(v("A")), sym(Box)(v("B")))
-  )
+  val modal = List(modalK, modalKLinear, modalT, modalDuality, modalDistTensor, modalDistForall, modal4, modal5)
 
-  val modalT = CatRule(
-    "modal-T",
-    sym(Box)(v("A")),
-    v("A")
-  )
-
-  val modal4 = CatRule(
-    "modal-4",
-    sym(Box)(v("A")),
-    sym(Box)(sym(Box)(v("A")))
-  )
-
-  val modal5 = CatRule(
-    "modal-5",
-    sym(Diamond)(v("A")),
-    sym(Box)(sym(Diamond)(v("A")))
-  )
-
-  val modalDuality = CatRule(
-    "modal-duality",
-    sym(Diamond)(v("A")),
-    sym(Implies)(sym(Box)(sym(Implies)(v("A"), sym(False))), sym(False))
-  )
-
-  val modalDistTensor = CatRule(
-    "modal-dist-tensor",
-    sym(Box)(sym(Tensor)(v("A"), v("B"))),
-    sym(Tensor)(sym(Box)(v("A")), sym(Box)(v("B")))
-  )
-
-  val modalDistForall = CatRule(
-    "modal-dist-forall",
-    sym(Box)(sym(Forall)(v("x"), v("P")(v("x")))),
-    sym(Forall)(v("x"), sym(Box)(v("P")(v("x"))))
-  )
-
-  val modalBasic = List(modalK, modalKLinear, modalT, modalDuality, modalDistTensor, modalDistForall)
-  val modalS4 = List(modal4)
-  val modalS5 = List(modal5)
-
-  val modal = modalBasic ++ modalS4 ++ modalS5 // Default to S5 modal logic
-
-  // --- 線形論理 ---
-  val linearBang = CatRule(
-    "linear-bang-elim",
-    sym(Bang)(v("A")),
-    v("A")
-  )
-
+  val linearBang = CatRule("linear-bang-elim", sym(Bang)(v("A")), v("A"))
   val linear = List(linearBang)
 
-  // --- 時相論理 ---
-  val temporalGDistTensor = CatRule(
-    "G-dist-tensor",
-    sym(Globally)(sym(Tensor)(v("A"), v("B"))),
-    sym(Tensor)(sym(Globally)(v("A")), sym(Globally)(v("B")))
-  )
-
-  val temporalGDistSepAnd = CatRule(
-    "G-dist-sepand",
-    sym(Globally)(sym(SepAnd)(v("A"), v("B"))),
-    sym(SepAnd)(sym(Globally)(v("A")), sym(Globally)(v("B")))
-  )
-
-  val temporalGDistLImplies = CatRule(
-    "G-dist-limplies",
-    sym(Globally)(sym(LImplies)(v("A"), v("B"))),
-    sym(LImplies)(sym(Globally)(v("A")), sym(Globally)(v("B")))
-  )
-
-  val temporalF = CatRule(
-    "F-expansion",
-    sym(Finally)(v("A")),
-    sym(Or)(v("A"), sym(Next)(sym(Finally)(v("A"))))
-  )
-
-  val temporalU = CatRule(
-    "U-expansion",
-    sym(Until)(v("A"), v("B")),
-    sym(Or)(v("B"), sym(And)(v("A"), sym(Next)(sym(Until)(v("A"), v("B")))))
-  )
-
+  val temporalGDistTensor = CatRule("G-dist-tensor", sym(Globally)(sym(Tensor)(v("A"), v("B"))), sym(Tensor)(sym(Globally)(v("A")), sym(Globally)(v("B"))))
+  val temporalGDistSepAnd = CatRule("G-dist-sepand", sym(Globally)(sym(SepAnd)(v("A"), v("B"))), sym(SepAnd)(sym(Globally)(v("A")), sym(Globally)(v("B"))))
+  val temporalGDistLImplies = CatRule("G-dist-limplies", sym(Globally)(sym(LImplies)(v("A"), v("B"))), sym(LImplies)(sym(Globally)(v("A")), sym(Globally)(v("B"))))
+  val temporalF = CatRule("F-expansion", sym(Finally)(v("A")), sym(Or)(v("A"), sym(Next)(sym(Finally)(v("A")))))
+  val temporalU = CatRule("U-expansion", sym(Until)(v("A"), v("B")), sym(Or)(v("B"), sym(And)(v("A"), sym(Next)(sym(Until)(v("A"), v("B"))))))
   val temporal = List(temporalGDistTensor, temporalGDistSepAnd, temporalGDistLImplies, temporalF, temporalU)
 
-  // --- 分離論理 ---
-  val sepAndCommutative = CatRule(
-    "sep-and-comm",
-    sym(SepAnd)(v("A"), v("B")),
-    sym(SepAnd)(v("B"), v("A"))
+  val separation = List(CatRule("sep-and-comm", sym(SepAnd)(v("A"), v("B")), sym(SepAnd)(v("B"), v("A"))))
+
+  val classical = List(
+    CatRule("EM", sym(True), sym(Or)(v("A"), sym(Implies)(v("A"), sym(False)))),
+    CatRule("DNE", sym(Implies)(sym(Implies)(v("A"), sym(False)), sym(False)), v("A"))
   )
 
-  val separation = List(sepAndCommutative)
-
-  // --- 古典論理 ---
-  val em = CatRule(
-    "EM",
-    sym(True),
-    sym(Or)(v("A"), sym(Implies)(v("A"), sym(False)))
-  )
-
-  val dne = CatRule(
-    "DNE",
-    sym(Implies)(sym(Implies)(v("A"), sym(False)), sym(False)),
-    v("A")
-  )
-
-  val classical = List(em, dne)
-
-  // --- HoTT (Homotopy Type Theory) ---
-  val pathRefl = CatRule(
-    "path-refl",
-    sym(Refl)(v("a")),
-    sym(Path)(v("A"), v("a"), v("a"))
-  )
-
-  val pathInv = CatRule(
-    "path-inv",
-    sym("inv")(sym(Path)(v("A"), v("a"), v("b"))),
-    sym(Path)(v("A"), v("b"), v("a"))
-  )
-
-  val univalence = CatRule(
-    "univalence",
-    sym("equiv")(v("A"), v("B")),
-    sym(Path)(sym(Type), v("A"), v("B"))
-  )
-
-  val pathToEquiv = CatRule(
-    "path-to-equiv",
-    sym(Path)(sym(Type), v("A"), v("B")),
-    sym("equiv")(v("A"), v("B"))
-  )
-
-  val pathConcatRule = CatRule(
-    "path-concat",
-    sym(Concat)(sym(Path)(v("A"), v("a"), v("b")), sym(Path)(v("A"), v("b"), v("c"))),
-    sym(Path)(v("A"), v("a"), v("c"))
-  )
-
-  val concatReflLeft = CatRule(
-    "concat-refl-left",
-    sym(Concat)(sym(Refl)(v("x")), v("p")),
-    v("p")
-  )
-
-  val concatReflRight = CatRule(
-    "concat-refl-right",
-    sym(Concat)(v("p"), sym(Refl)(v("x"))),
-    v("p")
-  )
-
-  val concatPathReflLeft = CatRule(
-    "concat-path-refl-left",
-    sym(Concat)(sym(Path)(v("A"), v("x"), v("x")), v("p")),
-    v("p")
-  )
-
-  val concatPathReflRight = CatRule(
-    "concat-path-refl-right",
-    sym(Concat)(v("p"), sym(Path)(v("A"), v("x"), v("x"))),
-    v("p")
-  )
-
-  val transportRefl = CatRule(
-    "transport-refl",
-    sym(Transport)(v("P"), sym(Refl)(v("x")), v("v")),
-    v("v")
-  )
-
-  val transportPathRefl = CatRule(
-    "transport-path-refl",
-    sym(Transport)(v("P"), sym(Path)(v("A"), v("x"), v("x")), v("v")),
-    v("v")
-  )
-
-  val pathInvRefl = CatRule(
-    "path-inv-refl",
-    sym("inv")(sym(Refl)(v("x"))),
-    sym(Refl)(v("x"))
-  )
-
-  val transportRule = CatRule(
-    "transport",
-    sym(Transport)(v("P"), sym(Path)(sym(Type), v("A"), v("B")), v("x")),
-    v("P")(v("B"))
-  )
-
-  val cubeRule = CatRule(
-    "cube-reduction",
-    sym(Cube)(v("A"), v("p"), v("q"), v("r"), v("s")),
-    sym(Path)(sym(Path)(v("A"), v("x"), v("y")), v("p"), v("r")), 
-    List(
-      eq(v("p"), sym(Path)(v("A"), v("x"), v("y"))),
-      eq(v("q"), sym(Path)(v("A"), v("x"), v("z"))),
-      eq(v("r"), sym(Path)(v("A"), v("z"), v("w"))),
-      eq(v("s"), sym(Path)(v("A"), v("y"), v("w")))
-    )
-  )
-
-  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, concatReflLeft, concatReflRight, concatPathReflLeft, concatPathReflRight, transportRefl, transportPathRefl, pathInvRefl, transportRule, cubeRule)
-
-  // --- 自然数の演算 ---
-  val plus0 = CatRule("plus_0", sym("plus")(sym("0"), v("n")), v("n"), List(v("n")))
-  val plusS = CatRule("plus_S", sym("plus")(sym("S")(v("n")), v("m")), sym("S")(sym("plus")(v("n"), v("m"))), List(v("n"), v("m")))
-  val natPlusRules = List(plus0, plusS)
-
-  // --- リストの演算 ---
-  val appendNil = CatRule("append_nil", sym("append")(sym("nil"), v("ys")), v("ys"), List(v("ys")))
-  val appendCons = CatRule("append_cons", sym("append")(sym("cons")(v("x"), v("xs")), v("ys")), sym("cons")(v("x"), sym("append")(v("xs"), v("ys"))), List(v("x"), v("xs"), v("ys")))
+  val pathRefl = CatRule("path-refl", sym(Refl)(v("a")), sym(Path)(v("A"), v("a"), v("a")))
+  val pathInv = CatRule("path-inv", sym("inv")(sym(Path)(v("A"), v("a"), v("b"))), sym(Path)(v("A"), v("b"), v("a")))
+  val univalence = CatRule("univalence", sym("equiv")(v("A"), v("B")), sym(Path)(sym(Type), v("A"), v("B")))
+  val pathToEquiv = CatRule("path-to-equiv", sym(Path)(sym(Type), v("A"), v("B")), sym("equiv")(v("A"), v("B")))
+  val pathConcatRule = CatRule("path-concat", sym(Concat)(sym(Path)(v("A"), v("a"), v("b")), sym(Path)(v("A"), v("b"), v("c"))), sym(Path)(v("A"), v("a"), v("c")))
   
-  val reverseNil = CatRule("reverse_nil", sym("reverse")(sym("nil")), sym("nil"))
-  val reverseCons = CatRule("reverse_cons", sym("reverse")(sym("cons")(v("x"), v("xs"))), sym("append")(sym("reverse")(v("xs")), sym("cons")(v("x"), sym("nil"))), List(v("x"), v("xs")))
-  
-  // Advanced List Lemmas
-  val reverseAppend = CatRule("lemma_rev_append", 
-    sym("reverse")(sym("append")(v("xs"), v("ys"))), 
-    sym("append")(sym("reverse")(v("ys")), sym("reverse")(v("xs"))), 
-    List(v("xs"), v("ys")))
-  
-  val reverseReverse = CatRule("lemma_rev_rev", 
-    sym("reverse")(sym("reverse")(v("xs"))), 
-    v("xs"), 
-    List(v("xs")))
+  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, pathToEquiv)
 
-  val mapNil = CatRule("map_nil", sym("map")(v("f"), sym("nil")), sym("nil"), List(v("f")))
-  val mapCons = CatRule("map_cons", sym("map")(v("f"), sym("cons")(v("x"), v("xs"))), sym("cons")(v("f")(v("x")), sym("map")(v("f"), v("xs"))), List(v("f"), v("x"), v("xs")))
-  
-  val mapCompose = CatRule("lemma_map_compose",
-    sym("map")(v("f"), sym("map")(v("g"), v("xs"))),
-    sym("map")(sym("∘")(v("f"), v("g")), v("xs")),
-    List(v("f"), v("g"), v("xs")))
+  val natPlusRules = List(
+    CatRule("plus_0", sym("plus")(sym("0"), v("n")), v("n"), List(v("n"))),
+    CatRule("plus_S", sym("plus")(sym("S")(v("n")), v("m")), sym("S")(sym("plus")(v("n"), v("m"))), List(v("n"), v("m")))
+  )
 
-  val listAppendRules = List(appendNil, appendCons, reverseNil, reverseCons, reverseAppend, reverseReverse, mapNil, mapCons, mapCompose)
+  val listAppendRules = List(
+    CatRule("append_nil", sym("append")(sym("nil"), v("ys")), v("ys"), List(v("ys"))),
+    CatRule("append_cons", sym("append")(sym("cons")(v("x"), v("xs")), v("ys")), sym("cons")(v("x"), sym("append")(v("xs"), v("ys"))), List(v("x"), v("xs"), v("ys"))),
+    CatRule("reverse_nil", sym("reverse")(sym("nil")), sym("nil")),
+    CatRule("reverse_cons", sym("reverse")(sym("cons")(v("x"), v("xs"))), sym("append")(sym("reverse")(v("xs")), sym("cons")(v("x"), sym("nil"))), List(v("x"), v("xs")))
+  )
 
-  // 全ての標準規則を populate
   val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ logicMapping ++ modal ++ linear ++ separation ++ hott ++ natPlusRules ++ listAppendRules
 
-  // --- 標準の初期代数 ---
   val defaultAlgebras = List(
     InitialAlgebra("Nat", List(ConstructorDef(Zero, Nil), ConstructorDef(Succ, List(ArgType.Recursive))), "n"),
     InitialAlgebra("List", List(ConstructorDef("nil", Nil), ConstructorDef("cons", List(ArgType.Constant, ArgType.Recursive))), "xs"),
     InitialAlgebra("Tree", List(ConstructorDef("leaf", Nil), ConstructorDef("node", List(ArgType.Recursive, ArgType.Constant, ArgType.Recursive))), "t"),
-    InitialAlgebra("S1", List(
-      ConstructorDef("base", Nil),
-      ConstructorDef("loop", Nil, ConstructorType.Path(sym("base"), sym("base")))
-    ), "s")
+    InitialAlgebra("S1", List(ConstructorDef("base", Nil), ConstructorDef("loop", Nil, ConstructorType.Path(sym("base"), sym("base")))), "s"),
+    InitialAlgebra("Maybe", List(ConstructorDef("nothing", Nil), ConstructorDef("just", List(ArgType.Constant))), "m")
   )
 
   val natAlgebra = defaultAlgebras(0)
   val listAlgebra = defaultAlgebras(1)
   val treeAlgebra = defaultAlgebras(2)
   val s1Algebra = defaultAlgebras(3)
+  val maybeAlgebra = defaultAlgebras(4)
 
   val nat = natAlgebra
   val list = listAlgebra
   val tree = treeAlgebra
   val s1 = s1Algebra
-
+  val maybe = maybeAlgebra
