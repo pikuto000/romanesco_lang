@@ -1116,12 +1116,16 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       unify(e, m, subst)
         .map(s => (applySubst(r, s), instRule.universals, rule.name, s))
         .filter { case (next, _, rname, _) =>
+          val regex = rname.matches(
+            ".*(dist|mapping|is|expansion|unfold|step|lemma|G-|bisim|comm|assoc|K-).*"
+          )
           if (isGoal) {
             val nextN = Rewriter.normalize(next)
-            nextN.complexity < e.complexity || rname.matches(
-              ".*(dist|mapping|is|expansion|unfold|step|lemma|G-|bisim|comm|assoc).*"
-            )
-          } else Rewriter.normalize(next) != e
+            nextN.complexity < e.complexity || regex
+          } else {
+            val nextN = Rewriter.normalize(next)
+            nextN.complexity <= e.complexity || regex || nextN != e
+          }
         }
         .toList
     } ++ (e match {
@@ -1176,26 +1180,32 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
             us: List[Expr],
             s: Subst,
             l: Context,
-            solved: List[ProofTree]
+            solved: List[ProofTree],
+            instLhs: Expr,
+            instRhs: Expr
         ): SolveTree[(List[ProofTree], Subst, Context)] = us match {
           case Nil       => SolveTree.Success((solved, s, l))
           case u :: tail =>
             val un = Rewriter.normalize(applySubst(u, s))
-            un match {
-              case Expr.Var(_) | Expr.Meta(_) => solveUnivs(tail, s, l, solved)
-              case _                          =>
-                val axL = searchAxiom(un, context, l, s, depth, limit)
-                val comb =
-                  axL #::: (if (axL.isEmpty) searchReflexivity(un, l, s, depth)
-                            else LazyList.empty)
-                if (comb.isEmpty) SolveTree.Failure()
-                else
-                  SolveTree.Choice(comb.map { case (t, ns, nl) =>
-                    solveUnivs(tail, ns, nl, solved :+ t)
-                  }.toList)
+            // Heuristic: If un is a subterm of LHS or RHS, it's a variable instantiation, not a premise.
+            if (un match { case Expr.Var(_) | Expr.Meta(_) => true; case _ => instLhs.contains(un) || instRhs.contains(un) }) {
+              solveUnivs(tail, s, l, solved, instLhs, instRhs)
+            } else {
+              val axL = searchAxiom(un, context, l, s, depth, limit)
+              val comb =
+                axL #::: (if (axL.isEmpty) searchReflexivity(un, l, s, depth)
+                          else LazyList.empty)
+              if (comb.isEmpty) SolveTree.Failure()
+              else
+                SolveTree.Choice(comb.map { case (t, ns, nl) =>
+                  solveUnivs(tail, ns, nl, solved :+ t, instLhs, instRhs)
+                }.toList)
             }
         }
-        solveUnivs(univs, nextS, linearContext, Nil).flatMap {
+        val instLhs = applySubst(rewritten, nextS) // Wait, rewritten is lhs or rhs depending on isGoal
+        val instRhs = goal // goal is the target we unified with
+        
+        solveUnivs(univs, nextS, linearContext, Nil, instLhs, instRhs).flatMap {
           case (tsUniv, fs, fl) =>
             search(
               finalGoal,

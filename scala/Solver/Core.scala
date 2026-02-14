@@ -95,6 +95,14 @@ enum Expr:
       f.complexity + maxDepth + 1
   }
 
+  def contains(other: Expr): Boolean = {
+    if (this == other) true
+    else this match {
+      case App(f, args) => f.contains(other) || args.exists(_.contains(other))
+      case _ => false
+    }
+  }
+
   /** 構造的パターンの抽象化（循環検知用） */
   def getStructuralPattern: String = {
     var varCounter = 0
