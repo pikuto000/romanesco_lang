@@ -28,9 +28,58 @@ trait LinearLogicSearch { self: Prover =>
   ): List[SolveTree[(ProofTree, Subst, Context)]] = {
     goal match {
       case Expr.App(Expr.Sym(LImplies), List(a, b)) =>
-        List(searchLinearImpliesGoal(goal, a, b, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history))
+        List(
+          searchLinearImpliesGoal(
+            goal,
+            a,
+            b,
+            rules,
+            context,
+            linearContext,
+            subst,
+            depth,
+            limit,
+            visited,
+            raaCount,
+            inductionCount,
+            guarded,
+            history
+          ),
+          // 追加: フレームルール
+          searchFrameRule(
+            goal,
+            rules,
+            context,
+            linearContext,
+            subst,
+            depth,
+            limit,
+            visited,
+            raaCount,
+            inductionCount,
+            guarded,
+            history
+          )
+        )
       case Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)) =>
-        List(searchLinearGoal(goal, a, b, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history))
+        List(
+          searchLinearGoal(
+            goal,
+            a,
+            b,
+            rules,
+            context,
+            linearContext,
+            subst,
+            depth,
+            limit,
+            visited,
+            raaCount,
+            inductionCount,
+            guarded,
+            history
+          )
+        )
       case Expr.Meta(_) =>
         // Frame Inference Hook
         List(searchFrameInference(goal, linearContext, subst))
@@ -53,8 +102,34 @@ trait LinearLogicSearch { self: Prover =>
       history: List[Expr]
   ): List[SolveTree[(ProofTree, Subst, Context)]] = {
     List(
-      searchCancellation(goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history),
-      searchLinearDecomposeContext(goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history)
+      searchCancellation(
+        goal,
+        rules,
+        context,
+        linearContext,
+        subst,
+        depth,
+        limit,
+        visited,
+        raaCount,
+        inductionCount,
+        guarded,
+        history
+      ),
+      searchLinearDecomposeContext(
+        goal,
+        rules,
+        context,
+        linearContext,
+        subst,
+        depth,
+        limit,
+        visited,
+        raaCount,
+        inductionCount,
+        guarded,
+        history
+      )
     )
   }
 
@@ -65,19 +140,116 @@ trait LinearLogicSearch { self: Prover =>
       subst: Subst
   ): SolveTree[(ProofTree, Subst, Context)] = {
     if (linearContext.isEmpty) return SolveTree.Failure()
+
+    logger.log(s"[Frame Inference] Goal: $goal")
     
-    // 線形文脈のリソースを全て結合 (A * B * C ...)
-    val resources = linearContext.map(_._2)
-    val frame = resources.reduceLeft((acc, e) => Expr.App(Expr.Sym(SepAnd), List(acc, e)))
-    
-    // ゴール（メタ変数）とフレームを単一化
-    SolveTree.fromLazyList(unify(frame, goal, subst).map { s =>
-      (
-        ProofTree.Leaf(applySubst(goal, s), "frame-inference"),
-        s,
-        Nil // リソースは全て消費されたとみなす
+    // 戦略0: スマート推論（もしゴールが既知の構造の一部なら）
+    // 例: P * ?F の ?F を埋める場合、P以外をフレームとする
+    val smartStrategy = goal match {
+      case Expr.Meta(_) => 
+        // 既存のヒストリや親のゴールから情報を得るのは難しいため、
+        // ここでは単純に「最小」と「全量」の戦略を優先する
+        SolveTree.Failure()
+      case _ => SolveTree.Failure()
+    }
+
+    // 戦略1: 最小フレームを優先（リソースの1つからの組み合わせ）
+    val minimalFrameStrategies = (1 until linearContext.length).toList.flatMap { n =>
+      linearContext.combinations(n).map { selectedResources =>
+        val frame = selectedResources
+          .map(_._2)
+          .reduceLeft((acc, e) => Expr.App(Expr.Sym(SepAnd), List(acc, e)))
+        val remaining = linearContext.filterNot(r => selectedResources.exists(_._1 == r._1))
+
+        SolveTree.fromLazyList(unify(frame, goal, subst).map { s =>
+          logger.log(s"[Frame] Minimal ($n): $frame")
+          (
+            ProofTree.Leaf(applySubst(goal, s), s"frame-inference-min-$n"),
+            s,
+            remaining
+          )
+        })
+      }
+    }
+
+    // 戦略2: 全リソースをフレームに（既存の動作）
+    val fullFrameStrategy = {
+      val resources = linearContext.map(_._2)
+      val frame = resources.reduceLeft((acc, e) =>
+        Expr.App(Expr.Sym(SepAnd), List(acc, e))
       )
-    })
+
+      SolveTree.fromLazyList(unify(frame, goal, subst).map { s =>
+        logger.log(s"[Frame] Full: $frame")
+        (
+          ProofTree.Leaf(applySubst(goal, s), "frame-inference-full"),
+          s,
+          Nil
+        )
+      })
+    }
+
+    SolveTree.Choice(smartStrategy :: (minimalFrameStrategies :+ fullFrameStrategy))
+  }
+
+  /** フレームルールの自動適用 {P} C {Q} から {P * F} C {Q * F} を導出
+    */
+  private def searchFrameRule(
+      goal: Expr,
+      rules: List[CatRule],
+      context: Context,
+      linearContext: Context,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr])],
+      raaCount: Int,
+      inductionCount: Int,
+      guarded: Boolean,
+      history: List[Expr]
+  ): SolveTree[(ProofTree, Subst, Context)] = {
+    goal match {
+      case App(
+            Sym(LImplies),
+            List(
+              App(Sym(SepAnd), List(p, framePre)),
+              App(Sym(SepAnd), List(q, framePost))
+            )
+          ) =>
+        unify(framePre, framePost, subst).headOption match {
+          case Some(s1) =>
+            val frameHyp = (s"frame_$depth", applySubst(framePre, s1))
+
+            searchLinearImpliesGoal(
+              App(Sym(LImplies), List(p, q)),
+              p,
+              q,
+              rules,
+              context,
+              frameHyp :: linearContext,
+              s1,
+              depth + 1,
+              limit,
+              visited,
+              raaCount,
+              inductionCount,
+              guarded,
+              history
+            ).map { case (innerProof, s2, restL) =>
+              (
+                ProofTree.Node(
+                  applySubst(goal, s2),
+                  "frame-rule",
+                  List(innerProof)
+                ),
+                s2,
+                restL.filterNot(_._1.startsWith("frame_"))
+              )
+            }
+          case None => SolveTree.Failure()
+        }
+      case _ => SolveTree.Failure()
+    }
   }
 
   private[core] def searchLinearImpliesGoal(
@@ -139,39 +311,47 @@ trait LinearLogicSearch { self: Prover =>
     goal match {
       case Expr.App(Expr.Sym(op), List(a, b)) if op == Tensor || op == SepAnd =>
         val goalTerms = collectTerms(goal, op)
-        val cancelOptions = linearContext.zipWithIndex.flatMap { case ((name, hyp), idx) =>
-          val hypTerms = collectTerms(hyp, op)
-          val common = goalTerms.intersect(hypTerms)
-          if (common.nonEmpty) {
-            val remainingGoal = buildTerm(goalTerms.diff(common), op)
-            val remainingHyp = buildTerm(hypTerms.diff(common), op)
-            val nextLinear = if (remainingHyp == Expr.Sym(Terminal) || remainingHyp == Expr.Sym(LPlus)) {
-              linearContext.patch(idx, Nil, 1)
-            } else {
-              linearContext.patch(idx, List((s"$name.c", remainingHyp)), 1)
-            }
-            
-            Some(search(
-              remainingGoal,
-              rules,
-              context,
-              nextLinear,
-              subst,
-              depth + 1,
-              limit,
-              visited,
-              raaCount,
-              inductionCount,
-              guarded,
-              history
-            ).map { case (t, s, restL) =>
-              (
-                ProofTree.Node(applySubst(goal, s), s"cancel[$name]", List(t)),
-                s,
-                restL
+        val cancelOptions = linearContext.zipWithIndex.flatMap {
+          case ((name, hyp), idx) =>
+            val hypTerms = collectTerms(hyp, op)
+            val common = goalTerms.intersect(hypTerms)
+            if (common.nonEmpty) {
+              val remainingGoal = buildTerm(goalTerms.diff(common), op)
+              val remainingHyp = buildTerm(hypTerms.diff(common), op)
+              val nextLinear =
+                if (
+                  remainingHyp == Expr.Sym(Terminal) || remainingHyp == Expr
+                    .Sym(LPlus)
+                ) {
+                  linearContext.patch(idx, Nil, 1)
+                } else {
+                  linearContext.patch(idx, List((s"$name.c", remainingHyp)), 1)
+                }
+
+              Some(
+                search(
+                  remainingGoal,
+                  rules,
+                  context,
+                  nextLinear,
+                  subst,
+                  depth + 1,
+                  limit,
+                  visited,
+                  raaCount,
+                  inductionCount,
+                  guarded,
+                  history
+                ).map { case (t, s, restL) =>
+                  (
+                    ProofTree
+                      .Node(applySubst(goal, s), s"cancel[$name]", List(t)),
+                    s,
+                    restL
+                  )
+                }
               )
-            })
-          } else None
+            } else None
         }
         SolveTree.merge(cancelOptions)
       case _ => SolveTree.Failure()
@@ -179,7 +359,8 @@ trait LinearLogicSearch { self: Prover =>
   }
 
   private def collectTerms(e: Expr, op: String): List[Expr] = e match {
-    case Expr.App(Expr.Sym(`op`), List(a, b)) => collectTerms(a, op) ++ collectTerms(b, op)
+    case Expr.App(Expr.Sym(`op`), List(a, b)) =>
+      collectTerms(a, op) ++ collectTerms(b, op)
     case other => List(other)
   }
 
@@ -214,7 +395,7 @@ trait LinearLogicSearch { self: Prover =>
         val rightPart =
           indexedLinear.filterNot(x => leftIndices.contains(x._2)).map(_._1)
         val leftPart = leftIndexed.map(_._1)
-        
+
         search(
           a,
           rules,
@@ -387,5 +568,23 @@ trait LinearLogicSearch { self: Prover =>
       case _ => Nil
     }
     SolveTree.merge(linear)
+  }
+
+  /** スマートフレーム推論: ゴールの構造を解析して必要なリソースを特定 */
+  private def smartFrameInference(
+      target: Expr,
+      resources: Context,
+      subst: Subst
+  ): (Context, Context) = {
+    val targetTerms = collectSepAndTerms(target)
+    resources.partition { case (_, res) =>
+      targetTerms.exists(t => unify(t, res, subst).nonEmpty)
+    }
+  }
+
+  private def collectSepAndTerms(e: Expr): List[Expr] = e match {
+    case Expr.App(Expr.Sym(SepAnd | Tensor), List(a, b)) =>
+      collectSepAndTerms(a) ++ collectSepAndTerms(b)
+    case other => List(other)
   }
 }

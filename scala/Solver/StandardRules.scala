@@ -105,7 +105,22 @@ object StandardRules:
     CatRule("append_nil_r", sym("append")(v("xs"), sym("nil")), v("xs"), List(v("xs")))
   )
 
-  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ modal ++ linear ++ separation ++ hott ++ natPlusRules ++ listAppendRules
+  val resourceRules = List(
+    // ファイル操作
+    CatRule("file-open", sym("file_exists")(v("f")), sym("file_open")(v("f"))),
+    CatRule("file-close", sym("file_open")(v("f")), sym(True)),
+    CatRule("file-read", sym("file_open")(v("f")), sym("file_open")(v("f"))),
+    
+    // メモリ操作
+    CatRule("memory-alloc", sym(True), sym(PointsTo)(v("ptr"), sym("_"))),
+    CatRule("memory-free", sym(PointsTo)(v("ptr"), v("val")), sym(True)),
+    
+    // ロック操作
+    CatRule("lock-acquire", sym("lock_free")(v("l")), sym("lock_held")(v("l"))),
+    CatRule("lock-release", sym("lock_held")(v("l")), sym("lock_free")(v("l")))
+  )
+
+  val all: List[CatRule] = products ++ coproducts ++ exponentials ++ colimits ++ equality ++ modal ++ linear ++ separation ++ hott ++ natPlusRules ++ listAppendRules ++ resourceRules
 
   val defaultAlgebras = List(
     InitialAlgebra("Nat", List(ConstructorDef(Zero, Nil), ConstructorDef(Succ, List(ArgType.Recursive))), "n"),

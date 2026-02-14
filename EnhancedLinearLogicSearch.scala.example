@@ -1,0 +1,297 @@
+// ==========================================
+// LinearLogicSearch.scala の強化版
+// 既存のコードに以下の機能を追加
+// ==========================================
+
+// ========== 追加する機能 ==========
+
+// 1. より高度なフレーム推論
+// 2. 最小フレームの優先
+// 3. プログラム検証用のフレーム自動生成
+
+// ========== 既存のsearchFrameInferenceを置き換える ==========
+
+/** フレーム推論（強化版）
+  * 
+  * 改善点:
+  * 1. 部分的なフレーム推論（全てのリソースではなく、必要な分だけ）
+  * 2. 最小フレームの優先（ヒューリスティック）
+  * 3. より詳細なログ
+  */
+private def searchFrameInference(
+    goal: Expr,
+    linearContext: Context,
+    subst: Subst
+): SolveTree[(ProofTree, Subst, Context)] = {
+  if (linearContext.isEmpty) return SolveTree.Failure()
+  
+  logger.log(s"[Frame Inference] Goal: $goal")
+  logger.log(s"[Frame Inference] Available resources: ${linearContext.map(_._2).mkString(", ")}")
+  
+  // 戦略1: 全てのリソースをフレームに割り当て（既存の実装）
+  val fullFrameStrategy = {
+    val resources = linearContext.map(_._2)
+    val frame = resources.reduceLeft((acc, e) => Expr.App(Expr.Sym(SepAnd), List(acc, e)))
+    
+    SolveTree.fromLazyList(unify(frame, goal, subst).map { s =>
+      logger.log(s"[Frame Inference] Full frame: $frame")
+      (
+        ProofTree.Leaf(applySubst(goal, s), "frame-inference-full"),
+        s,
+        Nil // リソースは全て消費
+      )
+    })
+  }
+  
+  // 戦略2: 最小フレームを優先（部分的なリソース割り当て）
+  val minimalFrameStrategies = (1 until linearContext.length).toList.flatMap { n =>
+    linearContext.combinations(n).map { selectedResources =>
+      val frame = selectedResources.map(_._2).reduceLeft((acc, e) => 
+        Expr.App(Expr.Sym(SepAnd), List(acc, e))
+      )
+      val remaining = linearContext.diff(selectedResources)
+      
+      SolveTree.fromLazyList(unify(frame, goal, subst).map { s =>
+        logger.log(s"[Frame Inference] Minimal frame ($n resources): $frame")
+        (
+          ProofTree.Leaf(applySubst(goal, s), s"frame-inference-min-$n"),
+          s,
+          remaining // 残りのリソースを保持
+        )
+      })
+    }
+  }
+  
+  // 最小フレームを優先して試行
+  if (minimalFrameStrategies.nonEmpty) {
+    SolveTree.merge(minimalFrameStrategies :+ fullFrameStrategy)
+  } else {
+    fullFrameStrategy
+  }
+}
+
+// ========== 新規追加: フレームルールの自動適用 ==========
+
+/** フレームルールの自動適用
+  * 
+  * P ⊸ Q から P * F ⊸ Q * F を自動導出
+  */
+private def searchFrameRuleApplication(
+    goal: Expr,
+    rules: List[CatRule],
+    context: Context,
+    linearContext: Context,
+    subst: Subst,
+    depth: Int,
+    limit: Int,
+    visited: Set[(Expr, Set[Expr], List[Expr])],
+    raaCount: Int,
+    inductionCount: Int,
+    guarded: Boolean,
+    history: List[Expr]
+): SolveTree[(ProofTree, Subst, Context)] = {
+  goal match {
+    // P * F ⊸ Q * F のパターンをマッチ
+    case App(Sym(LImplies), List(
+      App(Sym(SepAnd), List(p, framePre)),
+      App(Sym(SepAnd), List(q, framePost))
+    )) =>
+      // framePre と framePost が同一かチェック
+      unify(framePre, framePost, subst).headOption match {
+        case Some(s1) =>
+          logger.log(s"[Frame Rule] Detected: $p ⊸ $q with frame ${applySubst(framePre, s1)}")
+          
+          // フレームを線形文脈に追加して P ⊸ Q を証明
+          val frameHyp = (s"frame_$depth", applySubst(framePre, s1))
+          
+          searchLinearImpliesGoal(
+            App(Sym(LImplies), List(p, q)),
+            p,
+            q,
+            rules,
+            context,
+            frameHyp :: linearContext,
+            s1,
+            depth + 1,
+            limit,
+            visited,
+            raaCount,
+            inductionCount,
+            guarded,
+            history
+          ).map { case (innerProof, s2, restL) =>
+            // フレームが残っているか確認
+            val framePreserved = restL.exists(_._1.startsWith("frame_"))
+            
+            if (framePreserved) {
+              logger.log(s"[Frame Rule] Successfully applied with preserved frame")
+              (
+                ProofTree.Node(
+                  applySubst(goal, s2),
+                  "frame-rule-auto",
+                  List(innerProof)
+                ),
+                s2,
+                restL.filterNot(_._1.startsWith("frame_"))
+              )
+            } else {
+              logger.log(s"[Frame Rule] Frame was consumed (expected to be preserved)")
+              (innerProof, s2, restL) // フレームが消費された場合も許容
+            }
+          }
+        case None => SolveTree.Failure()
+      }
+    case _ => SolveTree.Failure()
+  }
+}
+
+// ========== 新規追加: スマートフレーム推論 ==========
+
+/** スマートフレーム推論
+  * 
+  * ゴールの構造を解析して、最適なフレームを推論
+  */
+private def smartFrameInference(
+    goal: Expr,
+    linearContext: Context,
+    subst: Subst
+): Option[(Expr, List[(String, Expr)])] = {
+  goal match {
+    // ゴールが P * ?F の形式
+    case App(Sym(SepAnd), List(target, Meta(frameId))) =>
+      // 線形文脈からtargetに必要なリソースを特定
+      val (needed, frame) = partitionResources(target, linearContext, subst)
+      
+      if (frame.nonEmpty) {
+        val frameExpr = frame.map(_._2).reduceLeft((acc, e) => 
+          App(Sym(SepAnd), List(acc, e))
+        )
+        logger.log(s"[Smart Frame] Inferred: $frameExpr")
+        Some((frameExpr, needed))
+      } else {
+        None
+      }
+    case _ => None
+  }
+}
+
+/** リソースを必要なものとフレームに分割
+  */
+private def partitionResources(
+    target: Expr,
+    resources: Context,
+    subst: Subst
+): (Context, Context) = {
+  val targetTerms = collectSepAndTerms(target)
+  
+  resources.partition { case (name, resource) =>
+    targetTerms.exists(t => unify(t, resource, subst).nonEmpty)
+  }
+}
+
+/** 分離連言の項を収集（ヘルパー）
+  */
+private def collectSepAndTerms(e: Expr): List[Expr] = e match {
+  case App(Sym(SepAnd | Tensor), List(a, b)) => 
+    collectSepAndTerms(a) ++ collectSepAndTerms(b)
+  case other => List(other)
+}
+
+// ========== getGoalHooksへの統合 ==========
+
+// 既存のgetGoalHooksに以下を追加:
+
+def getGoalHooks(
+    goal: Expr,
+    rules: List[CatRule],
+    context: Context,
+    linearContext: Context,
+    subst: Subst,
+    depth: Int,
+    limit: Int,
+    visited: Set[(Expr, Set[Expr], List[Expr])],
+    raaCount: Int,
+    inductionCount: Int,
+    guarded: Boolean,
+    history: List[Expr]
+): List[SolveTree[(ProofTree, Subst, Context)]] = {
+  goal match {
+    case Expr.App(Expr.Sym(LImplies), List(a, b)) =>
+      List(
+        searchLinearImpliesGoal(...),
+        // 追加: フレームルールの自動適用
+        searchFrameRuleApplication(goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history)
+      )
+    case Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)) =>
+      List(searchLinearGoal(...))
+    case Expr.Meta(_) =>
+      // 強化版フレーム推論
+      List(searchFrameInference(goal, linearContext, subst))
+    case _ => Nil
+  }
+}
+
+// ========== 使用例 ==========
+
+/*
+// 例1: 基本的なフレーム推論
+{x ↦ 1 * y ↦ 2} read(x) {x ↦ 1 * ?F}
+// ?F = y ↦ 2 を自動推論
+
+// 例2: フレームルールの自動適用
+{x ↦ 1} write(x, 2) {x ↦ 2}
+// ↓ フレーム y ↦ 3 を追加
+{x ↦ 1 * y ↦ 3} write(x, 2) {x ↦ 2 * y ↦ 3}
+
+// 例3: 複雑なフレーム推論
+{file_open(f) * buffer(b) * lock(l)} 
+read(f) 
+{file_open(f) * ?F}
+// ?F = buffer(b) * lock(l) を推論
+*/
+
+// ========== テストケース ==========
+
+object EnhancedFrameInferenceTest {
+  def main(args: Array[String]): Unit = {
+    println("=== Enhanced Frame Inference Test ===\n")
+    
+    val rules = StandardRules.all
+    val config = ProverConfig(rules = rules)
+    val prover = new Prover(config)
+    
+    val tests = List(
+      // Test 1: 基本的なフレーム推論
+      ("∃F. (x ↦ 1 * y ↦ 2 ⊸ x ↦ 1 * F)", "Should infer F = y ↦ 2"),
+      
+      // Test 2: 最小フレーム
+      ("∃F. (A * B * C ⊸ B * F)", "Should infer F = A * C (minimal frame)"),
+      
+      // Test 3: フレームルールの自動適用
+      ("(x ↦ 1 ⊸ x ↦ 2) → (x ↦ 1 * y ↦ 3 ⊸ x ↦ 2 * y ↦ 3)", "Frame rule should apply"),
+      
+      // Test 4: 複数のフレーム候補
+      ("∃F. (A * B * C * D ⊸ B * C * F)", "Should try minimal frames first")
+    )
+    
+    tests.foreach { case (input, description) =>
+      println(s"Test: $input")
+      println(s"  Expected: $description")
+      
+      try {
+        val goal = TestParser.parse(input)
+        prover.prove(goal, maxDepth = 15) match {
+          case Right(result) => 
+            println(s"  ✓ Solved")
+            println(result.tree.format(0))
+          case Left(trace) => 
+            println(s"  ✗ Failed: ${trace.reason}")
+        }
+      } catch {
+        case e: Exception => 
+          println(s"  Error: ${e.getMessage}")
+      }
+      println()
+    }
+  }
+}

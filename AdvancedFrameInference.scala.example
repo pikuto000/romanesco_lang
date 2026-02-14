@@ -1,0 +1,253 @@
+// ==========================================
+// AdvancedFrameInference.scala
+// 分離論理のフレーム推論の強化版
+// ==========================================
+
+package romanesco.Solver.core
+
+import romanesco.Utils.Debug.logger
+
+/** フレーム推論の高度な機能を提供するtrait
+  * 
+  * 主な機能：
+  * 1. 最小フレームの自動推論
+  * 2. フレームルールの自動適用
+  * 3. ヒューリスティックな探索
+  */
+trait AdvancedFrameInference { self: Prover with LinearLogicSearch =>
+  import Expr._
+  import LogicSymbols._
+  import Unifier._
+
+  /** フレーム推論の拡張フック
+    * 
+    * ゴールが P * ?F ⊸ Q * ?F の形式の場合、?F を自動推論
+    */
+  def getFrameInferenceHooks(
+      goal: Expr,
+      rules: List[CatRule],
+      context: Context,
+      linearContext: Context,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr])],
+      raaCount: Int,
+      inductionCount: Int,
+      guarded: Boolean,
+      history: List[Expr]
+  ): List[SolveTree[(ProofTree, Subst, Context)]] = {
+    goal match {
+      // フレームルール: P * F ⊸ Q * F
+      case App(Sym(LImplies), List(lhs, rhs)) =>
+        (lhs, rhs) match {
+          case (App(Sym(SepAnd), List(p, Meta(fId1))), 
+                App(Sym(SepAnd), List(q, Meta(fId2)))) if fId1 == fId2 =>
+            List(searchFrameRule(p, q, Meta(fId1), goal, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, history))
+          case _ => Nil
+        }
+      case _ => Nil
+    }
+  }
+
+  /** フレームルールの適用: {P} C {Q} から {P * F} C {Q * F} を導出
+    */
+  private def searchFrameRule(
+      p: Expr,
+      q: Expr,
+      frame: Expr,
+      goal: Expr,
+      rules: List[CatRule],
+      context: Context,
+      linearContext: Context,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr])],
+      raaCount: Int,
+      inductionCount: Int,
+      guarded: Boolean,
+      history: List[Expr]
+  ): SolveTree[(ProofTree, Subst, Context)] = {
+    logger.log(s"[Frame Rule] Attempting: $p ⊸ $q with frame $frame")
+    
+    // フレームを線形文脈に追加
+    val frameHyp = (s"frame_$depth", frame)
+    val newLinear = frameHyp :: linearContext
+    
+    // P ⊸ Q を証明
+    searchLinearImpliesGoal(
+      App(Sym(LImplies), List(p, q)),
+      p,
+      q,
+      rules,
+      context,
+      newLinear,
+      subst,
+      depth + 1,
+      limit,
+      visited,
+      raaCount,
+      inductionCount,
+      guarded,
+      history
+    ).flatMap { case (innerProof, s1, restL) =>
+      // フレームが未使用の場合、それを結果に含める
+      val usedFrame = !restL.exists(_._1.startsWith("frame_"))
+      
+      if (usedFrame) {
+        // フレームが使用された場合、P * F ⊸ Q * F の証明を構築
+        SolveTree.Success((
+          ProofTree.Node(
+            applySubst(goal, s1),
+            "frame-rule",
+            List(innerProof)
+          ),
+          s1,
+          restL
+        ))
+      } else {
+        SolveTree.Failure()
+      }
+    }
+  }
+
+  /** 最小フレームの推論
+    * 
+    * 複数の可能なフレームから最小のものを選択
+    */
+  def inferMinimalFrame(
+      precondition: Expr,
+      postcondition: Expr,
+      linearContext: Context,
+      subst: Subst
+  ): Option[(Expr, Subst)] = {
+    // 事前条件と事後条件から共通部分を除外
+    val preTerms = collectSepAndTerms(precondition)
+    val postTerms = collectSepAndTerms(postcondition)
+    
+    // 共通部分
+    val common = preTerms.intersect(postTerms)
+    
+    // フレーム = 事前条件 - 共通部分
+    val frameTerms = preTerms.diff(common)
+    
+    if (frameTerms.isEmpty) {
+      None
+    } else {
+      val frame = buildSepAnd(frameTerms)
+      logger.log(s"[Minimal Frame] Inferred: $frame")
+      Some((frame, subst))
+    }
+  }
+
+  /** 分離連言の項を収集
+    */
+  private def collectSepAndTerms(e: Expr): List[Expr] = e match {
+    case App(Sym(SepAnd), List(a, b)) => 
+      collectSepAndTerms(a) ++ collectSepAndTerms(b)
+    case other => List(other)
+  }
+
+  /** 分離連言を構築
+    */
+  private def buildSepAnd(terms: List[Expr]): Expr = {
+    if (terms.isEmpty) {
+      Sym(Terminal)
+    } else {
+      terms.reduceLeft((acc, t) => App(Sym(SepAnd), List(acc, t)))
+    }
+  }
+
+  /** プログラム検証用のフレーム推論
+    * 
+    * {P} C {Q} の形式で、Pから使用されないリソースを自動的にフレームとして推論
+    */
+  def inferProgramFrame(
+      program: Expr,
+      precondition: Expr,
+      postcondition: Expr,
+      linearContext: Context,
+      subst: Subst
+  ): Option[(Expr, Subst)] = {
+    logger.log(s"[Program Frame] Analyzing: $program")
+    logger.log(s"  Precondition: $precondition")
+    logger.log(s"  Postcondition: $postcondition")
+    
+    // プログラムが使用するリソースを解析
+    val usedResources = analyzeResourceUsage(program)
+    logger.log(s"  Used resources: $usedResources")
+    
+    // 事前条件から使用されないリソースを抽出
+    val preTerms = collectSepAndTerms(precondition)
+    val unusedResources = preTerms.filterNot(r => 
+      usedResources.exists(used => canUnify(r, used, subst).nonEmpty)
+    )
+    
+    if (unusedResources.isEmpty) {
+      logger.log(s"  No unused resources found")
+      None
+    } else {
+      val frame = buildSepAnd(unusedResources)
+      logger.log(s"  Inferred frame: $frame")
+      Some((frame, subst))
+    }
+  }
+
+  /** プログラムが使用するリソースを解析
+    * 
+    * TODO: プログラム構文に応じて実装
+    */
+  private def analyzeResourceUsage(program: Expr): List[Expr] = {
+    program match {
+      // スキップは何も使わない
+      case Sym("skip") => Nil
+      
+      // 代入: x := e
+      case App(Sym(":="), List(Var(x), e)) =>
+        List(Sym(x))  // 変数xを使用
+      
+      // シーケンス: C1 ; C2
+      case App(Sym(";"), List(c1, c2)) =>
+        analyzeResourceUsage(c1) ++ analyzeResourceUsage(c2)
+      
+      // ポイント操作: x ↦ v
+      case App(Sym("↦"), List(x, v)) =>
+        List(App(Sym("↦"), List(x, v)))
+      
+      // その他
+      case _ => Nil
+    }
+  }
+
+  /** 2つの式が単一化可能かチェック
+    */
+  private def canUnify(e1: Expr, e2: Expr, subst: Subst): Option[Subst] = {
+    unify(e1, e2, subst).headOption
+  }
+}
+
+/** フレーム推論のテストケース
+  */
+object AdvancedFrameInferenceTest {
+  def main(args: Array[String]): Unit = {
+    println("=== Advanced Frame Inference Test ===\n")
+    
+    // TODO: テストケースを追加
+    println("Test 1: Minimal frame inference")
+    println("  Input: {x ↦ 1 * y ↦ 2 * z ↦ 3} read(x) {x ↦ 1}")
+    println("  Expected frame: y ↦ 2 * z ↦ 3")
+    println()
+    
+    println("Test 2: Frame rule application")
+    println("  Input: {x ↦ 1} write(x, 2) {x ↦ 2}")
+    println("  With frame: y ↦ 3")
+    println("  Expected: {x ↦ 1 * y ↦ 3} write(x, 2) {x ↦ 2 * y ↦ 3}")
+    println()
+    
+    println("Test 3: Automatic frame for file handling")
+    println("  Input: {file_open(f) * buffer_allocated(b)} close(f) {⊤}")
+    println("  Expected frame: buffer_allocated(b)")
+    println()
+  }
+}
