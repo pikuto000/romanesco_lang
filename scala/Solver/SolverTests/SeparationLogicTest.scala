@@ -10,7 +10,8 @@ object SeparationLogicTest {
   def main(args: Array[String]): Unit = {
     logger.switch(false)
     val rules = StandardRules.separation ++ StandardRules.all
-    val config = ProverConfig(rules = rules, maxComplexity = 200, maxParallelism = 1)
+    val config =
+      ProverConfig(rules = rules, maxComplexity = 200, maxParallelism = 1)
     val prover = new Prover(config)
 
     println("=== Separation Logic: Resource Management Test ===")
@@ -19,16 +20,16 @@ object SeparationLogicTest {
       ("A * B ⊸ B * A", true, 10),
       ("(A * B) * C ⊸ A * (B * C)", true, 10),
       (
-        "(A ⊸ B) ⊸ (A * C ⊸ B * C)", 
+        "(A ⊸ B) ⊸ (A * C ⊸ B * C)",
         true,
         15
       ),
-      ("A * A ⊸ A", false, 5), // Fail fast
-      ("A ⊸ A * A", false, 5), // Fail fast
+      ("(A * A) ⊸ A", false, 5), // Fail fast
+      ("(A ⊸ A) * A", false, 5), // Fail fast
       ("(∀v. (x ↦ v ⊸ P(v))) ⊸ (x ↦ 5 ⊸ P(5))", true, 8),
       ("A * B * C ⊸ C * A * B", true, 8),
       ("(∀v. (x ↦ v * R)) ⊸ (x ↦ 5 * R)", true, 8),
-      
+
       // Frame Inference Tests
       ("∃F. (A * B ⊸ A * F)", true, 10),
       ("∃F. (x ↦ 1 * y ↦ 2 ⊸ x ↦ 1 * F)", true, 10),

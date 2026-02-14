@@ -32,5 +32,6 @@ else {
         "runMain romanesco.Solver.SolverTests.runAdvancedTestsSuite" `
         "runMain romanesco.Solver.SolverTests.HoTTAdvancedTest" `
         "runMain romanesco.Solver.SolverTests.UnificationAdvancedTest" `
-        "runMain romanesco.Solver.SolverTests.EnhancedFrameTest"
+        "runMain romanesco.Solver.SolverTests.EnhancedFrameTest" `
+        "runMain romanesco.Solver.SolverTests.runMathAndVerificationTests"
 }

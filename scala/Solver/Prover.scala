@@ -533,7 +533,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       unify(e, m, subst).map(s => (applySubst(r, s), instRule.universals, rule.name, s)).filter { case (next, _, rname, _) =>
         if (isGoal) {
           val nextN = Rewriter.normalize(next)
-          nextN.complexity < e.complexity || rname.matches(".*(dist|mapping|is|expansion|unfold|step|lemma|G-|bisim).*")
+          nextN.complexity < e.complexity || rname.matches(".*(dist|mapping|is|expansion|unfold|step|lemma|G-|bisim|comm|assoc).*")
         } else Rewriter.normalize(next) != e
       }.toList
     } ++ (e match {
