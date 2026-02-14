@@ -111,9 +111,19 @@ object Repl:
           pw.write(json)
           pw.close()
           println("\n[Visualization] Proof JSON exported to visualizer/proof.json")
+
+          s.searchTree.foreach { st =>
+            val stJson = st.toJson(_.toJson)
+            val stFile = new java.io.File("visualizer/search_tree.json")
+            val stPw = new java.io.PrintWriter(stFile)
+            stPw.write(stJson)
+            stPw.close()
+            println("[Visualization] Search Tree JSON exported to visualizer/search_tree.json")
+          }
+
           println("To view the proof:")
           println("1. Open visualizer/index.html in your browser.")
-          println("2. Copy the content of visualizer/proof.json.")
+          println("2. Copy the content of visualizer/proof.json or visualizer/search_tree.json.")
           println("3. Paste it into the text area and click 'Visualize'.")
         } else {
           println("No completed proofs to visualize yet. Use 'auto' or solve the goal first.")

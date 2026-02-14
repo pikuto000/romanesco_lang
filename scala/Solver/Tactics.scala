@@ -288,7 +288,8 @@ object Tactics {
             Right(
               state.copy(
                 goals = state.goals.tail,
-                completedProofs = result.tree :: state.completedProofs
+                completedProofs = result.tree :: state.completedProofs,
+                searchTree = result.searchTree
               )
             )
           case Left(fail) =>

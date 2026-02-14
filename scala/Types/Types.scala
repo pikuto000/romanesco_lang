@@ -50,6 +50,12 @@ enum Tree[T] {
       }
     }
   }
+
+  def toJson(f: T => String): String = this match {
+    case E() => "null"
+    case V(v, b) => 
+      s"{\"value\":${f(v)},\"branches\":[${b.map(_.toJson(f)).mkString(",")}]}"
+  }
 }
 
 object Tree {

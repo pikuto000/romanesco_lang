@@ -224,11 +224,14 @@ case class FailTrace(
     if children.isEmpty then base
     else s"$base\n${children.map(_.format(indent + 1)).mkString("\n")}"
 
+import romanesco.Types.Tree
+
 /** 証明結果
   */
 case class ProofResult(
     tree: ProofTree,
-    generatedLemma: Option[CatRule] = None
+    generatedLemma: Option[CatRule] = None,
+    searchTree: Option[Tree[SearchNode]] = None
 )
 
 /** コンストラクタの引数定義
@@ -304,7 +307,8 @@ case class Goal(
 case class ProofState(
     goals: List[Goal],
     completedProofs: List[Proof],
-    originalGoal: Expr
+    originalGoal: Expr,
+    searchTree: Option[Tree[SearchNode]] = None
 ):
   def isSolved: Boolean = goals.isEmpty
   def currentGoal: Option[Goal] = goals.headOption
