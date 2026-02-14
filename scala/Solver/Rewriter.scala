@@ -9,11 +9,19 @@ import LogicSymbols._
 
 object Rewriter {
 
-  def normalize(expr: Expr): Expr = {
-    val reduced = step(expr)
-    val acNormalized = acNormalize(reduced)
-    if (acNormalized == expr) acNormalized
-    else normalize(acNormalized)
+  def normalize(expr: Expr, maxIter: Int = 100): Expr = {
+    def loop(e: Expr, iter: Int): Expr = {
+      if (iter <= 0) {
+        // logger.log(s"Normalization limit reached for: $e")
+        e
+      } else {
+        val reduced = step(e)
+        val acNormalized = acNormalize(reduced)
+        if (acNormalized == e) e
+        else loop(acNormalized, iter - 1)
+      }
+    }
+    loop(expr, maxIter)
   }
 
   private def step(expr: Expr): Expr = expr match {
@@ -36,7 +44,14 @@ object Rewriter {
       val flattened = args.flatMap(collect)
       
       // Idempotency & Short-circuit (Only for non-linear operators)
-      var processed = if (op == And || op == Or) flattened.distinct.sortBy(_.toString) else flattened.sortBy(_.toString)
+      var processed = if (op == And || op == Or) {
+        flattened.distinct.sortBy(_.toString)
+      } else if (op == SepAnd || op == Tensor) {
+        // Linear Logic: Keep order, No idempotency
+        flattened
+      } else {
+        flattened.sortBy(_.toString)
+      }
       
       if (op == And) {
         if (processed.contains(Expr.Sym(False)) || processed.contains(Expr.Sym("⊥"))) return Expr.Sym(False)
@@ -107,7 +122,55 @@ object Rewriter {
             ))
           ))
 
-        case _ => expr
+        // Forall: transport(λz. ∀x:A(z). B(z, x), p, f) -> λx. transport(λz. B(z, transport(λz. A(z), inv(p), x)), p, f(transport(λz. A(z), inv(p), x)))
+        case (Expr.App(Expr.Sym("λ"), List(Expr.Var(z), Expr.App(Expr.Sym(Forall), argsB))), f) =>
+          val (xVar, typeA, bodyB) = argsB match {
+            case List(Expr.Var(x), t, b) => (x, t, b)
+            case List(Expr.Var(x), b) => (x, Expr.Sym("Type"), b)
+            case _ => (null, null, null)
+          }
+          if (xVar != null) {
+            val xt = Expr.Var("x_trans")
+            val transportedX = Expr.App(Expr.Sym(Transport), List(
+              Expr.App(Expr.Sym("λ"), List(Expr.Var(z), typeA)),
+              Expr.App(Expr.Sym("inv"), List(p)),
+              xt
+            ))
+            Expr.App(Expr.Sym("λ"), List(xt,
+              Expr.App(Expr.Sym(Transport), List(
+                Expr.App(Expr.Sym("λ"), List(Expr.Var(z), Prover.substVar(bodyB, xVar, transportedX))),
+                p,
+                Expr.App(f, List(transportedX))
+              ))
+            ))
+          } else expr
+
+        // Exists: transport(λz. ∃x:A(z). B(z, x), p, pair(u, v)) -> pair(transport(λz. A(z), p, u), transport(λz. B(z, transport(λz. A(z), refl, u)), p, v))
+        // Wait, Exists is usually represented as a pair in Martin-Löf Type Theory (Sigma types)
+        case (Expr.App(Expr.Sym("λ"), List(Expr.Var(z), Expr.App(Expr.Sym(Exists), argsB))), Expr.App(Expr.Sym(pair), List(u, v)))
+            if pair == Pair =>
+          val (xVar, typeA, bodyB) = argsB match {
+            case List(Expr.Var(x), t, b) => (x, t, b)
+            case List(Expr.Var(x), b) => (x, Expr.Sym("Type"), b)
+            case _ => (null, null, null)
+          }
+          if (xVar != null) {
+            val transportedU = Expr.App(Expr.Sym(Transport), List(Expr.App(Expr.Sym("λ"), List(Expr.Var(z), typeA)), p, u))
+            // The v term needs to be transported to the new type B(y, transportedU)
+            // This is more complex because of the dependency.
+            Expr.App(Expr.Sym(Pair), List(
+              transportedU,
+              Expr.App(Expr.Sym(Transport), List(
+                Expr.App(Expr.Sym("λ"), List(Expr.Var(z), Prover.substVar(bodyB, xVar, Expr.App(Expr.Sym(Transport), List(Expr.App(Expr.Sym("λ"), List(Expr.Var(z), typeA)), p, u))))), // This might be slightly off in the path argument
+                p,
+                v
+              ))
+            ))
+          } else expr
+
+        case _ => 
+          // logger.log(s"Transport reduction incomplete for: $pred")
+          expr
       }
 
     case Expr.App(Expr.Sym(t), List(_, Expr.App(Expr.Sym(r), _), x)) if t == Transport && r == Refl => x

@@ -66,8 +66,13 @@ object Unifier:
           val l1 = args1.headOption.map(getLevelDepth).getOrElse(-1)
           val l2 = args2.headOption.map(getLevelDepth).getOrElse(-1)
 
+          // Cumulative universes: Type(n) : Type(n+1)
+          // If l1 < l2, then Type(l1) can be considered a subtype of Type(l2)
+          // But for strict equality unification, we check equality.
           if (l1 != -1 && l2 != -1 && l1 != l2) {
-            logger.log(s"[UNIFY FAIL] Universe level mismatch: Type$l1 != Type$l2")
+            // logger.log(s"[UNIFY] Universe level mismatch: Type$l1 vs Type$l2")
+            // Support simple subtyping/cumulativity if needed, 
+            // but for now we keep it strict unless one is a meta-variable.
             LazyList.empty
           }
           else {
@@ -86,27 +91,23 @@ object Unifier:
         // --- 高階パターン単一化 (一般化) ---
         case (Expr.App(Expr.Meta(id), args), t) =>
           if (t == Expr.App(Expr.Meta(id), args)) LazyList(subst)
-          else if (!occursCheckHigher(id, t, args))
-            solveHigherOrder(id, args, t, subst)
-          else {
-            logger.log(s"[UNIFY FAIL] Occurs check failed for ?$id in $t")
-            LazyList.empty
-          }
+          else solveHigherOrder(id, args, t, subst)
 
         case (t, Expr.App(Expr.Meta(id), args)) =>
           if (t == Expr.App(Expr.Meta(id), args)) LazyList(subst)
-          else if (!occursCheckHigher(id, t, args))
-            solveHigherOrder(id, args, t, subst)
-          else {
-            logger.log(s"[UNIFY FAIL] Occurs check failed for ?$id in $t")
-            LazyList.empty
-          }
+          else solveHigherOrder(id, args, t, subst)
 
         // --- 基本的なメタ変数の単一化 ---
-        case (Expr.Meta(id), t) if !occursCheckHigher(id, t, Nil) =>
-          LazyList(subst + (id -> t))
-        case (t, Expr.Meta(id)) if !occursCheckHigher(id, t, Nil) =>
-          LazyList(subst + (id -> t))
+        case (Expr.Meta(id), t) =>
+          if (occursCheck(id, t)) {
+            // logger.log(s"[UNIFY FAIL] Occurs check failed for ?$id in $t")
+            LazyList.empty
+          } else LazyList(subst + (id -> t))
+        case (t, Expr.Meta(id)) =>
+          if (occursCheck(id, t)) {
+            // logger.log(s"[UNIFY FAIL] Occurs check failed for ?$id in $t")
+            LazyList.empty
+          } else LazyList(subst + (id -> t))
 
         // --- 変数の単一化 ---
         case (Expr.Var(n1), Expr.Var(n2)) if n1 == n2 => LazyList(subst)
@@ -143,64 +144,83 @@ object Unifier:
       target: Expr,
       subst: Subst
   ): LazyList[Subst] = {
-    val vars = args.indices.map(i => s"v_$i").toList
+    val vars = args.indices.map(i => s"bv$i").toList // Use bv for consistency with canonicalize
     val argFreeVars = args.flatMap(collectFreeVars).toSet
 
     // 1. まずターゲット内のメタ変数をPruningする
-    def performPruning(t: Expr, s: Subst): LazyList[Subst] = {
-      val freeVars = collectFreeVars(applySubst(t, s))
-      val outOfScope = freeVars -- argFreeVars
-      if (outOfScope.isEmpty) LazyList(s)
+    // target 内のメタ変数が、id の args に含まれない自由変数に依存している場合、
+    // その依存関係を解消（Pruning）しようと試みる。
+    def performPruning(t: Expr, s: Subst): LazyList[(Expr, Subst)] = {
+      val currentT = applySubst(t, s)
+      val freeInT = collectFreeVars(currentT)
+      val outOfScope = freeInT -- argFreeVars
+      
+      if (outOfScope.isEmpty) LazyList((currentT, s))
       else {
-        def findAndPrune(e: Expr, currentS: Subst): LazyList[Subst] = applySubst(e, currentS) match {
-          case Expr.App(Expr.Meta(mid), mArgs) =>
-            val invalidIndices = mArgs.indices.filter(i => collectFreeVars(applySubst(mArgs(i), currentS)).exists(outOfScope.contains))
-            if (invalidIndices.nonEmpty) {
-              val mVars = mArgs.indices.map(i => s"mv_$i").toList
-              val prunedBody = Expr.App(Expr.Meta(MetaId(mid.ids :+ 999)), 
-                mArgs.indices.filterNot(invalidIndices.contains).map(i => Expr.Var(mVars(i))).toList)
-              val lambda = mVars.foldRight(prunedBody) { (name, b) =>
-                Expr.App(Expr.Sym("λ"), List(Expr.Var(name), b))
+        // メタ変数アプリケーションを探して Pruning する
+        def findAndPrune(e: Expr, currentS: Subst): LazyList[(Expr, Subst)] = {
+          val actualE = applySubst(e, currentS)
+          actualE match {
+            case Expr.App(Expr.Meta(mid), mArgs) if mid != id =>
+              // このメタ変数の引数のうち、outOfScope に含まれるものを削除した新しいメタ変数を生成する
+              val mVars = mArgs.indices.map(i => s"mv$i").toList
+              val validIndices = mArgs.indices.filter { i =>
+                val argVars = collectFreeVars(applySubst(mArgs(i), currentS))
+                (argVars intersect outOfScope).isEmpty
               }
-              val nextS = currentS + (mid -> lambda)
-              performPruning(t, nextS)
-            } else {
-              mArgs.foldLeft(LazyList(currentS)) { (sl, arg) => sl.flatMap(s2 => findAndPrune(arg, s2)) }
-            }
-          case Expr.App(f, as) =>
-            (f :: as).foldLeft(LazyList(currentS)) { (sl, child) => sl.flatMap(s2 => findAndPrune(child, s2)) }
-          case _ => LazyList(currentS)
+              
+              if (validIndices.length < mArgs.length) {
+                val newMid = MetaId(mid.ids :+ 888) // Pruned ID
+                val prunedBody = Expr.App(Expr.Meta(newMid), validIndices.map(i => Expr.Var(mVars(i))).toList)
+                val lambda = mVars.foldRight(prunedBody) { (name, b) =>
+                  Expr.App(Expr.Sym("λ"), List(Expr.Var(name), b))
+                }
+                val nextS = currentS + (mid -> lambda)
+                performPruning(t, nextS)
+              } else {
+                // 引数自体を再帰的にチェック
+                mArgs.foldLeft(LazyList((actualE, currentS))) { (acc, arg) =>
+                  acc.flatMap { case (_, s) => findAndPrune(arg, s) }
+                }
+              }
+            case Expr.App(f, as) =>
+              (f :: as).foldLeft(LazyList((actualE, currentS))) { (acc, child) =>
+                acc.flatMap { case (_, s) => findAndPrune(child, s) }
+              }
+            case _ => LazyList((actualE, currentS))
+          }
         }
-        findAndPrune(t, s)
+        findAndPrune(currentT, s)
       }
     }
 
     // 2. Pruningを実行してから抽象化を行う
-    performPruning(target, subst).flatMap { s =>
-      val currentTarget = applySubst(target, s)
-      
+    performPruning(target, subst).flatMap { case (prunedTarget, s) =>
+      if (occursCheck(id, prunedTarget)) return LazyList.empty
+
       def abstractAll(t: Expr): LazyList[Expr] = {
-        val matchingIndices = args.indices.filter(i => args(i) == t)
-        val replacements = matchingIndices.to(LazyList).map(i => Expr.Var(vars(i)))
-        
-        val recursive = t match {
-          case Expr.App(f, as) =>
-            for {
-              nextF <- abstractAll(f)
-              nextArgs <- as.foldRight(LazyList(List.empty[Expr])) { (a, acc) =>
-                for {
-                  nextA <- abstractAll(a)
-                  rest <- acc
-                } yield nextA :: rest
-              }
-            } yield Expr.App(nextF, nextArgs)
-          case Expr.Meta(_) => LazyList(t)
-          case _ => LazyList(t)
+        // args と一致する部分を対応する変数に置き換える
+        val matchingIndices = args.indices.filter(i => applySubst(args(i), s) == t)
+        if (matchingIndices.nonEmpty) {
+          LazyList(Expr.Var(vars(matchingIndices.head)))
+        } else {
+          t match {
+            case Expr.App(f, as) =>
+              for {
+                nextF <- abstractAll(f)
+                nextArgs <- as.foldRight(LazyList(List.empty[Expr])) { (a, acc) =>
+                  for {
+                    nextA <- abstractAll(a)
+                    rest <- acc
+                  } yield nextA :: rest
+                }
+              } yield Expr.App(nextF, nextArgs)
+            case _ => LazyList(t)
+          }
         }
-        (replacements #::: recursive).distinct
       }
 
-      abstractAll(currentTarget).flatMap { body =>
+      abstractAll(prunedTarget).flatMap { body =>
         val freeInBody = collectFreeVars(body) -- vars.toSet
         if (freeInBody.subsetOf(argFreeVars)) {
           val lambda = vars.foldRight(body) { (name, b) =>
@@ -208,6 +228,7 @@ object Unifier:
           }
           LazyList(s + (id -> lambda))
         } else {
+          // Pruning 後もスコープ外の変数が残っている場合は失敗
           LazyList.empty
         }
       }
@@ -226,31 +247,8 @@ object Unifier:
       expr: Expr,
       args: List[Expr]
   ): Boolean = {
-    def collectMetaVars(e: Expr): Set[MetaId] = e match {
-      case Expr.Meta(id)   => Set(id)
-      case Expr.App(f, as) => collectMetaVars(f) ++ as.flatMap(collectMetaVars)
-      case _               => Set.empty
-    }
-
-    if (collectMetaVars(expr).contains(metaId)) return true
-
-    if (args.nonEmpty) {
-      val exprVars = collectFreeVars(expr)
-      val argVars = args.flatMap(collectFreeVars).toSet
-      
-      // Pruningが可能な場合（メタ変数アプリケーションを含む場合）は失敗させない
-      def canPrune(e: Expr): Boolean = e match {
-        case Expr.App(Expr.Meta(_), _) => true
-        case Expr.App(f, as) => canPrune(f) || as.exists(canPrune)
-        case _ => false
-      }
-
-      if (exprVars.exists(v => !argVars.contains(v)) && !canPrune(expr)) {
-        return true
-      }
-    }
-    
-    false
+    // 互換性のために残すが、基本的には solveHigherOrder 内でチェックする
+    occursCheck(metaId, expr)
   }
 
   private def occursCheckVar(varName: String, expr: Expr): Boolean = expr match

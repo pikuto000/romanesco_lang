@@ -99,7 +99,8 @@ enum SolveTree[+T]:
     */
   def solveParallel(maxParallelism: Int = 8): LazyList[T] = {
     val executor = SolveTree.sharedExecutor
-    val resultQueue = new LinkedBlockingQueue[Option[T]]()
+    // Bound the queue to prevent memory leak (Issue 4)
+    val resultQueue = new LinkedBlockingQueue[Option[T]](1000)
     val activeTasks = new AtomicInteger(0)
     val isCancelled = new java.util.concurrent.atomic.AtomicBoolean(false)
 

@@ -54,7 +54,7 @@ trait HoareLogicSearch { self: Prover =>
     val hoareProver = new Prover(hoareConfig)
     hoareProver.deadline = self.deadline
 
-    c match {
+    val syntaxDirected = c match {
       // {P} skip {Q}  => P -> Q
       case Sym("skip") =>
         hoareProver.search(App(Sym(Implies), List(p, q)), rules, context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded, history)
@@ -117,5 +117,30 @@ trait HoareLogicSearch { self: Prover =>
 
       case _ => SolveTree.Failure()
     }
+
+    // Rule of Consequence: {P} C {Q} is true if P -> P' and {P'} C {Q'} and Q' -> Q
+    val consequence = if (depth < limit) {
+      val pPrime = freshMeta(depth + 100)
+      val qPrime = freshMeta(depth + 200)
+      
+      // Try to solve {P'} C {Q'} first, then verify P -> P' and Q' -> Q
+      // To avoid immediate recursion, we only try this if C is not just a meta-variable
+      c match {
+        case Meta(_) => SolveTree.Failure()
+        case _ => 
+          self.search(App(Sym("triple"), List(pPrime, c, qPrime)), rules, context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded, history).flatMap { case (tC, s1, l1) =>
+            val instPPrime = applySubst(pPrime, s1)
+            val instQPrime = applySubst(qPrime, s1)
+            
+            hoareProver.search(App(Sym(Implies), List(p, instPPrime)), rules, context, linearContext, s1, depth + 1, limit, visited, raaCount, inductionCount, guarded, history).flatMap { case (tP, s2, l2) =>
+              hoareProver.search(App(Sym(Implies), List(applySubst(instQPrime, s2), q)), rules, context, l2, s2, depth + 1, limit, visited, raaCount, inductionCount, guarded, history).map { case (tQ, s3, l3) =>
+                (ProofTree.Node(applySubst(App(Sym("triple"), List(p, c, q)), s3), "hoare-consequence", List(tP, tC, tQ)), s3, l3)
+              }
+            }
+          }
+      }
+    } else SolveTree.Failure()
+
+    SolveTree.Choice(List(syntaxDirected, consequence))
   }
 }

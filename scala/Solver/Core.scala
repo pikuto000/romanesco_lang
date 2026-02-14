@@ -61,51 +61,51 @@ enum Expr:
       else s"$h(${args.mkString(",")})"
 
   /** メタ変数と変数を出現順に正規化（α同値性の判定用） */
-  def canonicalize: Expr = {
+  def canonicalize(renameMeta: Boolean = true): Expr = {
     val metaMap = scala.collection.mutable.Map[MetaId, MetaId]()
     val varMap = scala.collection.mutable.Map[String, String]()
     var metaCounter = 0
     var varCounter = 0
-    def loop(e: Expr): Expr = e match {
+    
+    // De Bruijn Index ベースの完全な実装
+    def deBruijn(e: Expr, env: List[String]): Expr = e match {
       case Meta(id) =>
-        val newId = metaMap.getOrElseUpdate(
-          id, {
-            val nid = MetaId(List(metaCounter))
-            metaCounter += 1
-            nid
-          }
-        )
-        Meta(newId)
+        if (renameMeta) {
+          val newId = metaMap.getOrElseUpdate(id, { val n = MetaId(List(metaCounter)); metaCounter += 1; n })
+          Meta(newId)
+        } else Meta(id)
       case Var(name) =>
-        val newName = varMap.getOrElseUpdate(
-          name, {
-            val n = s"v$varCounter"
-            varCounter += 1
-            n
-          }
-        )
-        Var(newName)
-      case App(f, args) => App(loop(f), args.map(loop))
-      case _            => e
+        val idx = env.indexOf(name)
+        if (idx >= 0) Var(s"bv$idx") // Bound variable (index)
+        else Var(name) // Free variable
+      case App(Sym("λ"), List(Var(v), body)) =>
+        App(Sym("λ"), List(Var(s"bv0"), deBruijn(body, v :: env))) 
+      case App(f, args) => App(deBruijn(f, env), args.map(deBruijn(_, env)))
+      case _ => e
     }
-    loop(this)
+    
+    deBruijn(this, Nil)
   }
 
   /** 式の複雑さ（ヒューリスティック用スコア） */
-  def complexity: Int = this match
-    case Var(_)     => 1
-    case Meta(_)    => 1
-    case Sym(_)     => 1
-    case App(f, as) => f.complexity + as.map(_.complexity).sum + 1
+  def complexity: Int = this match {
+    case Var(_) | Meta(_) | Sym(_) => 1
+    case App(f, as) => 
+      val maxDepth = if (as.isEmpty) 0 else as.map(_.complexity).max
+      f.complexity + maxDepth + 1
+  }
 
   /** 構造的パターンの抽象化（循環検知用） */
   def getStructuralPattern: String = {
     var varCounter = 0
     val varMap = scala.collection.mutable.Map[String, String]()
     def loop(e: Expr): String = e match {
-      case Var(_) =>
-        val n = s"V$varCounter"
-        varCounter += 1
+      case Var(name) =>
+        val n = varMap.getOrElseUpdate(name, {
+          val res = s"V$varCounter"
+          varCounter += 1
+          res
+        })
         n
       case Sym(n)  => s"S($n)"
       case Meta(_) => "M"
@@ -115,11 +115,14 @@ enum Expr:
     loop(this)
   }
 
-  def toJson: String = this match {
-    case Var(n) => s"{\"type\":\"Var\",\"name\":\"$n\"}"
-    case Sym(n) => s"{\"type\":\"Sym\",\"name\":\"$n\"}"
-    case Meta(id) => s"{\"type\":\"Meta\",\"id\":\"$id\"}"
-    case App(f, args) => s"{\"type\":\"App\",\"f\":${f.toJson},\"args\":[${args.map(_.toJson).mkString(",")}]}"
+  def toJson: String = {
+    def escape(s: String): String = s.replace("\"", "\\\"")
+    this match {
+      case Var(n) => s"{\"type\":\"Var\",\"name\":\"${escape(n)}\"}"
+      case Sym(n) => s"{\"type\":\"Sym\",\"name\":\"${escape(n)}\"}"
+      case Meta(id) => s"{\"type\":\"Meta\",\"id\":\"$id\"}"
+      case App(f, args) => s"{\"type\":\"App\",\"f\":${f.toJson},\"args\":[${args.map(_.toJson).mkString(",")}]}"
+    }
   }
 
 object Expr:
@@ -157,6 +160,11 @@ case class CatRule(
       else s" where ${universals.mkString(", ")}"
     s"[$domain] $name: $lhs ⟹ $rhs$cond (prio: $priority)"
 
+  def toJson: String = {
+    def escape(s: String): String = s.replace("\"", "\\\"")
+    s"{\"name\":\"${escape(name)}\",\"lhs\":${lhs.toJson},\"rhs\":${rhs.toJson},\"universals\":[${universals.map(_.toJson).mkString(",")}],\"priority\":$priority,\"domain\":\"${escape(domain)}\"}"
+  }
+
 /** 証明のツリー構造
   */
 enum ProofTree:
@@ -185,13 +193,26 @@ case class FailTrace(
     reason: String,
     depth: Int,
     children: List[FailTrace] = Nil,
-    failureType: String = "Normal" // "Unify", "Depth", "Cycle", etc.
+    failureType: String = "Normal", // "Unify", "Depth", "Cycle", etc.
+    attemptedRules: List[String] = Nil,
+    unificationFailures: List[(Expr, Expr)] = Nil
 ):
   def format(indent: Int = 0): String =
     val sp = "  " * indent
     val typeMark = if failureType == "Normal" then "✗" else s"[$failureType]"
-    val base =
+    var base =
       s"$sp$typeMark (Depth $depth) Goal: ${goal.target}\n$sp  Reason: $reason"
+    
+    if (attemptedRules.nonEmpty) {
+      base += s"\n$sp  Attempted Rules: ${attemptedRules.mkString(", ")}"
+    }
+    if (unificationFailures.nonEmpty) {
+      base += s"\n$sp  Unification Failures:"
+      unificationFailures.foreach { case (e1, e2) =>
+        base += s"\n$sp    $e1 != $e2"
+      }
+    }
+
     if children.isEmpty then base
     else s"$base\n${children.map(_.format(indent + 1)).mkString("\n")}"
 

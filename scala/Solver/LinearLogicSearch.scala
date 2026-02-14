@@ -213,44 +213,43 @@ trait LinearLogicSearch { self: Prover =>
             Sym(LImplies),
             List(
               App(Sym(SepAnd), List(p, framePre)),
-              App(Sym(SepAnd), List(q, framePost))
-            )
-          ) =>
-        unify(framePre, framePost, subst).headOption match {
-          case Some(s1) =>
-            val frameHyp = (s"frame_$depth", applySubst(framePre, s1))
-
-            searchLinearImpliesGoal(
-              App(Sym(LImplies), List(p, q)),
-              p,
-              q,
-              rules,
-              context,
-              frameHyp :: linearContext,
-              s1,
-              depth + 1,
-              limit,
-              visited,
-              raaCount,
-              inductionCount,
-              guarded,
-              history
-            ).map { case (innerProof, s2, restL) =>
-              (
-                ProofTree.Node(
-                  applySubst(goal, s2),
-                  "frame-rule",
-                  List(innerProof)
-                ),
-                s2,
-                restL.filterNot(_._1.startsWith("frame_"))
-              )
-            }
-          case None => SolveTree.Failure()
-        }
-      case _ => SolveTree.Failure()
-    }
-  }
+                          App(Sym(SepAnd), List(q, framePost))
+                        )
+                      ) =>
+                    SolveTree.merge(
+                      unify(framePre, framePost, subst).toList.map { s1 =>
+                        val frameHyp = (s"frame_$depth", applySubst(framePre, s1))
+              
+                        searchLinearImpliesGoal(
+                          App(Sym(LImplies), List(p, q)),
+                          p,
+                          q,
+                          rules,
+                          context,
+                          frameHyp :: linearContext,
+                          s1,
+                          depth + 1,
+                          limit,
+                          visited,
+                          raaCount,
+                          inductionCount,
+                          guarded,
+                          history
+                        ).map { case (innerProof, s2, restL) =>
+                          (
+                            ProofTree.Node(
+                              applySubst(goal, s2),
+                              "frame-rule",
+                              List(innerProof)
+                            ),
+                            s2,
+                            restL.filterNot(_._1.startsWith("frame_"))
+                          )
+                        }
+                      }
+                    )
+                  case _ => SolveTree.Failure()
+                }  }
 
   private[core] def searchLinearImpliesGoal(
       goal: Expr,
@@ -389,8 +388,26 @@ trait LinearLogicSearch { self: Prover =>
       history: List[Expr]
   ): SolveTree[(ProofTree, Subst, Context)] = {
     val indexedLinear = linearContext.zipWithIndex
-    val options = (0 to indexedLinear.length).toList.flatMap { n =>
-      indexedLinear.combinations(n).toList.map { leftIndexed =>
+    
+    // Heuristic: Estimate split size based on goal structure to avoid combinatorial explosion.
+    val sizeA = collectSepAndTerms(a).length
+    val sizeB = collectSepAndTerms(b).length
+    val totalSize = indexedLinear.length
+    
+    // Calculate probable size for A. If we have no info, try half.
+    // If we have structure, use the ratio.
+    val estimatedSizeA = if (sizeA + sizeB > 0) (totalSize * sizeA) / (sizeA + sizeB) else totalSize / 2
+    
+    // Widen the search range (±2 or ±3) to account for hidden resource usage
+    val radius = 3
+    val searchRange = (estimatedSizeA - radius to estimatedSizeA + radius).intersect(0 to totalSize).toList
+    
+    // Fallback: if heuristics fail or range is too small/invalid, ensure we at least try something reasonable
+    val finalRange = if (searchRange.isEmpty) (0 to totalSize).toList else searchRange
+
+    val options = finalRange.flatMap { n =>
+      // Limit to 100 combinations to prevent freeze
+      indexedLinear.combinations(n).take(100).toList.map { leftIndexed =>
         val leftIndices = leftIndexed.map(_._2).toSet
         val rightPart =
           indexedLinear.filterNot(x => leftIndices.contains(x._2)).map(_._1)
@@ -411,34 +428,46 @@ trait LinearLogicSearch { self: Prover =>
           history
         ).flatMap { case (tA, s1, restLA) =>
           if (restLA.isEmpty) {
-            search(
-              b,
-              rules,
-              context,
-              rightPart,
-              s1,
-              depth + 1,
-              limit,
-              visited,
-              raaCount,
-              inductionCount,
-              guarded,
-              history
-            ).flatMap { case (tB, s2, restLB) =>
-              if (restLB.isEmpty)
-                SolveTree.Success(
-                  (
-                    ProofTree.Node(
-                      applySubst(goal, s2),
-                      "tensor-intro",
-                      List(tA, tB)
-                    ),
-                    s2,
-                    Nil
-                  )
-                )
-              else SolveTree.Failure()
-            }
+             // SOUNDNESS CHECK:
+             // Ensure that substitution didn't multiply resource requirements.
+             // We count atomic resources in the instantiated goal vs. the input context.
+             val finalA = Rewriter.normalize(applySubst(a, s1))
+             val usedResources = collectSepAndTerms(finalA)
+             
+             // This is a heuristic check: length must match.
+             // If ?P consumes 1 resource, but becomes A * B (2 resources), this catches it.
+             if (usedResources.length == leftPart.length) {
+                search(
+                  b,
+                  rules,
+                  context,
+                  rightPart,
+                  s1,
+                  depth + 1,
+                  limit,
+                  visited,
+                  raaCount,
+                  inductionCount,
+                  guarded,
+                  history
+                ).flatMap { case (tB, s2, restLB) =>
+                  if (restLB.isEmpty)
+                    SolveTree.Success(
+                      (
+                        ProofTree.Node(
+                          applySubst(goal, s2),
+                          "tensor-intro",
+                          List(tA, tB)
+                        ),
+                        s2,
+                        Nil
+                      )
+                    )
+                  else SolveTree.Failure()
+                }
+             } else {
+               SolveTree.Failure()
+             }
           } else SolveTree.Failure()
         }
       }
@@ -585,6 +614,7 @@ trait LinearLogicSearch { self: Prover =>
   private def collectSepAndTerms(e: Expr): List[Expr] = e match {
     case Expr.App(Expr.Sym(SepAnd | Tensor), List(a, b)) =>
       collectSepAndTerms(a) ++ collectSepAndTerms(b)
+    case Expr.Sym(LOne) | Expr.Sym(Terminal) => Nil // Ignore units
     case other => List(other)
   }
 }

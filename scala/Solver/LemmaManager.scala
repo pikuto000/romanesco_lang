@@ -11,14 +11,14 @@ import romanesco.Solver.TestParser
 
 object LemmaManager {
 
-  /** 補題をテキストファイルに保存します。 フォーマット: name|lhs|rhs|univ1,univ2,...
+  /** 補題をテキストファイルに保存します。 フォーマット: name\tlhs\trhs\tuniv1,univ2,...
     */
   def saveLemmas(file: String, lemmas: List[CatRule]): Unit = {
     val writer = new PrintWriter(new File(file))
     try {
       lemmas.foreach { lemma =>
         val univs = lemma.universals.map(_.toString).mkString(",")
-        writer.println(s"${lemma.name}|${lemma.lhs}|${lemma.rhs}|$univs")
+        writer.println(s"${lemma.name}\t${lemma.lhs}\t${lemma.rhs}\t$univs")
       }
     } finally {
       writer.close()
@@ -36,7 +36,7 @@ object LemmaManager {
         .getLines()
         .filter(_.trim.nonEmpty)
         .flatMap { line =>
-          val parts = line.split("\\|", -1)
+          val parts = line.split("\t", -1)
           if (parts.length >= 3) {
             val name = parts(0)
             val lhs = TestParser.parse(parts(1), Set.empty)
