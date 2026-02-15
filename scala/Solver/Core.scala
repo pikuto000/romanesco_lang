@@ -308,7 +308,8 @@ case class ProofState(
     goals: List[Goal],
     completedProofs: List[Proof],
     originalGoal: Expr,
-    searchTree: Option[Tree[SearchNode]] = None
+    searchTree: Option[Tree[SearchNode]] = None,
+    rules: List[CatRule] = Nil
 ):
   def isSolved: Boolean = goals.isEmpty
   def currentGoal: Option[Goal] = goals.headOption

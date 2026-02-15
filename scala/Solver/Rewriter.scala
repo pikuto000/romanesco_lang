@@ -6,16 +6,17 @@
 package romanesco.Solver.core
 
 import LogicSymbols._
+import romanesco.Solver.core.Prover
 
 object Rewriter {
 
-  def normalize(expr: Expr, maxIter: Int = 100): Expr = {
+  def normalize(expr: Expr, rules: List[CatRule] = Nil, maxIter: Int = 100): Expr = {
     def loop(e: Expr, iter: Int): Expr = {
       if (iter <= 0) {
         // logger.log(s"Normalization limit reached for: $e")
         e
       } else {
-        val reduced = step(e)
+        val reduced = step(e, rules)
         val acNormalized = acNormalize(reduced)
         if (acNormalized == e) e
         else loop(acNormalized, iter - 1)
@@ -24,11 +25,11 @@ object Rewriter {
     loop(expr, maxIter)
   }
 
-  private def step(expr: Expr): Expr = expr match {
+  private def step(expr: Expr, rules: List[CatRule]): Expr = expr match {
     case Expr.App(f, args) =>
-      val nextF = step(f)
-      val nextArgs = args.map(step)
-      rewriteRule(Expr.App(nextF, nextArgs))
+      val nextF = step(f, rules)
+      val nextArgs = args.map(step(_, rules))
+      rewriteRule(Expr.App(nextF, nextArgs), rules)
     case _ => expr
   }
 
@@ -36,7 +37,7 @@ object Rewriter {
     * 分離論理 (*) やテンソル積 (⊗) などの可換・結合的演算子を正規化（ソート）する
     */
   private def acNormalize(expr: Expr): Expr = expr match {
-    case Expr.App(Expr.Sym(op), args) if op == SepAnd || op == Tensor || op == And || op == Or =>
+    case Expr.App(Expr.Sym(op), args) if op == SepAnd || op == Tensor || op == And || op == Or || op == "plus" =>
       def collect(e: Expr): List[Expr] = e match {
         case Expr.App(Expr.Sym(`op`), List(a, b)) => collect(a) ++ collect(b)
         case other => List(acNormalize(other))
@@ -73,7 +74,17 @@ object Rewriter {
     case _ => expr
   }
 
-  private def rewriteRule(expr: Expr): Expr = expr match {
+  private def rewriteRule(expr: Expr, rules: List[CatRule]): Expr = {
+    // ユーザー定義ルールの適用
+    val userRewritten = rules.view.flatMap { r =>
+      Unifier.unify(expr, r.lhs, Unifier.emptySubst).map { s =>
+        Unifier.applySubst(r.rhs, s)
+      }
+    }.headOption.getOrElse(expr)
+
+    if (userRewritten != expr) return userRewritten
+
+    expr match {
     // --- HoTT path reduction (Priority) ---
     case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym(r), _))) if r == Refl => 
       expr.asInstanceOf[Expr.App].args.head
@@ -221,6 +232,8 @@ object Rewriter {
     case Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("append"), List(xs, ys)), zs)) =>
       Expr.App(Expr.Sym("append"), List(xs, Expr.App(Expr.Sym("append"), List(ys, zs))))
 
+    case Expr.App(Expr.Sym("reverse"), List(Expr.App(Expr.Sym("reverse"), List(t)))) => t
+    case Expr.App(Expr.Sym("mirror"), List(Expr.App(Expr.Sym("mirror"), List(t)))) => t
     case Expr.App(Expr.Sym("reverse"), List(Expr.Sym("nil"))) => Expr.Sym("nil")
     case Expr.App(Expr.Sym("reverse"), List(Expr.App(Expr.Sym("cons"), List(x, xs)))) =>
       Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("reverse"), List(xs)), Expr.App(Expr.Sym("cons"), List(x, Expr.Sym("nil")))))
@@ -305,4 +318,5 @@ object Rewriter {
 
     case _ => expr
   }
+}
 }

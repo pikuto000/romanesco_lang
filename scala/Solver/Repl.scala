@@ -36,7 +36,8 @@ object Repl:
           else
             try
               val expr = TestParser.parse(input)
-              val s = ProofState(List(Goal(Nil, Nil, expr)), Nil, expr)
+              val allRules = StandardRules.all ++ loadedLemmas ++ sessionLemmas
+              val s = ProofState(List(Goal(Nil, Nil, expr)), Nil, expr, rules = allRules)
               state = Some(s)
               history = List(s)
               println(s"\nInitial Goal: $expr")

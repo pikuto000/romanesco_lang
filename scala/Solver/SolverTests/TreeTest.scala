@@ -5,7 +5,8 @@ import romanesco.Solver.sugar._
 import romanesco.Utils.Debug.logger
 
 @main def testTreeInduction = {
-  logger.switch(false)
+  logger.switch(true)
+  logger.setMaxDepth(20)
   println("=== Tree Induction Test ===")
 
   // Rules for Tree reverse

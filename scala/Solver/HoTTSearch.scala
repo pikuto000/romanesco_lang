@@ -8,6 +8,7 @@ package romanesco.Solver.core
 import romanesco.Utils.Debug.logger
 import LogicSymbols._
 import romanesco.Types.Tree
+import romanesco.Solver.core.Prover
 
 class HoTTPlugin extends LogicPlugin {
   override def name: String = "HoTT"
@@ -19,58 +20,46 @@ class HoTTPlugin extends LogicPlugin {
   override def getGoalHooks(
       exprs: Vector[Expr],
       rules: List[CatRule],
-      context: Context,
-      linearContext: Context,
+      context: List[(String, Expr)],
+      state: LogicState,
       subst: Subst,
       depth: Int,
       limit: Int,
-      visited: Set[(Expr, Set[Expr], List[Expr])],
-      raaCount: Int,
-      inductionCount: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr], LogicState)],
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
-    searchPathInduction(exprs, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, prover)
-  }
-
-  private def findSuccess(tree: Tree[SearchNode]): Option[SearchNode] = tree match {
-    case Tree.E() => None
-    case Tree.V(node, branches) =>
-      if (node.isSuccess) Some(node)
-      else branches.view.flatMap(findSuccess).headOption
+    searchPathInduction(exprs, rules, context, state, subst, depth, limit, visited, guarded, prover)
   }
 
   private def searchPathInduction(
       exprs: Vector[Expr],
       rules: List[CatRule],
-      context: Context,
-      linearContext: Context,
+      context: List[(String, Expr)],
+      state: LogicState,
       subst: Subst,
       depth: Int,
       limit: Int,
-      visited: Set[(Expr, Set[Expr], List[Expr])],
-      raaCount: Int,
-      inductionCount: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr], LogicState)],
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
     val goal = exprs.last
-    if (inductionCount >= prover.config.maxInduction) Vector.empty
+    if (state.inductionCount >= prover.config.maxInduction) Vector.empty
     else {
       context.indices.flatMap { i =>
+        prover.checkDeadline()
         context(i) match {
           case (pName, Expr.App(Expr.Sym(Path), List(_, x, Expr.Var(yName)))) if x != Expr.Var(yName) =>
             val reflX = Expr.App(Expr.Sym(Refl), List(x))
             val substGoal = Prover.substVar(Prover.substVar(goal, yName, x), pName, reflX)
             val nextCtx = context.patch(i, Nil, 1).map(h => (h._1, Prover.substVar(Prover.substVar(h._2, yName, x), pName, reflX)))
-            val subTree = prover.search(exprs :+ substGoal, nextCtx, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount + 1, guarded)
-            val success = findSuccess(subTree)
-            val result = success match {
-              case Some(s) => Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"path-induction[$pName]", List(s.result.toOption.get.tree))))
-              case None => Left(FailTrace(Goal(context, linearContext, goal), s"path-induction[$pName] failed", depth))
+            val subTree = prover.search(exprs :+ substGoal, nextCtx, state.incInduction, subst, depth + 1, limit, visited, guarded)
+            allSuccesses(subTree).map { s =>
+              val result = Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"path-induction[$pName]", List(s.result.toOption.get.tree))))
+              Tree.V(SearchNode(exprs :+ substGoal, s"path-induction[$pName]", depth, result, s.subst, s.context, s.linearContext), Vector(subTree))
             }
-            Some(Tree.V(SearchNode(exprs :+ substGoal, s"path-induction[$pName]", depth, result, success.map(_.subst).getOrElse(subst), success.map(_.context).getOrElse(nextCtx), success.map(_.linearContext).getOrElse(linearContext)), Vector(subTree)))
-          case _ => None
+          case _ => Vector.empty
         }
       }.toVector
     }

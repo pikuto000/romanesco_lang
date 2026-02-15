@@ -7,6 +7,7 @@ package romanesco.Solver.core
 
 import LogicSymbols._
 import romanesco.Types.Tree
+import romanesco.Solver.core.Prover
 
 class PersistentLogicPlugin extends LogicPlugin {
   override def name: String = "PersistentLogic"
@@ -15,56 +16,108 @@ class PersistentLogicPlugin extends LogicPlugin {
 
   type Context = List[(String, Expr)]
 
-  override def getContextHooks(
+  override def getGoalHooks(
       exprs: Vector[Expr],
       rules: List[CatRule],
-      context: Context,
-      linearContext: Context,
+      context: List[(String, Expr)],
+      state: LogicState,
       subst: Subst,
       depth: Int,
       limit: Int,
-      visited: Set[(Expr, Set[Expr], List[Expr])],
-      raaCount: Int,
-      inductionCount: Int,
-      guarded: Boolean,
-      prover: ProverInterface
-  ): Vector[Tree[SearchNode]] = {
-    searchPersistentDecomposeContext(exprs, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, prover)
-  }
-
-  private def findSuccess(tree: Tree[SearchNode]): Option[SearchNode] = tree match {
-    case Tree.E() => None
-    case Tree.V(node, branches) =>
-      if (node.isSuccess) Some(node)
-      else branches.view.flatMap(findSuccess).headOption
-  }
-
-  private def searchPersistentDecomposeContext(
-      exprs: Vector[Expr],
-      rules: List[CatRule],
-      context: Context,
-      linearContext: Context,
-      subst: Subst,
-      depth: Int,
-      limit: Int,
-      visited: Set[(Expr, Set[Expr], List[Expr])],
-      raaCount: Int,
-      inductionCount: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr], LogicState)],
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
     val goal = exprs.last
-    context.zipWithIndex.flatMap {
+    val results = scala.collection.mutable.ArrayBuffer[Tree[SearchNode]]()
+
+    context.foreach { case (name, hyp) =>
+      val (premises, conclusion) = decompose(hyp, () => prover.freshMeta(depth))
+      unify(conclusion, goal, subst).foreach { s =>
+        // 全ての前提を解決する必要がある
+        def solvePremises(ps: List[Expr], currentS: Subst, currentCtx: List[(String, Expr)], solved: List[ProofTree]): LazyList[(Subst, List[(String, Expr)], List[ProofTree])] = ps match {
+          case Nil => LazyList((currentS, currentCtx, solved))
+          case p :: tail =>
+            val targetP = applySubst(p, currentS)
+            val subTree = prover.search(exprs :+ targetP, currentCtx, state, currentS, depth + 1, limit, visited, guarded)
+            allSuccesses(subTree).flatMap { res =>
+              solvePremises(tail, res.subst, res.context, solved :+ res.result.toOption.get.tree)
+            }
+        }
+
+        solvePremises(premises, s, context, Nil).foreach { case (finalS, finalCtx, proofs) =>
+          val pTree = ProofTree.Node(applySubst(goal, finalS), s"apply[$name]", proofs)
+          results += Tree.V(SearchNode(exprs, s"apply[$name]", depth, Right(ProofResult(pTree)), finalS, finalCtx, state.linearContext), Vector.empty) // 簡略化のため subtree は記録しない
+        }
+      }
+    }
+    results.toVector
+  }
+
+  private def decompose(e: Expr, freshMeta: () => Expr): (List[Expr], Expr) = e match {
+    case Expr.App(Expr.Sym(Implies), List(a, b)) =>
+      val (ps, c) = decompose(b, freshMeta)
+      (a :: ps, c)
+    case Expr.App(Expr.Sym(Forall), args) if args.length >= 2 =>
+      val (vName, body) = args match {
+        case List(Expr.Var(v), b) => (v, b)
+        case List(Expr.Var(v), _, b) => (v, b)
+        case _ => (null, null)
+      }
+      if (vName != null) {
+        val meta = freshMeta()
+        decompose(Prover.substVar(body, vName, meta), freshMeta)
+      } else (Nil, e)
+    case _ => (Nil, e)
+  }
+
+  override def getContextHooks(
+      exprs: Vector[Expr],
+      rules: List[CatRule],
+      context: List[(String, Expr)],
+      state: LogicState,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr], LogicState)],
+      guarded: Boolean,
+      prover: ProverInterface
+  ): Vector[Tree[SearchNode]] = {
+    val goal = exprs.last
+    val results = scala.collection.mutable.ArrayBuffer[Tree[SearchNode]]()
+
+    context.zipWithIndex.foreach {
       case ((name, Expr.App(Expr.Sym(And | Product), List(a, b))), i) =>
         val newCtx = context.patch(i, List((s"$name.1", a), (s"$name.2", b)), 1)
-        val subTree = prover.search(exprs, newCtx, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded)
-        val success = findSuccess(subTree)
-        val result = success match {
-          case Some(s) => Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"destruct[$name]", List(s.result.toOption.get.tree))))
-          case None => Left(FailTrace(Goal(context, linearContext, goal), s"destruct[$name] failed", depth))
+        val subTree = prover.search(exprs, newCtx, state, subst, depth + 1, limit, visited, guarded)
+        allSuccesses(subTree).foreach { s =>
+          val result = Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"destruct[$name]", List(s.result.toOption.get.tree))))
+          results += Tree.V(SearchNode(exprs, s"destruct[$name]", depth, result, s.subst, s.context, s.linearContext), Vector(subTree))
         }
-        Some(Tree.V(SearchNode(exprs, s"destruct[$name]", depth, result, success.map(_.subst).getOrElse(subst), success.map(_.context).getOrElse(linearContext), success.map(_.linearContext).getOrElse(linearContext)), Vector(subTree)))
-      case _ => None
-    }.toVector
+
+      case ((name, Expr.App(Expr.Sym(Or | Coproduct), List(a, b))), i) =>
+        // OR-elim (Case Analysis)
+        val newCtxA = context.patch(i, List((s"$name.l", a)), 1)
+        val subTreeA = prover.search(exprs, newCtxA, state, subst, depth + 1, limit, visited, guarded)
+        val successesA = allSuccesses(subTreeA)
+        
+        successesA.foreach { sA =>
+          val newCtxB = context.patch(i, List((s"$name.r", b)), 1)
+          // Aの枝で見つかった代入を引き継いでBを探索
+          val subTreeB = prover.search(exprs, newCtxB, state, sA.subst, depth + 1, limit, visited, guarded)
+          allSuccesses(subTreeB).foreach { sB =>
+            val result = Right(ProofResult(ProofTree.Node(applySubst(goal, sB.subst), s"case-analysis[$name]", List(sA.result.toOption.get.tree, sB.result.toOption.get.tree))))
+            results += Tree.V(SearchNode(exprs, s"case-analysis[$name]", depth, result, sB.subst, sB.context, sB.linearContext), Vector(subTreeA, subTreeB))
+          }
+        }
+
+      case ((name, Expr.Sym(False | "⊥")), i) =>
+        // 矛盾 (Explosion Principle)
+        val result = Right(ProofResult(ProofTree.Leaf(applySubst(goal, subst), s"explosion[$name]")))
+        results += Tree.V(SearchNode(exprs, s"explosion[$name]", depth, result, subst, context, state.linearContext), Vector.empty)
+
+      case _ => ()
+    }
+    results.toVector
   }
 }

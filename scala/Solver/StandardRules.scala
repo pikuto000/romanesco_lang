@@ -82,8 +82,8 @@ object StandardRules:
     val cubeApprox = CatRule("cube-approx", sym(Cube)(v("A"), v("p"), v("q"), v("r"), v("s")), sym(Path)(sym(Path)(v("A"), v("x"), v("y")), v("p"), v("r")), List(v("A"), v("p"), v("q"), v("r"), v("s"), v("x"), v("y")))
   
   
-  val propPath = CatRule("prop-path", sym("isProp")(v("A")), sym(Implies)(sym(True), sym(Path)(v("A"), v("x"), v("y"))), List(v("A"), v("x"), v("y")))
-  val setPath = CatRule("set-path", sym("isSet")(v("A")), sym(Implies)(sym(True), sym(Path)(sym(Path)(v("A"), v("x"), v("y")), v("p"), v("q"))), List(v("A"), v("x"), v("y"), v("p"), v("q")))
+  val propPath = CatRule("prop-path", sym("isProp")(v("A")), sym(Path)(v("A"), v("x"), v("y")), List(v("A"), v("x"), v("y")))
+  val setPath = CatRule("set-path", sym("isSet")(v("A")), sym(Path)(sym(Path)(v("A"), v("x"), v("y")), v("p"), v("q")), List(v("A"), v("x"), v("y"), v("p"), v("q")))
   val propToSet = CatRule("prop-to-set", sym("isProp")(v("A")), sym("isSet")(v("A")), List(v("A")))
   val propProd = CatRule("prop-prod", sym(And)(sym("isProp")(v("A")), sym("isProp")(v("B"))), sym("isProp")(sym(Product)(v("A"), v("B"))), List(v("A"), v("B")))
 
@@ -102,7 +102,12 @@ object StandardRules:
     CatRule("reverse_nil", sym("reverse")(sym("nil")), sym("nil")),
     CatRule("reverse_cons", sym("reverse")(sym("cons")(v("x"), v("xs"))), sym("append")(sym("reverse")(v("xs")), sym("cons")(v("x"), sym("nil"))), List(v("x"), v("xs"))),
     CatRule("reverse_append", sym("reverse")(sym("append")(v("xs"), v("ys"))), sym("append")(sym("reverse")(v("ys")), sym("reverse")(v("xs"))), List(v("xs"), v("ys"))),
-    CatRule("append_nil_r", sym("append")(v("xs"), sym("nil")), v("xs"), List(v("xs")))
+    CatRule("append_nil_r", sym("append")(v("xs"), sym("nil")), v("xs"), List(v("xs"))),
+    CatRule("mirror_leaf", sym("mirror")(sym("leaf")), sym("leaf")),
+    CatRule("mirror_node", sym("mirror")(sym("node")(v("l"), v("v"), v("r"))), sym("node")(sym("mirror")(v("r")), v("v"), sym("mirror")(v("l"))), List(v("l"), v("v"), v("r"))),
+    CatRule("list_prop_nil", sym("list_prop")(sym("nil")), sym(True)),
+    CatRule("list_prop_cons", sym("list_prop")(sym("cons")(v("x"), v("xs"))), sym("list_prop")(v("xs")), List(v("x"), v("xs"))),
+    CatRule("list_prop_append", sym("list_prop")(sym("append")(v("xs"), v("ys"))), sym(And)(sym("list_prop")(v("xs")), sym("list_prop")(v("ys"))), List(v("xs"), v("ys")))
   )
 
   val resourceRules = List(

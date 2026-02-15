@@ -8,6 +8,7 @@ package romanesco.Solver.core
 import romanesco.Utils.Debug.logger
 import LogicSymbols._
 import romanesco.Types.Tree
+import romanesco.Solver.core.Prover
 
 class HoareLogicPlugin extends LogicPlugin {
   override def name: String = "HoareLogic"
@@ -19,30 +20,21 @@ class HoareLogicPlugin extends LogicPlugin {
   override def getGoalHooks(
       exprs: Vector[Expr],
       rules: List[CatRule],
-      context: Context,
-      linearContext: Context,
+      context: List[(String, Expr)],
+      state: LogicState,
       subst: Subst,
       depth: Int,
       limit: Int,
-      visited: Set[(Expr, Set[Expr], List[Expr])],
-      raaCount: Int,
-      inductionCount: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr], LogicState)],
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
     val goal = exprs.last
     goal match {
       case Expr.App(Expr.Sym("triple"), List(p, c, q)) =>
-        searchHoare(exprs, p, c, q, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, prover)
+        searchHoare(exprs, p, c, q, rules, context, state, subst, depth, limit, visited, guarded, prover)
       case _ => Vector.empty
     }
-  }
-
-  private def findSuccess(tree: Tree[SearchNode]): Option[SearchNode] = tree match {
-    case Tree.E() => None
-    case Tree.V(node, branches) =>
-      if (node.isSuccess) Some(node)
-      else branches.view.flatMap(findSuccess).headOption
   }
 
   private def searchHoare(
@@ -51,14 +43,12 @@ class HoareLogicPlugin extends LogicPlugin {
       c: Expr,
       q: Expr,
       rules: List[CatRule],
-      context: Context,
-      linearContext: Context,
+      context: List[(String, Expr)],
+      state: LogicState,
       subst: Subst,
       depth: Int,
       limit: Int,
-      visited: Set[(Expr, Set[Expr], List[Expr])],
-      raaCount: Int,
-      inductionCount: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr], LogicState)],
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
@@ -66,13 +56,11 @@ class HoareLogicPlugin extends LogicPlugin {
     val syntaxDirected: Vector[Tree[SearchNode]] = c match {
       case Expr.Sym("skip") =>
         val nextGoal = Expr.App(Expr.Sym(Implies), List(p, q))
-        val subTree = prover.search(exprs :+ nextGoal, context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded)
-        val success = findSuccess(subTree)
-        val result = success match {
-          case Some(s) => Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "hoare-skip", List(s.result.toOption.get.tree))))
-          case None => Left(FailTrace(Goal(context, linearContext, goal), "hoare-skip failed", depth))
-        }
-        Vector(Tree.V(SearchNode(exprs :+ nextGoal, "hoare-skip", depth, result, success.map(_.subst).getOrElse(subst), success.map(_.context).getOrElse(context), success.map(_.linearContext).getOrElse(linearContext)), Vector(subTree)))
+        val subTree = prover.search(exprs :+ nextGoal, context, state, subst, depth + 1, limit, visited, guarded)
+        allSuccesses(subTree).map { s =>
+          val result = Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "hoare-skip", List(s.result.toOption.get.tree))))
+          Tree.V(SearchNode(exprs :+ nextGoal, "hoare-skip", depth, result, s.subst, s.context, s.linearContext), Vector(subTree))
+        }.toVector
 
       case Expr.App(Expr.Sym(":="), List(targetVar, e)) =>
         val varName = targetVar match {
@@ -83,29 +71,59 @@ class HoareLogicPlugin extends LogicPlugin {
         if (varName != null) {
           val substitutedQ = Prover.substVar(q, varName, e)
           val nextGoal = Expr.App(Expr.Sym(Implies), List(p, substitutedQ))
-          val subTree = prover.search(exprs :+ nextGoal, context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded)
-          val success = findSuccess(subTree)
-          val result = success match {
-            case Some(s) => Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "hoare-assign", List(s.result.toOption.get.tree))))
-            case None => Left(FailTrace(Goal(context, linearContext, goal), "hoare-assign failed", depth))
-          }
-          Vector(Tree.V(SearchNode(exprs :+ nextGoal, "hoare-assign", depth, result, success.map(_.subst).getOrElse(subst), success.map(_.context).getOrElse(context), success.map(_.linearContext).getOrElse(linearContext)), Vector(subTree)))
+          val subTree = prover.search(exprs :+ nextGoal, context, state, subst, depth + 1, limit, visited, guarded)
+          allSuccesses(subTree).map { s =>
+            val result = Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "hoare-assign", List(s.result.toOption.get.tree))))
+            Tree.V(SearchNode(exprs :+ nextGoal, "hoare-assign", depth, result, s.subst, s.context, s.linearContext), Vector(subTree))
+          }.toVector
         } else Vector.empty
 
       case Expr.App(Expr.Sym(";"), List(c1, c2)) =>
         val midR = prover.freshMeta(depth)
-        val goal1 = Expr.App(Expr.Sym("triple"), List(p, c1, midR))
-        val tree1 = prover.search(exprs :+ goal1, context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded)
+        val goal2 = Expr.App(Expr.Sym("triple"), List(midR, c2, q))
+        val tree2 = prover.search(exprs :+ goal2, context, state, subst, depth + 1, limit, visited, guarded)
         
-        findSuccess(tree1).toVector.flatMap { s1 =>
-          val goal2 = Expr.App(Expr.Sym("triple"), List(applySubst(midR, s1.subst), c2, q))
-          val tree2 = prover.search(exprs :+ goal2, s1.context, s1.linearContext, s1.subst, depth + 1, limit, visited, raaCount, inductionCount, guarded)
-          val success2 = findSuccess(tree2)
-          val result = success2 match {
-            case Some(s2) => Right(ProofResult(ProofTree.Node(applySubst(goal, s2.subst), "hoare-seq", List(s1.result.toOption.get.tree, s2.result.toOption.get.tree))))
-            case None => Left(FailTrace(Goal(context, linearContext, goal), "hoare-seq failed", depth))
+        allSuccesses(tree2).toVector.flatMap { s2 =>
+          val goal1 = Expr.App(Expr.Sym("triple"), List(p, c1, applySubst(midR, s2.subst)))
+          val tree1 = prover.search(exprs :+ goal1, s2.context, state.withLinear(s2.linearContext), s2.subst, depth + 1, limit, visited, guarded)
+          allSuccesses(tree1).map { s1 =>
+            val result = Right(ProofResult(ProofTree.Node(applySubst(goal, s1.subst), "hoare-seq", List(s1.result.toOption.get.tree, s2.result.toOption.get.tree))))
+            Tree.V(SearchNode(exprs :+ goal1, "hoare-seq", depth, result, s1.subst, s1.context, s1.linearContext), Vector(tree1, tree2))
           }
-          Vector(Tree.V(SearchNode(exprs :+ goal2, "hoare-seq", depth, result, success2.map(_.subst).getOrElse(s1.subst), success2.map(_.context).getOrElse(s1.context), success2.map(_.linearContext).getOrElse(s1.linearContext)), Vector(tree1, tree2)))
+        }
+
+      case Expr.App(Expr.Sym("if"), List(b, c1, c2)) =>
+        // {P ∧ b} c1 {Q} and {P ∧ ¬b} c2 {Q}
+        val goalThen = Expr.App(Expr.Sym("triple"), List(Expr.App(Expr.Sym(And), List(p, b)), c1, q))
+        val goalElse = Expr.App(Expr.Sym("triple"), List(Expr.App(Expr.Sym(And), List(p, Expr.App(Expr.Sym(Not), List(b)))), c2, q))
+        
+        val treeThen = prover.search(exprs :+ goalThen, context.distinct, state, subst, depth + 1, limit, visited, guarded)
+        allSuccesses(treeThen).toVector.flatMap { sThen =>
+          val treeElse = prover.search(exprs :+ goalElse, context.distinct, state, sThen.subst, depth + 1, limit, visited, guarded)
+          allSuccesses(treeElse).map { sElse =>
+            val result = Right(ProofResult(ProofTree.Node(applySubst(goal, sElse.subst), "hoare-if", List(sThen.result.toOption.get.tree, sElse.result.toOption.get.tree))))
+            Tree.V(SearchNode(exprs, "hoare-if", depth, result, sElse.subst, sElse.context, sElse.linearContext), Vector(treeThen, treeElse))
+          }
+        }
+
+      case Expr.App(Expr.Sym("while"), List(b, c, inv)) =>
+        // 1. P → inv (Precondition implies invariant)
+        // 2. {inv ∧ b} c {inv} (Invariant preserved)
+        // 3. inv ∧ ¬b → Q (Invariant and exit condition implies postcondition)
+        val g1 = Expr.App(Expr.Sym(Implies), List(p, inv))
+        val g2 = Expr.App(Expr.Sym("triple"), List(Expr.App(Expr.Sym(And), List(inv, b)), c, inv))
+        val g3 = Expr.App(Expr.Sym(Implies), List(Expr.App(Expr.Sym(And), List(inv, Expr.App(Expr.Sym(Not), List(b)))), q))
+        
+        val t1 = prover.search(exprs :+ g1, context.distinct, state, subst, depth + 1, limit, visited, guarded)
+        allSuccesses(t1).toVector.flatMap { s1 =>
+          val t2 = prover.search(exprs :+ g2, s1.context.distinct, state, s1.subst, depth + 1, limit, visited, guarded)
+          allSuccesses(t2).toVector.flatMap { s2 =>
+            val t3 = prover.search(exprs :+ g3, s2.context.distinct, state, s2.subst, depth + 1, limit, visited, guarded)
+            allSuccesses(t3).map { s3 =>
+              val result = Right(ProofResult(ProofTree.Node(applySubst(goal, s3.subst), "hoare-while", List(s1.result.toOption.get.tree, s2.result.toOption.get.tree, s3.result.toOption.get.tree))))
+              Tree.V(SearchNode(exprs, "hoare-while", depth, result, s3.subst, s3.context, s3.linearContext), Vector(t1, t2, t3))
+            }
+          }
         }
 
       case _ => Vector.empty

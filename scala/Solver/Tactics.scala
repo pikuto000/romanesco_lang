@@ -30,7 +30,7 @@ object Tactics {
 
       case Some(Goal(ctx, lin, App(Sym(Forall), List(Var(v), body)))) =>
         val hypName = name.getOrElse(s"${v}_t${state.goals.size}")
-        val instantiated = Prover.substVar(body, v, Var(hypName))
+        val instantiated = romanesco.Solver.core.Prover.substVar(body, v, Var(hypName))
         val newGoal = Goal(ctx, lin, instantiated)
         Right(state.copy(goals = newGoal :: state.goals.tail))
 
@@ -130,11 +130,11 @@ object Tactics {
       case Some(Goal(_, _, App(Sym(Eq | Path), args))) if args.length >= 2 =>
         val l = args match { case List(_, x, _) if args.length == 3 => x; case List(x, _) => x; case _ => null }
         val r = args.last
-        if (l != null && Rewriter.normalize(l) == Rewriter.normalize(r))
+        if (l != null && Rewriter.normalize(l, state.rules) == Rewriter.normalize(r, state.rules))
           Right(state.copy(goals = state.goals.tail))
         else
           Left(
-            s"reflexivity: ${Rewriter.normalize(l)} and ${Rewriter.normalize(r)} are not equal"
+            s"reflexivity: ${Rewriter.normalize(l, state.rules)} and ${Rewriter.normalize(r, state.rules)} are not equal"
           )
       case _ => Left("reflexivity: Goal is not an equality or True")
     }
@@ -145,7 +145,7 @@ object Tactics {
   def rewrite(state: ProofState, hypName: String): TacticResult = {
     state.currentGoal match {
       case Some(goal @ Goal(ctx, lin, target)) =>
-        val normTarget = Rewriter.normalize(target)
+        val normTarget = Rewriter.normalize(target, state.rules)
         if (normTarget == Sym(True)) {
           // 目標がすでに解決されている場合
           return Right(state.copy(goals = state.goals.tail))
@@ -164,7 +164,7 @@ object Tactics {
               case _ => expr
             }
 
-            val instHyp = Rewriter.normalize(instantiate(hypExpr))
+            val instHyp = Rewriter.normalize(instantiate(hypExpr), state.rules)
             instHyp match {
               case App(Sym(Eq | Path), args) if args.length >= 2 =>
                 val l = args match { case List(_, x, _) if args.length == 3 => x; case List(x, _) => x; case _ => null }
@@ -198,7 +198,7 @@ object Tactics {
                 findAndReplace(normTarget) match {
                   case Some((rewritten, subst)) =>
                     val finalTarget =
-                      Rewriter.normalize(applySubst(rewritten, subst))
+                      Rewriter.normalize(applySubst(rewritten, subst), state.rules)
                     if (finalTarget == Sym(True))
                       Right(state.copy(goals = state.goals.tail))
                     else
@@ -304,14 +304,14 @@ object Tactics {
   def simpl(state: ProofState): TacticResult = {
     state.currentGoal match {
       case Some(goal) =>
-        val nextTarget = Rewriter.normalize(goal.target)
+        val nextTarget = Rewriter.normalize(goal.target, state.rules)
         if (nextTarget == Sym(True)) {
           // 簡約の結果 True になったら、そのゴールを解決したとみなす
           Right(state.copy(goals = state.goals.tail))
         } else {
           val nextGoal = Goal(
-            goal.context.map((n, e) => (n, Rewriter.normalize(e))),
-            goal.linearContext.map((n, e) => (n, Rewriter.normalize(e))),
+            goal.context.map((n, e) => (n, Rewriter.normalize(e, state.rules))),
+            goal.linearContext.map((n, e) => (n, Rewriter.normalize(e, state.rules))),
             nextTarget
           )
           Right(state.copy(goals = nextGoal :: state.goals.tail))

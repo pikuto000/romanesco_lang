@@ -18,14 +18,12 @@ class TemporalLogicPlugin extends LogicPlugin {
   override def getGoalHooks(
       exprs: Vector[Expr],
       rules: List[CatRule],
-      context: Context,
-      linearContext: Context,
+      context: List[(String, Expr)],
+      state: LogicState,
       subst: Subst,
       depth: Int,
       limit: Int,
-      visited: Set[(Expr, Set[Expr], List[Expr])],
-      raaCount: Int,
-      inductionCount: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr], LogicState)],
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
@@ -36,16 +34,9 @@ class TemporalLogicPlugin extends LogicPlugin {
           case Expr.App(_, List(p)) => p
           case _ => return Vector.empty
         }
-        searchTemporalGoal(exprs, goal, a, rules, context, linearContext, subst, depth, limit, visited, raaCount, inductionCount, guarded, prover)
+        searchTemporalGoal(exprs, goal, a, rules, context, state, subst, depth, limit, visited, guarded, prover)
       case _ => Vector.empty
     }
-  }
-
-  private def findSuccess(tree: Tree[SearchNode]): Option[SearchNode] = tree match {
-    case Tree.E() => None
-    case Tree.V(node, branches) =>
-      if (node.isSuccess) Some(node)
-      else branches.view.flatMap(findSuccess).headOption
   }
 
   private def searchTemporalGoal(
@@ -53,14 +44,12 @@ class TemporalLogicPlugin extends LogicPlugin {
       goal: Expr,
       a: Expr,
       rules: List[CatRule],
-      context: Context,
-      linearContext: Context,
+      context: List[(String, Expr)],
+      state: LogicState,
       subst: Subst,
       depth: Int,
       limit: Int,
-      visited: Set[(Expr, Set[Expr], List[Expr])],
-      raaCount: Int,
-      inductionCount: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr], LogicState)],
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
@@ -68,13 +57,11 @@ class TemporalLogicPlugin extends LogicPlugin {
       case Globally =>
         // G(A) -> A AND X(G(A))
         val expansion = Expr.App(Expr.Sym(And), List(a, Expr.App(Expr.Sym(Next), List(goal))))
-        val subTree = prover.search(exprs :+ expansion, context, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded)
-        val success = findSuccess(subTree)
-        val result = success match {
-          case Some(s) => Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "G-expansion", List(s.result.toOption.get.tree))))
-          case None => Left(FailTrace(Goal(context, linearContext, goal), "G-expansion failed", depth))
-        }
-        Vector(Tree.V(SearchNode(exprs :+ expansion, "G-expansion", depth, result, success.map(_.subst).getOrElse(subst), success.map(_.context).getOrElse(context), success.map(_.linearContext).getOrElse(linearContext)), Vector(subTree)))
+        val subTree = prover.search(exprs :+ expansion, context, state, subst, depth + 1, limit, visited, guarded)
+        allSuccesses(subTree).map { s =>
+          val result = Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "G-expansion", List(s.result.toOption.get.tree))))
+          Tree.V(SearchNode(exprs :+ expansion, "G-expansion", depth, result, s.subst, s.context, s.linearContext), Vector(subTree))
+        }.toVector
       
       case Next =>
         // X(A) -> ステップを進めて A を証明
@@ -83,13 +70,11 @@ class TemporalLogicPlugin extends LogicPlugin {
           case (n, Expr.App(Expr.Sym(Next), List(p))) => Some((s"next:$n", p))
           case _ => None
         }
-        val subTree = prover.search(exprs :+ a, nextCtx, Nil, subst, depth + 1, limit, visited, raaCount, inductionCount, true)
-        val success = findSuccess(subTree)
-        val result = success match {
-          case Some(s) => Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "next-step", List(s.result.toOption.get.tree))))
-          case None => Left(FailTrace(Goal(context, linearContext, goal), "next-step failed", depth))
-        }
-        Vector(Tree.V(SearchNode(exprs :+ a, "next-step", depth, result, success.map(_.subst).getOrElse(subst), success.map(_.context).getOrElse(nextCtx), success.map(_.linearContext).getOrElse(Nil)), Vector(subTree)))
+        val subTree = prover.search(exprs :+ a, nextCtx, state.withLinear(Nil), subst, depth + 1, limit, visited, true)
+        allSuccesses(subTree).map { s =>
+          val result = Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "next-step", List(s.result.toOption.get.tree))))
+          Tree.V(SearchNode(exprs :+ a, "next-step", depth, result, s.subst, s.context, s.linearContext), Vector(subTree))
+        }.toVector
       case _ => Vector.empty
     }
   }
@@ -97,14 +82,12 @@ class TemporalLogicPlugin extends LogicPlugin {
   override def getContextHooks(
       exprs: Vector[Expr],
       rules: List[CatRule],
-      context: Context,
-      linearContext: Context,
+      context: List[(String, Expr)],
+      state: LogicState,
       subst: Subst,
       depth: Int,
       limit: Int,
-      visited: Set[(Expr, Set[Expr], List[Expr])],
-      raaCount: Int,
-      inductionCount: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr], LogicState)],
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
@@ -114,8 +97,8 @@ class TemporalLogicPlugin extends LogicPlugin {
         // G(A) -> A と X(G(A)) を直接文脈に追加
         val nextG = Expr.App(Expr.Sym(Next), List(Expr.App(Expr.Sym(Globally), List(a))))
         val newCtx = context.patch(i, List((s"$name.now", a), (s"$name.next", nextG)), 1)
-        val subTree = prover.search(exprs, newCtx, linearContext, subst, depth + 1, limit, visited, raaCount, inductionCount, guarded)
-        findSuccess(subTree).map { s =>
+        val subTree = prover.search(exprs, newCtx, state, subst, depth + 1, limit, visited, guarded)
+        allSuccesses(subTree).map { s =>
           Tree.V(SearchNode(exprs, s"G-elim[$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"G-elim[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
         }
       case _ => None
