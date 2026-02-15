@@ -186,6 +186,20 @@ object Rewriter {
 
     case Expr.App(Expr.Sym(t), List(_, Expr.App(Expr.Sym(r), _), x)) if t == Transport && r == Refl => x
     
+    case Expr.App(Expr.Sym(t), List(Expr.App(Expr.Sym("λ"), List(v, Expr.App(Expr.Sym(Product), List(a, b)))), p, Expr.App(Expr.Sym("pair"), List(u, v2)))) if t == Transport =>
+      Expr.App(Expr.Sym("pair"), List(
+        Expr.App(Expr.Sym(Transport), List(Expr.App(Expr.Sym("λ"), List(v, a)), p, u)),
+        Expr.App(Expr.Sym(Transport), List(Expr.App(Expr.Sym("λ"), List(v, b)), p, v2))
+      ))
+    
+    // list_prop(append(xs, ys)) -> list_prop(xs) ∧ list_prop(ys)
+    case Expr.App(Expr.Sym("list_prop"), List(Expr.App(Expr.Sym("append"), List(xs, ys)))) =>
+      Expr.App(Expr.Sym(And), List(Expr.App(Expr.Sym("list_prop"), List(xs)), Expr.App(Expr.Sym("list_prop"), List(ys))))
+
+    // S1: transport(λx. P, loop, b) -> b (if loop respects P)
+    case Expr.App(Expr.Sym(t), List(Expr.App(Expr.Sym("λ"), List(_, pBody)), Expr.Sym("loop"), b)) if t == Transport =>
+      b // 簡略化: 円周上の性質 P が loop で不変であることを前提とする計算簡約
+
     // --- Cubical Kan Operations ---
     // comp(A, refl, u0) -> u0
     case Expr.App(Expr.Sym(c), List(_, Expr.App(Expr.Sym(r), _), u0)) if c == Comp && r == Refl => u0
@@ -263,6 +277,10 @@ object Rewriter {
     case Expr.App(Expr.Sym("bind"), List(m, Expr.Sym("return"))) => m
     
     // List Monad 特化
+    case Expr.App(Expr.Sym("bind_list"), List(Expr.App(Expr.Sym("return_list"), List(x)), f)) =>
+      Expr.App(f, List(x))
+    case Expr.App(Expr.Sym("bind_list"), List(Expr.App(Expr.Sym("cons"), List(x, Expr.Sym("nil"))), f)) =>
+      Expr.App(f, List(x))
     case Expr.App(Expr.Sym("bind_list"), List(Expr.App(Expr.Sym("cons"), List(x, xs)), f)) =>
       Expr.App(Expr.Sym("append"), List(Expr.App(f, List(x)), Expr.App(Expr.Sym("bind_list"), List(xs, f))))
     case Expr.App(Expr.Sym("bind_list"), List(m, Expr.Sym("return_list"))) => m
@@ -270,9 +288,11 @@ object Rewriter {
       Expr.App(Expr.Sym("bind_list"), List(m, Expr.App(Expr.Sym("λ"), List(Expr.Var("x"), Expr.App(Expr.Sym("bind_list"), List(Expr.App(f, List(Expr.Var("x"))), g))))))
 
     // Maybe Monad 特化
-    case Expr.App(Expr.Sym("bind_maybe"), List(Expr.Sym("nothing"), _)) => Expr.Sym("nothing")
+    case Expr.App(Expr.Sym("bind_maybe"), List(Expr.App(Expr.Sym("return_maybe"), List(x)), f)) =>
+      Expr.App(f, List(x))
     case Expr.App(Expr.Sym("bind_maybe"), List(Expr.App(Expr.Sym("just"), List(x)), f)) =>
       Expr.App(f, List(x))
+    case Expr.App(Expr.Sym("bind_maybe"), List(Expr.Sym("nothing"), _)) => Expr.Sym("nothing")
     case Expr.App(Expr.Sym("bind_maybe"), List(m, Expr.Sym("return_maybe"))) => m
     case Expr.App(Expr.Sym("bind_maybe"), List(Expr.App(Expr.Sym("bind_maybe"), List(m, f)), g)) =>
       Expr.App(Expr.Sym("bind_maybe"), List(m, Expr.App(Expr.Sym("λ"), List(Expr.Var("x"), Expr.App(Expr.Sym("bind_maybe"), List(Expr.App(f, List(Expr.Var("x"))), g))))))

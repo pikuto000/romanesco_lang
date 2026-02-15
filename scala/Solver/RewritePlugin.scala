@@ -53,10 +53,10 @@ class RewritePlugin extends LogicPlugin {
               direct ++ recursive
             }
 
-            findAndReplace(goal).take(5).foreach { case (rewritten, nextS) =>
+            findAndReplace(goal).take(10).foreach { case (rewritten, nextS) =>
               val subGoal = prover.normalize(rewritten)
               if (subGoal.canonicalize() != goal.canonicalize()) {
-                val subTree = prover.search(exprs :+ subGoal, context, state, nextS, depth + 1, limit, visited, guarded)
+                val subTree = prover.search(exprs :+ subGoal, context, state, nextS, depth + 1, limit + 1, visited, guarded) // Bonus +1 depth
                 allSuccesses(subTree).foreach { res =>
                   val p = ProofTree.Node(applySubst(goal, res.subst), s"rewrite[$name]", List(res.result.toOption.get.tree))
                   results += Tree.V(SearchNode(exprs :+ subGoal, s"rewrite[$name]", depth, Right(ProofResult(p)), res.subst, res.context, res.linearContext), Vector(subTree))

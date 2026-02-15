@@ -257,9 +257,13 @@ final class Prover(val config: ProverConfig = ProverConfig.default) extends Prov
         return Tree.V(SearchNode(exprs, "lemma-cache", depth, Right(ProofResult(p)), s, context, l), Vector.empty)
       }
 
-      // キャッシュのチェック (Failure Cache)
-      if (globalFailureCache.get((currentGoalCan, contextExprs, linearExprs, guarded)).exists(_ >= limit - depth)) {
-        logger.log(s"Failure Cache hit: $currentGoalRaw")
+      // キャッシュのチェック (Failure Cache - サブセット考慮)
+      // 線形リソースが「減少」のみする場合、多いリソースで失敗したなら少ないリソースでも失敗するはず
+      val failureHit = globalFailureCache.find { case ((g, cExprs, lExprs, gded), d) =>
+        g == currentGoalCan && cExprs == contextExprs && gded == guarded && linearExprs.forall(lExprs.contains) && d >= limit - depth
+      }
+      if (failureHit.isDefined) {
+        logger.log(s"Failure Cache (subset) hit: $currentGoalRaw")
         logger.decreaseDepth()
         return Tree.V(SearchNode(exprs, "failure-cache", depth, Left(FailTrace(Goal(context, state.linearContext, currentGoal), "Cached failure", depth)), subst, context, state.linearContext), Vector.empty)
       }

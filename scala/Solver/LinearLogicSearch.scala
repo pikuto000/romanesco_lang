@@ -57,6 +57,14 @@ class LinearLogicPlugin extends LogicPlugin {
     }.toVector
 
     goal match {
+      case Expr.App(Expr.Sym(LImplies), List(Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)), target)) =>
+        // (A * B) ⊸ C  =>  A ⊸ B ⊸ C
+        val subGoal = Expr.App(Expr.Sym(LImplies), List(a, Expr.App(Expr.Sym(LImplies), List(b, target))))
+        val subTree = prover.search(exprs :+ subGoal, context, state, subst, depth + 1, limit, visited, guarded)
+        allSuccesses(subTree).map { s =>
+          Tree.V(SearchNode(exprs :+ subGoal, "tensor-limplies-destruct", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "tensor-limplies-destruct", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
+        }.toVector ++ linearBackchain
+
       case Expr.App(Expr.Sym(LImplies), List(a, b)) =>
         val subTree = prover.search(exprs :+ b, context, state.withLinear((s"lh$depth", a) :: linearContext), subst, depth + 1, limit, visited, guarded)
         allSuccesses(subTree).filter(_.linearContext.isEmpty).map { s =>
@@ -64,26 +72,28 @@ class LinearLogicPlugin extends LogicPlugin {
         }.toVector ++ linearBackchain
       
       case Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)) =>
-        // リソース分割の試行
-        val indexedLinear = linearContext.zipWithIndex
-        val results = (0 to indexedLinear.length).toVector.flatMap { n =>
-          prover.checkDeadline()
-          indexedLinear.combinations(n).toVector.flatMap { leftIndexed =>
-            prover.checkDeadline()
-            val leftIndices = leftIndexed.map(_._2).toSet
-            val leftPart = leftIndexed.map(_._1)
-            val rightPart = indexedLinear.filterNot(x => leftIndices.contains(x._2)).map(_._1)
-
-            val subTreeA = prover.search(exprs :+ a, context, state.withLinear(leftPart), subst, depth + 1, limit, visited, guarded)
-            allSuccesses(subTreeA).toVector.flatMap { sA =>
-              val subTreeB = prover.search(exprs :+ b, sA.context, state.withLinear(rightPart), sA.subst, depth + 1, limit, visited, guarded)
-              allSuccesses(subTreeB).map { sB =>
-                Tree.V(SearchNode(exprs :+ goal, "tensor-intro", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, sB.subst), "tensor-intro", List(sA.result.toOption.get.tree, sB.result.toOption.get.tree)))), sB.subst, sB.context, sB.linearContext), Vector(subTreeA, subTreeB))
-              }
+        // リソース分割の試行 (より強力なパーティショニング)
+        def partition(ctx: List[(String, Expr)]): LazyList[(List[(String, Expr)], List[(String, Expr)])] = {
+          if (ctx.isEmpty) LazyList((Nil, Nil))
+          else {
+            val (name, expr) :: tail = ctx
+            partition(tail).flatMap { case (l, r) =>
+              LazyList(((name, expr) :: l, r), (l, (name, expr) :: r))
             }
           }
         }
-        results ++ linearBackchain
+
+        val results = partition(linearContext).flatMap { case (leftPart, rightPart) =>
+          prover.checkDeadline()
+          val subTreeA = prover.search(exprs :+ a, context, state.withLinear(leftPart), subst, depth + 1, limit, visited, guarded)
+          allSuccesses(subTreeA).flatMap { sA =>
+            val subTreeB = prover.search(exprs :+ b, sA.context, state.withLinear(rightPart), sA.subst, depth + 1, limit, visited, guarded)
+            allSuccesses(subTreeB).map { sB =>
+              Tree.V(SearchNode(exprs :+ goal, "tensor-intro", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, sB.subst), "tensor-intro", List(sA.result.toOption.get.tree, sB.result.toOption.get.tree)))), sB.subst, sB.context, sB.linearContext), Vector(subTreeA, subTreeB))
+            }
+          }
+        }
+        results.toVector ++ linearBackchain
 
       case Expr.Meta(_) =>
         // Frame Inference: 残りのリソースをすべてメタ変数に割り当てる
@@ -168,6 +178,27 @@ class LinearLogicPlugin extends LogicPlugin {
       case _ => None
     }.toVector
 
-    bangElim ++ tensorDestruct
+    val ptrAssign = linearContext.flatMap {
+      case (name, Expr.App(Expr.Sym(PointsTo), List(ptr, oldVal))) =>
+        goal match {
+          case Expr.App(Expr.Sym("triple"), List(pre, Expr.App(Expr.Sym(":="), List(p, newVal)), post)) if p == ptr =>
+            // 残りのリソースをすべて F (Frame) としてまとめる
+            val otherLinear = linearContext.filterNot(_._1 == name)
+            val frame = if (otherLinear.isEmpty) Expr.Sym("emp") else otherLinear.map(_._2).reduce((a, b) => Expr.App(Expr.Sym(SepAnd), List(a, b)))
+            
+            // 目標: post が (ptr |-> newVal * frame) を含むことを示す
+            val targetPost = Expr.App(Expr.Sym(SepAnd), List(Expr.App(Expr.Sym(PointsTo), List(ptr, newVal)), frame))
+            val subGoal = Expr.App(Expr.Sym(LImplies), List(targetPost, post))
+            
+            val subTree = prover.search(exprs :+ subGoal, context, state.withLinear(Nil), subst, depth + 1, limit, visited, guarded)
+            allSuccesses(subTree).map { s =>
+              Tree.V(SearchNode(exprs :+ goal, s"ptr-assign[$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"ptr-assign[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
+            }
+          case _ => Nil
+        }
+      case _ => Nil
+    }.toVector
+
+    bangElim ++ tensorDestruct ++ ptrAssign
   }
 }

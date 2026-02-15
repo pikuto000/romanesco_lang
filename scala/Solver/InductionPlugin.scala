@@ -108,35 +108,28 @@ class InductionPlugin extends LogicPlugin {
               case ((ArgType.Recursive, i), acc) => Expr.App(Expr.Sym(Forall), List(Expr.Var(s"${vn}_$i"), acc))
             }
 
-            val subTree = prover.search(exprs :+ caseGoal, ihs ++ context, st.incInduction, s, depth + 1, limit, visited, guarded)
+            val subTree = prover.search(exprs :+ caseGoal, ihs ++ context, st.incInduction, s, depth + 1, limit + 1, visited, guarded) // Bonus +1 depth
             allSuccesses(subTree).flatMap { res =>
               solveCases(tail, res.subst, st.withLinear(res.linearContext), solved + (c.symbol -> res.result.toOption.get.tree))
             }
 
           case ConstructorType.Path(from, to) =>
-            // 道のケース: transport(λx. body, p, proof_from) = proof_to
-            // 簡略化: from, to が既存のコンストラクタ（baseなど）であることを期待する
-            val fromName = from.headSymbol
-            val toName = to.headSymbol
+            // 道のケース: transport(λx. body, p, val_from) = val_to
+            val p = Expr.Sym(c.symbol) // path constructor
+            val pred = Expr.App(Expr.Sym("λ"), List(Expr.Var(vn), body))
             
-            if (solved.contains(fromName) && solved.contains(toName)) {
-              val p = Expr.Sym(c.symbol) // path constructor
-              val pred = Expr.App(Expr.Sym("λ"), List(Expr.Var(vn), body))
-              
-              // transport(λx. body, p, proof_from) = proof_to
-              // 本来的には証明オブジェクトを項として扱う必要があるが、現状は型レベルの等式として近似
-              val transportGoal = Expr.App(Expr.Sym(Eq), List(
-                Expr.App(Expr.Sym(Transport), List(pred, p, from)), // 実際には proof_from だが簡略化
-                to
-              ))
-              
-              val subTree = prover.search(exprs :+ transportGoal, context, st.incInduction, s, depth + 1, limit, visited, guarded)
-              allSuccesses(subTree).flatMap { res =>
-                solveCases(tail, res.subst, st.withLinear(res.linearContext), solved + (c.symbol -> res.result.toOption.get.tree))
-              }
-            } else {
-              // 依存関係が解決できない場合はスキップ（または失敗）
-              LazyList.empty
+            // from, to のシンボル名を正規化して solved から取得
+            val fromSym = from match { case Expr.Sym(s) => s; case Expr.App(Expr.Sym(s), _) => s; case _ => "" }
+            val toSym = to match { case Expr.Sym(s) => s; case Expr.App(Expr.Sym(s), _) => s; case _ => "" }
+
+            val transportGoal = Expr.App(Expr.Sym(Eq), List(
+              Expr.App(Expr.Sym(Transport), List(pred, p, from)),
+              to
+            ))
+            
+            val subTree = prover.search(exprs :+ transportGoal, context, st.incInduction, s, depth + 1, limit, visited, guarded)
+            allSuccesses(subTree).flatMap { res =>
+              solveCases(tail, res.subst, st.withLinear(res.linearContext), solved + (c.symbol -> res.result.toOption.get.tree))
             }
         }
     }

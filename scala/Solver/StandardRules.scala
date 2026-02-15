@@ -52,8 +52,10 @@ object StandardRules:
   val modalDuality = CatRule("modal-duality", sym(Diamond)(v("A")), sym(Implies)(sym(Box)(sym(Implies)(v("A"), sym(False))), sym(False)))
   val modalDistTensor = CatRule("modal-dist-tensor", sym(Box)(sym(Tensor)(v("A"), v("B"))), sym(Tensor)(sym(Box)(v("A")), sym(Box)(v("B"))))
   val modalDistForall = CatRule("modal-dist-forall", sym(Box)(sym(Forall)(v("x"), v("P")(v("x")))), sym(Forall)(v("x"), sym(Box)(v("P")(v("x")))))
+  val modalDistSepAnd = CatRule("modal-dist-sepand", sym(Box)(sym(SepAnd)(v("A"), v("B"))), sym(SepAnd)(sym(Box)(v("A")), sym(Box)(v("B"))))
+  val modalDistForallLImplies = CatRule("modal-dist-forall-limplies", sym(Globally)(sym(Forall)(v("x"), sym(LImplies)(v("A")(v("x")), v("B")(v("x"))))), sym(Forall)(v("x"), sym(LImplies)(sym(Globally)(v("A")(v("x"))), sym(Globally)(v("B")(v("x"))))))
 
-  val modal = List(modalK, modalKLinear, modalT, modalDuality, modalDistTensor, modalDistForall, modal4, modal5)
+  val modal = List(modalK, modalKLinear, modalT, modalDuality, modalDistTensor, modalDistForall, modalDistSepAnd, modalDistForallLImplies, modal4, modal5)
 
   val linearBang = CatRule("linear-bang-elim", sym(Bang)(v("A")), v("A"))
   val linear = List(linearBang)

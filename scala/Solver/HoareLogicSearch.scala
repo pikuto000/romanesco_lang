@@ -94,12 +94,16 @@ class HoareLogicPlugin extends LogicPlugin {
 
       case Expr.App(Expr.Sym("if"), List(b, c1, c2)) =>
         // {P ∧ b} c1 {Q} and {P ∧ ¬b} c2 {Q}
-        val goalThen = Expr.App(Expr.Sym("triple"), List(Expr.App(Expr.Sym(And), List(p, b)), c1, q))
-        val goalElse = Expr.App(Expr.Sym("triple"), List(Expr.App(Expr.Sym(And), List(p, Expr.App(Expr.Sym(Not), List(b)))), c2, q))
+        val condThen = prover.normalize(b)
+        val condElse = prover.normalize(Expr.App(Expr.Sym(Not), List(b)))
+        val preNorm = prover.normalize(p)
         
-        val treeThen = prover.search(exprs :+ goalThen, context.distinct, state, subst, depth + 1, limit, visited, guarded)
+        val ctxThen = (s"hPre$depth", preNorm) :: (s"hThen$depth", condThen) :: context
+        val treeThen = prover.search(exprs :+ Expr.App(Expr.Sym("triple"), List(preNorm, c1, q)), ctxThen, state, subst, depth + 1, limit, visited, guarded)
+        
         allSuccesses(treeThen).toVector.flatMap { sThen =>
-          val treeElse = prover.search(exprs :+ goalElse, context.distinct, state, sThen.subst, depth + 1, limit, visited, guarded)
+          val ctxElse = (s"hPre$depth", preNorm) :: (s"hElse$depth", condElse) :: context
+          val treeElse = prover.search(exprs :+ Expr.App(Expr.Sym("triple"), List(preNorm, c2, q)), ctxElse, state, sThen.subst, depth + 1, limit, visited, guarded)
           allSuccesses(treeElse).map { sElse =>
             val result = Right(ProofResult(ProofTree.Node(applySubst(goal, sElse.subst), "hoare-if", List(sThen.result.toOption.get.tree, sElse.result.toOption.get.tree))))
             Tree.V(SearchNode(exprs, "hoare-if", depth, result, sElse.subst, sElse.context, sElse.linearContext), Vector(treeThen, treeElse))
@@ -108,17 +112,14 @@ class HoareLogicPlugin extends LogicPlugin {
 
       case Expr.App(Expr.Sym("while"), List(b, c, inv)) =>
         // 1. P → inv (Precondition implies invariant)
-        // 2. {inv ∧ b} c {inv} (Invariant preserved)
-        // 3. inv ∧ ¬b → Q (Invariant and exit condition implies postcondition)
-        val g1 = Expr.App(Expr.Sym(Implies), List(p, inv))
-        val g2 = Expr.App(Expr.Sym("triple"), List(Expr.App(Expr.Sym(And), List(inv, b)), c, inv))
-        val g3 = Expr.App(Expr.Sym(Implies), List(Expr.App(Expr.Sym(And), List(inv, Expr.App(Expr.Sym(Not), List(b)))), q))
-        
-        val t1 = prover.search(exprs :+ g1, context.distinct, state, subst, depth + 1, limit, visited, guarded)
+        val t1 = prover.search(exprs :+ Expr.App(Expr.Sym(Implies), List(p, inv)), context, state, subst, depth + 1, limit, visited, guarded)
         allSuccesses(t1).toVector.flatMap { s1 =>
-          val t2 = prover.search(exprs :+ g2, s1.context.distinct, state, s1.subst, depth + 1, limit, visited, guarded)
+          // 2. {inv ∧ b} c {inv} (Invariant preserved)
+          val ctxBody = (s"hInv$depth", prover.normalize(inv)) :: (s"hWhile$depth", prover.normalize(b)) :: s1.context
+          val t2 = prover.search(exprs :+ Expr.App(Expr.Sym("triple"), List(inv, c, inv)), ctxBody, state, s1.subst, depth + 1, limit, visited, guarded)
           allSuccesses(t2).toVector.flatMap { s2 =>
-            val t3 = prover.search(exprs :+ g3, s2.context.distinct, state, s2.subst, depth + 1, limit, visited, guarded)
+            // 3. inv ∧ ¬b → Q (Invariant and exit condition implies postcondition)
+            val t3 = prover.search(exprs :+ Expr.App(Expr.Sym(Implies), List(Expr.App(Expr.Sym(And), List(inv, Expr.App(Expr.Sym(Not), List(b)))), q)), s2.context, state, s2.subst, depth + 1, limit, visited, guarded)
             allSuccesses(t3).map { s3 =>
               val result = Right(ProofResult(ProofTree.Node(applySubst(goal, s3.subst), "hoare-while", List(s1.result.toOption.get.tree, s2.result.toOption.get.tree, s3.result.toOption.get.tree))))
               Tree.V(SearchNode(exprs, "hoare-while", depth, result, s3.subst, s3.context, s3.linearContext), Vector(t1, t2, t3))
