@@ -125,6 +125,7 @@ object Rewriter {
       // HIT path constructors: transport reduces trivially for loop, seg, merid
       val isHITPath = p match {
         case Expr.Sym(name) if name == "loop" || name == "seg" || name == "merid" => true
+        case Expr.App(Expr.Sym(name), _) if name == "loop" || name == "seg" || name == "merid" => true
         case _ => false
       }
       if (isHITPath) v

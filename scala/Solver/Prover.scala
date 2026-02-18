@@ -51,7 +51,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
 
   // addHIT removed: HIT DSL should be integrated into the HoTT plug-in.
 
-  override def getAlgebras: List[InitialAlgebra] = dynamicAlgebras.toList
+  override def getAlgebras: List[InitialAlgebra] = config.algebras ++ dynamicAlgebras.toList
 
   def addDynamicRule(rule: CatRule): Unit = {
     if (!dynamicRules.contains(rule.toString)) {

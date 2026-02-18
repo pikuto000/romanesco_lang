@@ -116,19 +116,26 @@ class InductionPlugin extends LogicPlugin {
 
           case ConstructorType.Path(from, to) =>
             // 道のケース: transport(λx. body, p, val_from) = val_to
-            val p = Expr.Sym(c.symbol) // path constructor
+            val ct = if (c.argTypes.isEmpty) Expr.Sym(c.symbol)
+                     else Expr.App(Expr.Sym(c.symbol), c.argTypes.zipWithIndex.map {
+                       case (ArgType.Recursive, i) => Expr.Var(s"${vn}_$i")
+                       case (ArgType.Constant, i) => Expr.Var(s"a_$i")
+                     })
+            
+            val p = ct // path constructor
             val pred = Expr.App(Expr.Sym("λ"), List(Expr.Var(vn), body))
             
-            // from, to のシンボル名を正規化して solved から取得
-            val fromSym = from match { case Expr.Sym(s) => s; case Expr.App(Expr.Sym(s), _) => s; case _ => "" }
-            val toSym = to match { case Expr.Sym(s) => s; case Expr.App(Expr.Sym(s), _) => s; case _ => "" }
-
             val bodyFrom = Prover.substVar(body, vn, from)
             val bodyTo = Prover.substVar(body, vn, to)
-            val transportGoal = Expr.App(Expr.Sym(Eq), List(
+            val transportGoalBase = Expr.App(Expr.Sym(Eq), List(
               Expr.App(Expr.Sym(Transport), List(pred, p, bodyFrom)),
               bodyTo
             ))
+
+            val transportGoal = c.argTypes.zipWithIndex.foldRight[Expr](transportGoalBase) {
+              case ((ArgType.Constant, i), acc) => Expr.App(Expr.Sym(Forall), List(Expr.Var(s"a_$i"), acc))
+              case ((ArgType.Recursive, i), acc) => Expr.App(Expr.Sym(Forall), List(Expr.Var(s"${vn}_$i"), acc))
+            }
             
             val subTree = prover.search(exprs :+ transportGoal, context, st.incInduction, s, depth + 1, limit, visited, guarded)
             allSuccesses(subTree).flatMap { res =>

@@ -44,6 +44,33 @@ class HoTTPlugin extends LogicPlugin {
     )
   }
 
+  override def getContextHooks(
+      exprs: Vector[Expr],
+      rules: List[CatRule],
+      context: Context,
+      state: LogicState,
+      subst: Subst,
+      depth: Int,
+      limit: Int,
+      visited: Set[(Expr, Set[Expr], List[Expr], LogicState)],
+      guarded: Boolean,
+      prover: ProverInterface
+  ): Vector[Tree[SearchNode]] = {
+    // isProp(A) -> ∀x, y:A. path(A, x, y)
+    // isSet(A)  -> ∀x, y:A. ∀p, q:path(A, x, y). path(path(A, x, y), p, q)
+    context.foreach {
+      case (name, Expr.App(Expr.Sym("isProp"), List(a))) =>
+        val rule = CatRule(s"prop_$name", Expr.App(Expr.Sym(Path), List(a, Expr.Var("x"), Expr.Var("y"))), Expr.Sym(True), List(Expr.Var("x"), Expr.Var("y")))
+        prover.asInstanceOf[Prover].addDynamicRule(rule)
+      case (name, Expr.App(Expr.Sym("isSet"), List(a))) =>
+        val innerPath = Expr.App(Expr.Sym(Path), List(a, Expr.Var("x"), Expr.Var("y")))
+        val rule = CatRule(s"set_$name", Expr.App(Expr.Sym(Path), List(innerPath, Expr.Var("p"), Expr.Var("q"))), Expr.Sym(True), List(Expr.Var("x"), Expr.Var("y"), Expr.Var("p"), Expr.Var("q")))
+        prover.asInstanceOf[Prover].addDynamicRule(rule)
+      case _ => ()
+    }
+    Vector.empty
+  }
+
   private def searchPathInduction(
       exprs: Vector[Expr],
       rules: List[CatRule],

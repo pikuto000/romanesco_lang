@@ -32,16 +32,32 @@ class RewritePlugin extends LogicPlugin {
 
     context.foreach { case (name, hyp) =>
       prover.checkDeadline()
+      
+      // 量化子を剥ぎ取って等式を取り出す
+      def extractEq(e: Expr, vars: List[String]): (Expr, List[String]) = e match {
+        case Expr.App(Expr.Sym(Forall), args) =>
+          val vName = args match {
+            case List(Expr.Var(v), _) => v
+            case List(Expr.Var(v), _, _) => v
+            case _ => null
+          }
+          val body = args.last
+          if (vName != null) extractEq(body, vName :: vars) else (e, vars)
+        case _ => (e, vars)
+      }
+
       val instHyp = applySubst(hyp, subst)
-      instHyp match {
+      val (eqPart, quantifiedVars) = extractEq(instHyp, Nil)
+
+      eqPart match {
         case Expr.App(Expr.Sym(Eq | Path), args) if args.length >= 2 =>
           val lRaw = args match { case List(_, x, _) if args.length == 3 => x; case List(x, _) => x; case _ => null }
           val rRaw = args.last
           if (lRaw != null) {
             // IH中のVarをメタ変数化してパターンとして使う（xs_1 と xs_1_2 のような変数名の違いを吸収）
             var metaCounter = 0
-            val vars = Prover.collectVars(lRaw) ++ Prover.collectVars(rRaw)
-            val varToMeta = vars.map { v =>
+            val allVars = Prover.collectVars(lRaw) ++ Prover.collectVars(rRaw) ++ quantifiedVars.toSet
+            val varToMeta = allVars.map { v =>
               metaCounter += 1
               v -> Expr.Meta(MetaId(List(-2, depth * 100 + metaCounter)))
             }.toMap
