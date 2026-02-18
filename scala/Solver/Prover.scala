@@ -49,10 +49,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     Expr.Meta(MetaId(List(depth, Prover.globalMetaCounter.incrementAndGet())))
   }
 
-  // テスト用でもハードコード許すまじ
-  // def addHIT(hit: InitialAlgebra): Unit = {
-  //  if (!dynamicAlgebras.exists(_.name == hit.name)) { dynamicAlgebras += hit }
-  // }
+  // addHIT removed: HIT DSL should be integrated into the HoTT plug-in.
 
   override def getAlgebras: List[InitialAlgebra] = dynamicAlgebras.toList
 

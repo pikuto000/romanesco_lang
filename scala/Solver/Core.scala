@@ -66,12 +66,15 @@ enum Expr:
     val varMap = scala.collection.mutable.Map[String, String]()
     var metaCounter = 0
     var varCounter = 0
-    
+
     // De Bruijn Index ベースの完全な実装
     def deBruijn(e: Expr, env: List[String]): Expr = e match {
       case Meta(id) =>
         if (renameMeta) {
-          val newId = metaMap.getOrElseUpdate(id, { val n = MetaId(List(metaCounter)); metaCounter += 1; n })
+          val newId = metaMap.getOrElseUpdate(
+            id,
+            { val n = MetaId(List(metaCounter)); metaCounter += 1; n }
+          )
           Meta(newId)
         } else Meta(id)
       case Var(name) =>
@@ -79,28 +82,29 @@ enum Expr:
         if (idx >= 0) Var(s"bv$idx") // Bound variable (index)
         else Var(name) // Free variable
       case App(Sym("λ"), List(Var(v), body)) =>
-        App(Sym("λ"), List(Var(s"bv0"), deBruijn(body, v :: env))) 
+        App(Sym("λ"), List(Var(s"bv0"), deBruijn(body, v :: env)))
       case App(f, args) => App(deBruijn(f, env), args.map(deBruijn(_, env)))
-      case _ => e
+      case _            => e
     }
-    
+
     deBruijn(this, Nil)
   }
 
   /** 式の複雑さ（ヒューリスティック用スコア） */
   def complexity: Int = this match {
     case Var(_) | Meta(_) | Sym(_) => 1
-    case App(f, as) => 
+    case App(f, as)                =>
       val maxDepth = if (as.isEmpty) 0 else as.map(_.complexity).max
       f.complexity + maxDepth + 1
   }
 
   def contains(other: Expr): Boolean = {
     if (this == other) true
-    else this match {
-      case App(f, args) => f.contains(other) || args.exists(_.contains(other))
-      case _ => false
-    }
+    else
+      this match {
+        case App(f, args) => f.contains(other) || args.exists(_.contains(other))
+        case _            => false
+      }
   }
 
   /** 構造的パターンの抽象化（循環検知用） */
@@ -109,14 +113,16 @@ enum Expr:
     val varMap = scala.collection.mutable.Map[String, String]()
     def loop(e: Expr): String = e match {
       case Var(name) =>
-        val n = varMap.getOrElseUpdate(name, {
-          val res = s"V$varCounter"
-          varCounter += 1
-          res
-        })
+        val n = varMap.getOrElseUpdate(
+          name, {
+            val res = s"V$varCounter"
+            varCounter += 1
+            res
+          }
+        )
         n
-      case Sym(n)  => s"S($n)"
-      case Meta(_) => "M"
+      case Sym(n)       => s"S($n)"
+      case Meta(_)      => "M"
       case App(f, args) =>
         s"A(${loop(f)},${args.map(loop).mkString(",")})"
     }
@@ -126,10 +132,11 @@ enum Expr:
   def toJson: String = {
     def escape(s: String): String = s.replace("\"", "\\\"")
     this match {
-      case Var(n) => s"{\"type\":\"Var\",\"name\":\"${escape(n)}\"}"
-      case Sym(n) => s"{\"type\":\"Sym\",\"name\":\"${escape(n)}\"}"
-      case Meta(id) => s"{\"type\":\"Meta\",\"id\":\"$id\"}"
-      case App(f, args) => s"{\"type\":\"App\",\"f\":${f.toJson},\"args\":[${args.map(_.toJson).mkString(",")}]}"
+      case Var(n)       => s"{\"type\":\"Var\",\"name\":\"${escape(n)}\"}"
+      case Sym(n)       => s"{\"type\":\"Sym\",\"name\":\"${escape(n)}\"}"
+      case Meta(id)     => s"{\"type\":\"Meta\",\"id\":\"$id\"}"
+      case App(f, args) =>
+        s"{\"type\":\"App\",\"f\":${f.toJson},\"args\":[${args.map(_.toJson).mkString(",")}]}"
     }
   }
 
@@ -159,18 +166,18 @@ case class CatRule(
     lhs: Expr,
     rhs: Expr,
     universals: List[Expr] = Nil,
-    priority: Int = 10,
+    // priority: Int = 10,
     domain: String = "general"
 ):
   override def toString: String =
     val cond =
       if universals.isEmpty then ""
       else s" where ${universals.mkString(", ")}"
-    s"[$domain] $name: $lhs ⟹ $rhs$cond (prio: $priority)"
+    s"[$domain] $name: $lhs ⟹ $rhs$cond"
 
   def toJson: String = {
     def escape(s: String): String = s.replace("\"", "\\\"")
-    s"{\"name\":\"${escape(name)}\",\"lhs\":${lhs.toJson},\"rhs\":${rhs.toJson},\"universals\":[${universals.map(_.toJson).mkString(",")}],\"priority\":$priority,\"domain\":\"${escape(domain)}\"}"
+    s"{\"name\":\"${escape(name)}\",\"lhs\":${lhs.toJson},\"rhs\":${rhs.toJson},\"universals\":[${universals.map(_.toJson).mkString(",")}],\"domain\":\"${escape(domain)}\"}"
   }
 
 /** 証明のツリー構造
@@ -188,8 +195,10 @@ enum ProofTree:
         s"$childrenStr\n$sp└─ $g  {$r}"
 
   def toJson: String = this match {
-    case Leaf(g, r) => s"{\"nodeType\":\"Leaf\",\"goal\":\"$g\",\"rule\":\"$r\"}"
-    case Node(g, r, cs) => s"{\"nodeType\":\"Node\",\"goal\":\"$g\",\"rule\":\"$r\",\"children\":[${cs.map(_.toJson).mkString(",")}]}"
+    case Leaf(g, r) =>
+      s"{\"nodeType\":\"Leaf\",\"goal\":\"$g\",\"rule\":\"$r\"}"
+    case Node(g, r, cs) =>
+      s"{\"nodeType\":\"Node\",\"goal\":\"$g\",\"rule\":\"$r\",\"children\":[${cs.map(_.toJson).mkString(",")}]}"
   }
 
 type Proof = ProofTree
@@ -210,7 +219,7 @@ case class FailTrace(
     val typeMark = if failureType == "Normal" then "✗" else s"[$failureType]"
     var base =
       s"$sp$typeMark (Depth $depth) Goal: ${goal.target}\n$sp  Reason: $reason"
-    
+
     if (attemptedRules.nonEmpty) {
       base += s"\n$sp  Attempted Rules: ${attemptedRules.mkString(", ")}"
     }

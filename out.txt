@@ -12,272 +12,240 @@ Active code page: 65001
 === Cycle Detection Test ===
 Testing simple loop: P(a)
 Failed as expected: No proof found
-Testing loop with Forall: 竏(x,P(x))
-Failed: No proof found
+Testing loop with Forall: ∀(x,P(x))
+Failed as expected: No proof found
 Testing complex loop: P(a) -> Q(a) -> P(a)
-Failed: No proof found
+Failed as expected: No proof found
 Testing growth loop: P(a) -> P(f(a))
-Failed: No proof found
-[success] Total time: 2 s, completed 2026/02/14 19:42:52
+Failed as expected: No proof found
+[success] Total time: 3 s, completed 2026/02/19 3:54:25
 [info] running romanesco.Solver.SolverTests.CycleTest2 
 [LOGGER] DISABLED
 === Cycle Detection Test 2 (Inner Branch) ===
 Testing loop: P(a)
-[success] Total time: 0 s, completed 2026/02/14 19:42:52
+[success] Total time: 0 s, completed 2026/02/19 3:54:26
 [info] running romanesco.Solver.SolverTests.DebugAssoc 
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 10
 === Debug: Path Associativity ===
-笨・Solved!
-              笨・竓､  {true-intro}
-            笏披楳 竏(r,path(A,z_2,w_3),竓､)  {forall-intro}
-          笏披楳 竏(q,path(A,y_1,z_2),竏(r,path(A,z_2,w_3),竓､))  {forall-intro}
-        笏披楳 竏(p,path(A,x_0,y_1),竏(q,path(A,y_1,z_2),竏(r,path(A,z_2,w_3),竓､)))  {forall-intro}
-      笏披楳 竏(w,竏(p,path(A,x_0,y_1),竏(q,path(A,y_1,z_2),竏(r,path(A,z_2,w),竓､))))  {forall-intro}
-    笏披楳 竏(z,竏(w,竏(p,path(A,x_0,y_1),竏(q,path(A,y_1,z),竏(r,path(A,z,w),竓､)))))  {forall-intro}
-  笏披楳 竏(y,竏(z,竏(w,竏(p,path(A,x_0,y),竏(q,path(A,y,z),竏(r,path(A,z,w),竓､))))))  {forall-intro}
-笏披楳 竏(x,竏(y,竏(z,竏(w,竏(p,path(A,x,y),竏(q,path(A,y,z),竏(r,path(A,z,w),竓､)))))))  {forall-intro}
-[success] Total time: 1 s, completed 2026/02/14 19:42:53
+✓ Solved!
+            ✓ path(A,x_0,y_1)  {p_4}
+          └─ ∀(q,path(A,y_1,z_2),∀(r,path(A,z_2,w_3),⊤))  {rewrite[p_4]}
+        └─ ∀(p,path(A,x_0,y_1),∀(q,path(A,y_1,z_2),∀(r,path(A,z_2,w_3),⊤)))  {forall-intro}
+      └─ ∀(w,∀(p,path(A,x_0,y_1),∀(q,path(A,y_1,z_2),∀(r,path(A,z_2,w),⊤))))  {forall-intro}
+    └─ ∀(z,∀(w,∀(p,path(A,x_0,y_1),∀(q,path(A,y_1,z),∀(r,path(A,z,w),⊤)))))  {forall-intro}
+  └─ ∀(y,∀(z,∀(w,∀(p,path(A,x_0,y),∀(q,path(A,y,z),∀(r,path(A,z,w),⊤))))))  {forall-intro}
+└─ ∀(x,∀(y,∀(z,∀(w,∀(p,path(A,x,y),∀(q,path(A,y,z),∀(r,path(A,z,w),⊤)))))))  {forall-intro}
+[success] Total time: 13 s, completed 2026/02/19 3:54:39
 [info] running romanesco.Solver.SolverTests.DebugLinear 
 [LOGGER] DISABLED
-=== Debug: A 竓ｸ B 竓ｸ (A 竓・B) ===
-笨・Solved!
-      笨・A  {lh0}
-    笏披楳 竓・A,B)  {cancel[lh1]}
-  笏披楳 竓ｸ(B,竓・A,B))  {linear-implies-intro}
-笏披楳 竓ｸ(A,竓ｸ(B,竓・A,B)))  {linear-implies-intro}
-[success] Total time: 0 s, completed 2026/02/14 19:42:54
+=== Debug: A ⊸ B ⊸ (A ⊗ B) ===
+✓ Solved!
+      ✓ A  {lh0}
+      ✓ B  {lh1}
+    └─ ⊗(A,B)  {tensor-intro}
+  └─ ⊸(B,⊗(A,B))  {linear-implies-intro}
+└─ ⊸(A,⊸(B,⊗(A,B)))  {linear-implies-intro}
+[success] Total time: 0 s, completed 2026/02/19 3:54:39
 [info] running romanesco.Solver.SolverTests.HoTTCubeTest 
 [LOGGER] DISABLED
 === HoTT: Cubical Model Approximation Test ===
-Case: cube(A, p, q, r, s) 竊・path(path(A, x, y), p, r) ... 笨・OK (Solved)
-Case: cube(A, p, q, r, s) 竊・path(path(A, x, z), q, s) ... 笨・OK (Failed as expected)
-[success] Total time: 0 s, completed 2026/02/14 19:42:54
+Case: cube(A, p, q, r, s) → path(path(A, x, y), p, r) ... ✓ OK (Solved)
+Case: cube(A, p, q, r, s) → path(path(A, x, z), q, s) ... ✓ OK (Solved)
+[success] Total time: 1 s, completed 2026/02/19 3:54:40
 [info] running romanesco.Solver.SolverTests.HoTTTest 
 [LOGGER] DISABLED
 === HoTT: Path Induction and HIT Test ===
-Case: 竏x. 竏y. 竏p:path(A,x,y). concat(p, refl(y)) = p ... 笨・OK (Solved)
-Case: 竏x. 竏y. 竏p:path(A,x,y). concat(refl(x), p) = p ... 笨・OK (Solved)
-Case: 竏x. 竏y. 竏z. 竏w. 竏p:path(A,x,y). 竏q:path(A,y,z). 竏r:path(A,z,w). concat(concat(p, q), r) = concat(p, concat(q, r)) ... 笨・OK (Solved)
-Case: 竏x. 竏y. 竏p:path(A,x,y). inv(inv(p)) = p ... 笨・OK (Solved)
-Case: 竏x:S1. P(base) 竊・P(x) ... 笨・OK (Solved)
-Case: equiv(A, B) 竊・path(Type, A, B) ... 笨・OK (Solved)
-[success] Total time: 1 s, completed 2026/02/14 19:42:55
+Case: ∀x. ∀y. ∀p:path(A,x,y). concat(p, refl(y)) = p ... ✓ OK (Solved)
+Case: ∀x. ∀y. ∀p:path(A,x,y). concat(refl(x), p) = p ... ✓ OK (Solved)
+Case: ∀x. ∀y. ∀z. ∀w. ∀p:path(A,x,y). ∀q:path(A,y,z). ∀r:path(A,z,w). concat(concat(p, q), r) = concat(p, concat(q, r)) ... ✓ OK (Solved)
+Case: ∀x. ∀y. ∀p:path(A,x,y). inv(inv(p)) = p ... ✓ OK (Solved)
+Case: ∀x:S1. P(base) → P(x) ... ✓ OK (Solved)
+Case: equiv(A, B) → path(Type, A, B) ... ✓ OK (Solved)
+[success] Total time: 14 s, completed 2026/02/19 3:54:54
 [info] running romanesco.Solver.SolverTests.LinearResourceTest 
 [LOGGER] DISABLED
 === Linear Logic: Resource Consumption Test ===
-Case: A 竓ｸ A ... 笨・OK (Solved as expected)
-Case: (A 竓・B) 竓ｸ (B 竓・A) ... 笨・OK (Solved as expected)
-Case: A 竓ｸ (A 竓・A) ... 笨・OK (Failed as expected)
-Case: A 竓ｸ B 竓ｸ (A 竓・B) ... 笨・OK (Solved as expected)
-Case: (A 竓・A) 竓ｸ A ... 笨・OK (Failed as expected)
-[success] Total time: 0 s, completed 2026/02/14 19:42:55
+Case: A ⊸ A ... ✓ OK (Solved as expected)
+Case: (A ⊗ B) ⊸ (B ⊗ A) ... ✓ OK (Solved as expected)
+Case: A ⊸ (A ⊗ A) ... ✓ OK (Failed as expected)
+Case: A ⊸ B ⊸ (A ⊗ B) ... ✓ OK (Solved as expected)
+Case: (A ⊗ A) ⊸ A ... ✓ OK (Failed as expected)
+[success] Total time: 0 s, completed 2026/02/19 3:54:54
 [info] running romanesco.Solver.SolverTests.SeparationLogicTest 
 [LOGGER] DISABLED
 === Separation Logic: Resource Management Test ===
-Case: A * B 竓ｸ B * A (depth 10) ... 笨・OK (Solved)
-Case: (A * B) * C 竓ｸ A * (B * C) (depth 10) ... 笨・OK (Solved)
-Case: (A 竓ｸ B) 竓ｸ (A * C 竓ｸ B * C) (depth 15) ... 笨・OK (Solved)
-Case: (A * A) 竓ｸ A (depth 5) ... 笨・OK (Failed as expected)
-Case: (A 竓ｸ A) * A (depth 5) ... 笨・OK (Failed as expected)
-Case: (竏v. (x 竊ｦ v 竓ｸ P(v))) 竓ｸ (x 竊ｦ 5 竓ｸ P(5)) (depth 8) ... 笨・OK (Solved)
-Case: A * B * C 竓ｸ C * A * B (depth 8) ... 笨・OK (Solved)
-Case: (竏v. (x 竊ｦ v * R)) 竓ｸ (x 竊ｦ 5 * R) (depth 8) ... 笨・OK (Solved)
-Case: 竏ェ. (A * B 竓ｸ A * F) (depth 10) ... 笨・OK (Solved)
-Case: 竏ェ. (x 竊ｦ 1 * y 竊ｦ 2 竓ｸ x 竊ｦ 1 * F) (depth 10) ... 笨・OK (Solved)
-Case: 竏ェ. (A * B * C 竓ｸ B * F) (depth 10) ... 笨・OK (Solved)
-[success] Total time: 1 s, completed 2026/02/14 19:42:56
+Case: A * B ⊸ B * A (depth 10) ... ✓ OK (Solved)
+Case: (A * B) * C ⊸ A * (B * C) (depth 10) ... ✓ OK (Solved)
+Case: (A ⊸ B) ⊸ (A * C ⊸ B * C) (depth 15) ... ✓ OK (Solved)
+Case: (A * A) ⊸ A (depth 5) ... ✓ OK (Failed as expected)
+Case: (A ⊸ A) * A (depth 5) ... ✓ OK (Failed as expected)
+Case: (∀v. (x ↦ v ⊸ P(v))) ⊸ (x ↦ 5 ⊸ P(5)) (depth 8) ... ✓ OK (Solved)
+Case: A * B * C ⊸ C * A * B (depth 8) ... ✓ OK (Solved)
+Case: (∀v. (x ↦ v * R)) ⊸ (x ↦ 5 * R) (depth 8) ... ✓ OK (Solved)
+Case: ∃F. (A * B ⊸ A * F) (depth 10) ... ✓ OK (Solved)
+Case: ∃F. (x ↦ 1 * y ↦ 2 ⊸ x ↦ 1 * F) (depth 10) ... ✓ OK (Solved)
+Case: ∃F. (A * B * C ⊸ B * F) (depth 10) ... ✓ OK (Solved)
+[success] Total time: 1 s, completed 2026/02/19 3:54:55
 [info] running romanesco.Solver.SolverTests.TemporalLogicTest 
 [LOGGER] DISABLED
 === Temporal Logic: Co-induction Test ===
-Case: G(A) 竊・A ... 笨・OK (Solved)
-Case: G(A) 竊・X(A) ... 笨・OK (Solved)
-Case: G(A) 竊・G(G(A)) ... 笨・OK (Solved)
-Case: G(A 竊・B) 竊・G(A) 竊・G(B) ... 笨・OK (Solved)
-[success] Total time: 0 s, completed 2026/02/14 19:42:57
+Case: G(A) → A ... ✓ OK (Solved)
+Case: G(A) → X(A) ... ✓ OK (Solved)
+Case: G(A) → G(G(A)) ... ✓ OK (Solved)
+Case: G(A → B) → G(A) → G(B) ... ✓ OK (Solved)
+[success] Total time: 1 s, completed 2026/02/19 3:54:56
 [info] running romanesco.Solver.SolverTests.TypeLevelTest 
 [LOGGER] DISABLED
 === Strict Universe Level Unification Test ===
 Proving: Type0 = Type0 ...
-笨・OK (Solved)
+✓ OK (Solved)
 Proving: Type0 = Type1 ...
-笨・OK (Failed as expected)
-[success] Total time: 0 s, completed 2026/02/14 19:42:57
+✓ OK (Failed as expected)
+[success] Total time: 0 s, completed 2026/02/19 3:54:56
 [info] running romanesco.Solver.SolverTests.HoareLogicTest 
 [LOGGER] DISABLED
 === Hoare Logic: Program Verification Test ===
-Case: {x = 1} skip {x = 1} ... 笨・OK (Solved)
-Case: {竓､} x := 1 {x = 1} ... 笨・OK (Solved)
-Case: {竓､} x := 1 ; y := 2 {x = 1 竏ｧ y = 2} ... 笨・OK (Solved)
-Case: {竓､} if (x = 0) x := 1 else x := 2 {x = 1 竏ｨ x = 2} ... 笨・OK (Solved)
-Case: {x = 0} while [x = 0 竏ｨ x = 1] (x = 0) x := 1 {x = 1} ... 笨・OK (Solved)
-[success] Total time: 1 s, completed 2026/02/14 19:42:58
+Case: {x = 1} skip {x = 1} ... ✁EOK (Solved)
+Case: {⊤} x := 1 {x = 1} ... ✁EOK (Solved)
+Case: {⊤} x := 1 ; y := 2 {x = 1 ∧ y = 2} ... ✁EOK (Solved)
+Case: {⊤} if (x = 0) x := 1 else x := 2 {x = 1 ∨ x = 2} ... ✁EOK (Solved)
+Case: {x = 0} while [x = 0 ∨ x = 1] (x = 0) x := 1 {x = 1} ... ✁EOK (Solved)
+[success] Total time: 6 s, completed 2026/02/19 3:55:03
 [info] running romanesco.Solver.testGeneralizedUnification 
 [LOGGER] DISABLED
 === Generalized Higher-Order Unification Test ===
 
 Test 1: ?P(f(x)) = g(f(x))
 Unifying: ?1(f(x)) = g(f(x))
-笨・Solutions found:
+✓ Solutions found:
   Solution 0:
-    ?1 -> ﾎｻv_0. g(v_0)
+    ?1 -> λbv0. g(bv0)
     Check: g(f(x)) == g(f(x))
-    笨・Valid
-  Solution 1:
-    ?1 -> ﾎｻv_0. g(f(x))
-    Check: g(f(x)) == g(f(x))
-    笨・Valid
+    ✓ Valid
 
 Test 2: ?P(a, b) = f(b, a)
 Unifying: ?1(a,b) = f(b,a)
-笨・Solutions found:
+✓ Solutions found:
   Solution 0:
-    ?1 -> ﾎｻv_0. ﾎｻv_1. f(v_1,v_0)
+    ?1 -> λbv0. λbv1. f(bv1,bv0)
     Check: f(b,a) == f(b,a)
-    笨・Valid
-  Solution 1:
-    ?1 -> ﾎｻv_0. ﾎｻv_1. f(v_1,a)
-    Check: f(b,a) == f(b,a)
-    笨・Valid
-  Solution 2:
-    ?1 -> ﾎｻv_0. ﾎｻv_1. f(b,v_0)
-    Check: f(b,a) == f(b,a)
-    笨・Valid
-  Solution 3:
-    ?1 -> ﾎｻv_0. ﾎｻv_1. f(b,a)
-    Check: f(b,a) == f(b,a)
-    笨・Valid
+    ✓ Valid
 
 Test 3: ?P(S(x), x) = S(S(x))
 Unifying: ?1(S(x),x) = S(S(x))
-笨・Solutions found:
+✓ Solutions found:
   Solution 0:
-    ?1 -> ﾎｻv_0. ﾎｻv_1. S(v_0)
+    ?1 -> λbv0. λbv1. S(bv0)
     Check: S(S(x)) == S(S(x))
-    笨・Valid
-  Solution 1:
-    ?1 -> ﾎｻv_0. ﾎｻv_1. S(S(v_1))
-    Check: S(S(x)) == S(S(x))
-    笨・Valid
-  Solution 2:
-    ?1 -> ﾎｻv_0. ﾎｻv_1. S(S(x))
-    Check: S(S(x)) == S(S(x))
-    笨・Valid
-[success] Total time: 0 s, completed 2026/02/14 19:42:58
+    ✓ Valid
+[success] Total time: 0 s, completed 2026/02/19 3:55:03
 [info] running romanesco.Solver.testLinearLogic 
 [LOGGER] DISABLED
 === Linear Logic Test (Mapping Approach) ===
 
-[Test Case] A 竓ｸ A
-笨・Solved:
-    笨・A  {linear:lh0}
-  笏披楳 竓ｸ(A,A)  {linear-implies-intro}
+[Test Case] A ⊸ A
+✓ Solved:
+    ✓ A  {lh0}
+  └─ ⊸(A,A)  {linear-implies-intro}
 
-[Test Case] (A 竓・B) 竓ｸ (A 竓・B)
-笨・Solved:
-    笨・竓・A,B)  {linear:lh0}
-  笏披楳 竓ｸ(竓・A,B),竓・A,B))  {linear-implies-intro}
+[Test Case] (A ⊗ B) ⊸ (A ⊗ B)
+✓ Solved:
+          ✓ A  {lh0}
+          ✓ B  {lh2}
+        └─ ⊗(A,B)  {tensor-intro}
+      └─ ⊸(B,⊗(A,B))  {linear-implies-intro}
+    └─ ⊸(A,⊸(B,⊗(A,B)))  {linear-implies-intro}
+  └─ ⊸(⊗(A,B),⊗(A,B))  {tensor-limplies-destruct}
 
-[Test Case] !A 竊・A
-笨・Solved:
-      笨・A  {h0}
-    笏披楳 A  {linear-bang-elim[h0]}
-  笏披楳 竊・!(A),A)  {implies-intro}
+[Test Case] !A → A
+✓ Solved:
+      ✓ A  {h0}
+    └─ A  {linear-bang-elim[h0]}
+  └─ →(!(A),A)  {implies-intro}
 
-[Test Case] A 竓・B 竊・A 竏ｧ B
-笨・Solved:
-          笨・A  {h0.1}
-          笨・B  {h0.2}
-        笏披楳 竏ｧ(A,B)  {product-intro}
-      笏披楳 竏ｧ(A,B)  {destruct[h0]}
-    笏披楳 竏ｧ(A,B)  {tensor-is-ﾃ夕h0]}
-  笏披楳 竊・竓・A,B),竏ｧ(A,B))  {implies-intro}
-[success] Total time: 0 s, completed 2026/02/14 19:42:58
+[Test Case] A ⊗ B → A ∧ B
+✓ Solved:
+        ✓ A  {h0.1}
+      └─ A  {tensor-is-ﾃ夕h0]}
+      ✓ B  {h0.2}
+    └─ ∧(A,B)  {product-intro}
+  └─ →(⊗(A,B),∧(A,B))  {implies-intro}
+[success] Total time: 1 s, completed 2026/02/19 3:55:03
 [info] running romanesco.Solver.testMapFusion 
 [LOGGER] DISABLED
 === Map Fusion Test ===
-Goal: 竏f. 竏g. 竏xs. map(f, map(g, xs)) = map(f 竏・g, xs)
-笨・Proof found:
-        笨・竓､  {true-intro}
-                笨・竓､  {true-intro}
-              笏披楳 cons(f_0(g_1(a_0_3)),nil) = cons(竏・f_0,g_1)(a_0_3),nil)  {compose_app}
-                      笨・竓､  {true-intro}
-                    笏披楳 cons(f_0(g_1(a_0_3)),cons(竏・f_0,g_1)(a_0_7),map(竏・f_0,g_1),xs_1_1_8))) = cons(竏・f_0,g_1)(a_0_3),cons(竏・f_0,g_1)(a_0_7),map(竏・f_0,g_1),xs_1_1_8)))  {compose_app}
-                  笏披楳 竏(xs_1_1,cons(f_0(g_1(a_0_3)),cons(竏・f_0,g_1)(a_0_7),map(竏・f_0,g_1),xs_1_1))) = cons(竏・f_0,g_1)(a_0_3),cons(竏・f_0,g_1)(a_0_7),map(竏・f_0,g_1),xs_1_1))))  {forall-intro}
-                笏披楳 竏(a_0,竏(xs_1_1,cons(f_0(g_1(a_0_3)),cons(竏・f_0,g_1)(a_0),map(竏・f_0,g_1),xs_1_1))) = cons(竏・f_0,g_1)(a_0_3),cons(竏・f_0,g_1)(a_0),map(竏・f_0,g_1),xs_1_1)))))  {forall-intro}
-              笏披楳 竏(a_0,竏(xs_1_1,cons(f_0(g_1(a_0_3)),cons(竏・f_0,g_1)(a_0),map(竏・f_0,g_1),xs_1_1))) = cons(竏・f_0,g_1)(a_0_3),cons(竏・f_0,g_1)(a_0),map(竏・f_0,g_1),xs_1_1)))))  {compose_app[IH_xs_1_1]}
-            笏披楳 竏(xs_1,cons(f_0(g_1(a_0_3)),map(竏・f_0,g_1),xs_1)) = cons(竏・f_0,g_1)(a_0_3),map(竏・f_0,g_1),xs_1)))  {induction[List]}
-          笏披楳 竏(xs_1,cons(f_0(g_1(a_0_3)),map(f_0,map(g_1,xs_1))) = cons(竏・f_0,g_1)(a_0_3),map(竏・f_0,g_1),xs_1)))  {rewrite[IH_xs_1]}
-        笏披楳 竏(a_0,竏(xs_1,cons(f_0(g_1(a_0)),map(f_0,map(g_1,xs_1))) = cons(竏・f_0,g_1)(a_0),map(竏・f_0,g_1),xs_1))))  {forall-intro}
-      笏披楳 竏(xs,map(f_0,map(g_1,xs)) = map(竏・f_0,g_1),xs))  {induction[List]}
-    笏披楳 竏(g,竏(xs,map(f_0,map(g,xs)) = map(竏・f_0,g),xs)))  {forall-intro}
-  笏披楳 竏(f,竏(g,竏(xs,map(f,map(g,xs)) = map(竏・f,g),xs))))  {forall-intro}
-[success] Total time: 2 s, completed 2026/02/14 19:43:01
+Goal: ∀f. ∀g. ∀xs. map(f, map(g, xs)) = map(f ∘ g, xs)
+✓ Proof found:
+        ✓ map(f_0,map(g_1,nil)) = map(∘(f_0,g_1),nil)  {true-intro}
+              ✓ ⊤  {true-intro}
+            └─ cons(f_0(g_1(a_0_3)),map(f_0,map(g_1,xs_1_4))) = cons(f_0(g_1(a_0_3)),map(∘(f_0,g_1),xs_1_4))  {rewrite[IH_xs_1]}
+          └─ ∀(xs_1,cons(f_0(g_1(a_0_3)),map(f_0,map(g_1,xs_1))) = cons(∘(f_0,g_1)(a_0_3),map(∘(f_0,g_1),xs_1)))  {forall-intro}
+        └─ ∀(a_0,∀(xs_1,cons(f_0(g_1(a_0)),map(f_0,map(g_1,xs_1))) = cons(∘(f_0,g_1)(a_0),map(∘(f_0,g_1),xs_1))))  {forall-intro}
+      └─ ∀(xs,map(f_0,map(g_1,xs)) = map(∘(f_0,g_1),xs))  {induction[List]}
+    └─ ∀(g,∀(xs,map(f_0,map(g,xs)) = map(∘(f_0,g),xs)))  {forall-intro}
+  └─ ∀(f,∀(g,∀(xs,map(f,map(g,xs)) = map(∘(f,g),xs))))  {forall-intro}
+[success] Total time: 1 s, completed 2026/02/19 3:55:05
 [info] running romanesco.Solver.testModalLogic 
 [LOGGER] DISABLED
 === Modal Logic Test ===
-[Test Case] 笆｡(A 竊・B) 竊・(笆｡A 竊・笆｡B)
-笨・Solved:      笨・竊・笆｡(A),笆｡(B))  {h0}
-    笏披楳 竊・笆｡(A),笆｡(B))  {modal-K[h0]}
-  笏披楳 竊・笆｡(竊・A,B)),竊・笆｡(A),笆｡(B)))  {implies-intro}
-[Test Case] 笆｡A 竊・A
-笨・Solved:      笨・A  {h0}
-    笏披楳 A  {modal-T[h0]}
-  笏披楳 竊・笆｡(A),A)  {implies-intro}
-[Test Case] 笆｡A 竊・笆｡笆｡A
-笨・Solved:      笨・笆｡(笆｡(A))  {h0}
-    笏披楳 笆｡(笆｡(A))  {modal-4[h0]}
-  笏披楳 竊・笆｡(A),笆｡(笆｡(A)))  {implies-intro}
-[Test Case] 笳② 竊・笆｡笳②
-笨・Solved:      笨・笆｡(笳・A))  {h0}
-    笏披楳 笆｡(笳・A))  {modal-5[h0]}
-  笏披楳 竊・笳・A),笆｡(笳・A)))  {implies-intro}
-[Test Case] 笳② 竊・(笆｡(A 竊・竓･) 竊・竓･)
-笨・Solved:      笨・竊・笆｡(竊・A,竓･)),竓･)  {h0}
-    笏披楳 竊・笆｡(竊・A,竓･)),竓･)  {modal-duality[h0]}
-  笏披楳 竊・笳・A),竊・笆｡(竊・A,竓･)),竓･))  {implies-intro}
-[success] Total time: 1 s, completed 2026/02/14 19:43:02
+[Test Case] □(A → B) → (□A → □B)
+✓ Solved:      ✓ □(→(A,B))  {h0}
+    └─ →(□(A),□(B))  {modal-K}
+  └─ →(□(→(A,B)),→(□(A),□(B)))  {implies-intro}
+[Test Case] □A → A
+✓ Solved:      ✓ A  {h0.T}
+    └─ A  {box-elim-T[h0]}
+  └─ →(□(A),A)  {implies-intro}
+[Test Case] □A → □□A
+✓ Solved:      ✓ □(A)  {h0}
+    └─ □(□(A))  {box-intro}
+  └─ →(□(A),□(□(A)))  {implies-intro}
+[Test Case] ◇A → □◇A
+✓ Solved:      ✓ ◇(A)  {h0}
+    └─ □(◇(A))  {modal-5}
+  └─ →(◇(A),□(◇(A)))  {implies-intro}
+[Test Case] ◇A → (□(A → ⊥) → ⊥)
+✓ Solved:      ✓ ◇(A)  {h0}
+    └─ →(□(→(A,⊥)),⊥)  {modal-duality}
+  └─ →(◇(A),→(□(→(A,⊥)),⊥))  {implies-intro}
+[success] Total time: 1 s, completed 2026/02/19 3:55:05
 [info] running romanesco.Solver.testPatternUnification 
 [LOGGER] DISABLED
 === Pattern Unification Test ===
 Test 1: ?P(x) = x = 0
 Unifying: ?1(x) = x = 0
-笨・Solutions found:
+✓ Solutions found:
   Solution 0:
-    ?1 -> ﾎｻv_0. v_0 = 0
+    ?1 -> λbv0. bv0 = 0
     Applied LHS: x = 0
     Normalized:  x = 0
-    笨・Valid solution
-  Solution 1:
-    ?1 -> ﾎｻv_0. x = 0
-    Applied LHS: x = 0
-    Normalized:  x = 0
-    笨・Valid solution
+    ✓ Valid solution
 
 Test 2: ?M(x) = S(x)
 Unifying: ?2(x) = S(x)
-  Solution: ﾎｻv_0. S(v_0)
-[success] Total time: 0 s, completed 2026/02/14 19:43:02
+  Solution: λbv0. S(bv0)
+[success] Total time: 0 s, completed 2026/02/19 3:55:06
 [info] running romanesco.Solver.testTactics 
 === Tactic System Test ===
 Initial state:
 --------------------------------
 
 --------------------------------
-  Goal: 竊・竏ｧ(A,B),竏ｧ(B,A))
+  Goal: →(∧(A,B),∧(B,A))
 
 After intro:
 --------------------------------
-  h0: 竏ｧ(A,B)
+  h0: ∧(A,B)
 --------------------------------
-  Goal: 竏ｧ(B,A)
+  Goal: ∧(B,A)
 
 After destruct h0:
 --------------------------------
   h0.1: A
   h0.2: B
 --------------------------------
-  Goal: 竏ｧ(B,A)
+  Goal: ∧(B,A)
 
 After split (Subgoal 1):
 --------------------------------
@@ -293,17 +261,17 @@ After solve B (Subgoal 2):
 --------------------------------
   Goal: A
 
-笨・Goal solved successfully using tactics!
+✓ Goal solved successfully using tactics!
 
-=== Auto Tactic Test: A 竏ｧ B 竊・B 竏ｧ A ===
+=== Auto Tactic Test: A ∧ B → B ∧ A ===
 
 After intro, calling auto on goal: --------------------------------
-  h0: 竏ｧ(A,B)
+  h0: ∧(A,B)
 --------------------------------
-  Goal: 竏ｧ(B,A)
-笨・Auto solved: 笨・竏ｧ(A,B)  {h0}
+  Goal: ∧(B,A)
+✓ Auto solved: ✓ ∧(B,A)  {h0}
 
-笨・Auto tactic solved the goal with context!
+✓ Auto tactic solved the goal with context!
 
 === Simpl Tactic Test: plus(0, n) = n ===
 
@@ -316,7 +284,7 @@ After intro:
 After simpl:
 Solved
 
-笨・Simpl tactic worked!
+✓ Simpl tactic worked!
 
 === Induction Test: plus(n, 0) = n ===
 
@@ -330,19 +298,19 @@ Inductive Step:
 --------------------------------
 
 --------------------------------
-  Goal: 竏(n,竊・plus(n,0) = n,plus(S(n),0) = S(n)))
+  Goal: ∀(n,→(plus(n,0) = n,plus(S(n),0) = S(n)))
 
 Base Case solved! Next goal:
 --------------------------------
 
 --------------------------------
-  Goal: 竏(n,竊・plus(n,0) = n,plus(S(n),0) = S(n)))
+  Goal: ∀(n,→(plus(n,0) = n,plus(S(n),0) = S(n)))
 
 After intro n:
 --------------------------------
 
 --------------------------------
-  Goal: 竊・plus(n_t1,0) = n_t1,plus(S(n_t1),0) = S(n_t1))
+  Goal: →(plus(n_t1,0) = n_t1,plus(S(n_t1),0) = S(n_t1))
 
 After intro IH:
 --------------------------------
@@ -353,35 +321,26 @@ After intro IH:
 After rewrite IH:
 Solved
 
-笨・Induction goal solved successfully!
-[success] Total time: 0 s, completed 2026/02/14 19:43:02
+✓ Induction goal solved successfully!
+[success] Total time: 1 s, completed 2026/02/19 3:55:06
 [info] running romanesco.Solver.testTreeInduction 
 [LOGGER] DISABLED
+[LOGGER] Max log depth set to 20
 === Tree Induction Test ===
-Goal: 竏t. reverse(reverse(t)) = t
-笨・Proof found:
-        笨・竓､  {true-intro}
-      笏披楳 reverse(leaf) = leaf  {reverse_leaf}
-    笏披楳 reverse(reverse(leaf)) = leaf  {reverse_leaf}
-                  笨・竓､  {true-intro}
-                笏披楳 竏(t_2,竓､)  {forall-intro}
-              笏披楳 竏(a_1,竏(t_2,竓､))  {forall-intro}
-            笏披楳 竏(t_0,竏(a_1,竏(t_2,竓､)))  {forall-intro}
-          笏披楳 竏(t_0,竏(a_1,竏(t_2,node(reverse(reverse(t_0)),a_1,t_2) = node(t_0,a_1,t_2))))  {rewrite[IH_t_0]}
-        笏披楳 竏(t_0,竏(a_1,竏(t_2,node(reverse(reverse(t_0)),a_1,reverse(reverse(t_2))) = node(t_0,a_1,t_2))))  {rewrite[IH_t_2]}
-      笏披楳 竏(t_0,竏(a_1,竏(t_2,reverse(node(reverse(t_2),a_1,reverse(t_0))) = node(t_0,a_1,t_2))))  {reverse_node}
-    笏披楳 竏(t_0,竏(a_1,竏(t_2,reverse(reverse(node(t_0,a_1,t_2))) = node(t_0,a_1,t_2))))  {reverse_node}
-  笏披楳 竏(t,reverse(reverse(t)) = t)  {induction[Tree]}
-[success] Total time: 1 s, completed 2026/02/14 19:43:03
+Goal: ∀t. reverse(reverse(t)) = t
+✓ Proof found:
+    ✓ reverse(reverse(t_0)) = t_0  {true-intro}
+  └─ ∀(t,reverse(reverse(t)) = t)  {forall-intro}
+[success] Total time: 1 s, completed 2026/02/19 3:55:07
 [info] running romanesco.Solver.SolverTests.RecursiveInductionTest 
 [LOGGER] DISABLED
 === Recursive Data Structure Induction Test ===
-Case: 竏xs. append(xs, nil) = xs ... 笨・OK
-Case: 竏xs. 竏ys. 竏zs. append(append(xs, ys), zs) = append(xs, append(ys, zs)) ... 笨・OK
-Case: 竏t. mirror(mirror(t)) = t ... 笨・OK
+Case: ∀xs. append(xs, nil) = xs ... ✓ OK
+Case: ∀xs. ∀ys. ∀zs. append(append(xs, ys), zs) = append(xs, append(ys, zs)) ... ✓ OK
   (Induction used)
-Case: 竏xs. 竏ys. list_prop(append(xs, ys)) ... 笨・OK
-[success] Total time: 6 s, completed 2026/02/14 19:43:10
+Case: ∀t. mirror(mirror(t)) = t ... ✓ OK
+Case: ∀xs. ∀ys. list_prop(append(xs, ys)) ... ✓ OK
+[success] Total time: 1 s, completed 2026/02/19 3:55:08
 [info] running romanesco.testSomeCases 
 [LOGGER] DISABLED
 
@@ -392,133 +351,126 @@ Goals:
   0: --------------------------------
 
 --------------------------------
-  Goal: 竏(n,竊・竏(m,plus(n,S(m)) = S(plus(n,m))),竏(m,plus(S(n),S(m)) = S(plus(S(n),m)))))
+  Goal: ∀(n,→(∀(m,plus(n,S(m)) = S(plus(n,m))),∀(m,plus(S(n),S(m)) = S(plus(S(n),m)))))
 
 After intros:
 Goals:
   0: --------------------------------
-  IH: 竏(m,plus(n_step,S(m)) = S(plus(n_step,m)))
+  IH: ∀(m,plus(n_step,S(m)) = S(plus(n_step,m)))
 --------------------------------
   Goal: plus(S(n_step),S(m)) = S(plus(S(n_step),m))
 
 After rewrite IH:
 Goals:
 
-笨・Manual induction goal solved successfully!
+✓ Manual induction goal solved successfully!
 
 === Automatic Induction Tests ===
 
-[Test Case] 竏n. plus(n, 0) = n
-笨・Solved:
-    笨・竓､  {true-intro}
-  笏披楳 竏(n,竓､)  {forall-intro}
+[Test Case] ∀n. plus(n, 0) = n
+✓ Solved:
+    ✓ plus(n_0,0) = n_0  {true-intro}
+  └─ ∀(n,plus(n,0) = n)  {forall-intro}
 
-[Test Case] 竏n. plus(0, n) = n
-笨・Solved:
-    笨・竓､  {true-intro}
-  笏披楳 竏(n,竓､)  {forall-intro}
+[Test Case] ∀n. plus(0, n) = n
+✓ Solved:
+    ✓ plus(0,n_0) = n_0  {true-intro}
+  └─ ∀(n,plus(0,n) = n)  {forall-intro}
 
-[Test Case] 竏n. 竏m. plus(n, S(m)) = S(plus(n, m))
-笨・Solved:
-      笨・竓､  {true-intro}
-    笏披楳 竏(m,竓､)  {forall-intro}
-  笏披楳 竏(n,竏(m,竓､))  {forall-intro}
+[Test Case] ∀n. ∀m. plus(n, S(m)) = S(plus(n, m))
+✓ Solved:
+      ✓ plus(n_0,S(nothing)) = S(plus(n_0,nothing))  {true-intro}
+    └─ ∀(m,plus(0,S(m)) = S(plus(0,m)))  {forall-intro}
+      ✓ ∀(m,plus(S(n_0_1),S(m)) = S(plus(S(n_0_1),m)))  {IH_n_0}
+    └─ ∀(n_0,∀(m,plus(S(n_0),S(m)) = S(plus(S(n_0),m))))  {forall-intro}
+  └─ ∀(n,∀(m,plus(n,S(m)) = S(plus(n,m))))  {induction[Nat]}
 
-[Test Case] 竏xs. append(xs, nil) = xs
-笨・Solved:
-    笨・竓､  {true-intro}
-  笏披楳 竏(xs,竓､)  {forall-intro}
+[Test Case] ∀xs. append(xs, nil) = xs
+✓ Solved:
+    ✓ append(xs_0,nil) = xs_0  {true-intro}
+  └─ ∀(xs,append(xs,nil) = xs)  {forall-intro}
 
-[Test Case] 竏xs. append(nil, xs) = xs
-笨・Solved:
-    笨・竓､  {true-intro}
-  笏披楳 竏(xs,竓､)  {forall-intro}
+[Test Case] ∀xs. append(nil, xs) = xs
+✓ Solved:
+    ✓ append(nil,xs_0) = xs_0  {true-intro}
+  └─ ∀(xs,append(nil,xs) = xs)  {forall-intro}
 
-[Test Case] 竏xs. 竏ys. 竏zs. append(append(xs, ys), zs) = append(xs, append(ys, zs))
-笨・Solved:
-        笨・竓､  {true-intro}
-      笏披楳 竏(zs,竓､)  {forall-intro}
-    笏披楳 竏(ys,竏(zs,竓､))  {forall-intro}
-  笏披楳 竏(xs,竏(ys,竏(zs,竓､)))  {forall-intro}
+[Test Case] ∀xs. ∀ys. ∀zs. append(append(xs, ys), zs) = append(xs, append(ys, zs))
+✓ Solved:
+        ✓ append(append(nil,ys_1),zs_2) = append(nil,append(ys_1,zs_2))  {true-intro}
+      └─ ∀(zs,append(append(nil,ys_1),zs) = append(nil,append(ys_1,zs)))  {forall-intro}
+    └─ ∀(ys,∀(zs,append(append(nil,ys),zs) = append(nil,append(ys,zs))))  {forall-intro}
+        ✓ ∀(ys,∀(zs,append(append(cons(a_0_1,xs_1_2),ys),zs) = append(cons(a_0_1,xs_1_2),append(ys,zs))))  {IH_xs_1}
+      └─ ∀(xs_1,∀(ys,∀(zs,append(append(cons(a_0_1,xs_1),ys),zs) = append(cons(a_0_1,xs_1),append(ys,zs)))))  {forall-intro}
+    └─ ∀(a_0,∀(xs_1,∀(ys,∀(zs,append(append(cons(a_0,xs_1),ys),zs) = append(cons(a_0,xs_1),append(ys,zs))))))  {forall-intro}
+  └─ ∀(xs,∀(ys,∀(zs,append(append(xs,ys),zs) = append(xs,append(ys,zs)))))  {induction[List]}
 
-[Test Case] 竏n. 竏m. plus(n, m) = plus(m, n)
-笨・Solved:
-      笨・竓､  {true-intro}
-    笏披楳 竏(m,竓､)  {forall-intro}
-        笨・竓､  {true-intro}
-      笏披楳 竏(m,竓､)  {forall-intro}
-            笨・竓､  {true-intro}
-          笏披楳 竏(m,竓､)  {forall-intro}
-        笏披楳 竏(n_0_0,竏(m,竓､))  {forall-intro}
-      笏披楳 竏(n_0_0,竏(m,S(S(plus(n_0_0,m))) = S(S(plus(m,n_0_0)))))  {rewrite[IH_n_0_0]}
-    笏披楳 竏(n_0,竏(m,S(plus(n_0,m)) = S(plus(m,n_0))))  {induction[Nat]}
-  笏披楳 竏(n,竏(m,plus(n,m) = plus(m,n)))  {induction[Nat]}
+[Test Case] ∀n. ∀m. plus(n, m) = plus(m, n)
+✓ Solved:
+      ✓ plus(n_0,nothing) = plus(nothing,n_0)  {true-intro}
+    └─ ∀(m,plus(0,m) = plus(m,0))  {forall-intro}
+      ✓ ∀(m,plus(S(n_0_1),m) = plus(m,S(n_0_1)))  {IH_n_0}
+    └─ ∀(n_0,∀(m,plus(S(n_0),m) = plus(m,S(n_0))))  {forall-intro}
+  └─ ∀(n,∀(m,plus(n,m) = plus(m,n)))  {induction[Nat]}
 
-[Test Case] 竏n. 竏m. 竏k. plus(plus(n, m), k) = plus(n, plus(m, k))
-笨・Solved:
-        笨・竓､  {true-intro}
-      笏披楳 竏(k,竓､)  {forall-intro}
-    笏披楳 竏(m,竏(k,竓､))  {forall-intro}
-  笏披楳 竏(n,竏(m,竏(k,竓､)))  {forall-intro}
-[success] Total time: 2 s, completed 2026/02/14 19:43:11
+[Test Case] ∀n. ∀m. ∀k. plus(plus(n, m), k) = plus(n, plus(m, k))
+✓ Solved:
+        ✓ plus(plus(0,nothing),k_2) = plus(0,plus(nothing,k_2))  {true-intro}
+      └─ ∀(k,plus(plus(n_0,nothing),k) = plus(n_0,plus(nothing,k)))  {forall-intro}
+          ✓ plus(plus(0,nothing),k_2) = plus(0,plus(nothing,k_2))  {true-intro}
+        └─ ∀(k,plus(plus(n_0,nothing),k) = plus(n_0,plus(nothing,k)))  {forall-intro}
+      └─ ∀(a_0,∀(k,plus(plus(n_0,just(a_0)),k) = plus(n_0,plus(just(a_0),k))))  {forall-intro}
+    └─ ∀(m,∀(k,plus(plus(n_0,m),k) = plus(n_0,plus(m,k))))  {induction[Maybe]}
+  └─ ∀(n,∀(m,∀(k,plus(plus(n,m),k) = plus(n,plus(m,k)))))  {forall-intro}
+[success] Total time: 1 s, completed 2026/02/19 3:55:09
 [info] running romanesco.Solver.SolverTests.CombinedLogicTest 
 === Combined Multi-Logic Test ===
 
-[Test Case] G(A 竓ｸ B) 竊・(G(A) 竓ｸ G(B))
-笨・Solved!
-      笨・竓ｸ(G(A),G(B))  {h0}
-    笏披楳 竓ｸ(G(A),G(B))  {G-dist-limplies[h0]}
-  笏披楳 竊・G(竓ｸ(A,B)),竓ｸ(G(A),G(B)))  {implies-intro}
+[Test Case] G(A ⊸ B) → (G(A) ⊸ G(B))
+✓ Solved!
+      ✓ G(⊸(A,B))  {h0}
+    └─ ⊸(G(A),G(B))  {G-dist-limplies}
+  └─ →(G(⊸(A,B)),⊸(G(A),G(B)))  {implies-intro}
 
-[Test Case] 笆｡(A 竓ｸ B) 竊・(笆｡A 竓ｸ 笆｡B)
-笨・Solved!
-      笨・笆｡(竓ｸ(A,B))  {h0}
-    笏披楳 竓ｸ(笆｡(A),笆｡(B))  {modal-K-linear}
-  笏披楳 竊・笆｡(竓ｸ(A,B)),竓ｸ(笆｡(A),笆｡(B)))  {implies-intro}
+[Test Case] □(A ⊸ B) → (□A ⊸ □B)
+✓ Solved!
+      ✓ □(⊸(A,B))  {h0}
+    └─ ⊸(□(A),□(B))  {modal-K-linear}
+  └─ →(□(⊸(A,B)),⊸(□(A),□(B)))  {implies-intro}
 
-[Test Case] G(A * B) 竓ｸ (G(A) * G(B))
-笨・Solved!
-      笨・G(*(A,B))  {linear:lh0}
-    笏披楳 *(G(A),G(B))  {G-dist-sepand}
-  笏披楳 竓ｸ(G(*(A,B)),*(G(A),G(B)))  {linear-implies-intro}
+[Test Case] G(A * B) ⊸ (G(A) * G(B))
+✓ Solved!
+      ✓ G(*(A,B))  {lh0}
+    └─ *(G(A),G(B))  {G-dist-sepand}
+  └─ ⊸(G(*(A,B)),*(G(A),G(B)))  {linear-implies-intro}
 
-[Test Case] 笆｡G(A 竓ｸ B) 竊・G(笆｡A 竓ｸ 笆｡B)
-笨・Solved!
-          笨・G(竓ｸ(A,B))  {h0}
-        笏披楳 G(笆｡(竓ｸ(A,B)))  {modal-T}
-      笏披楳 G(竓ｸ(笆｡(A),笆｡(B)))  {modal-K-linear}
-    笏披楳 G(竓ｸ(笆｡(A),笆｡(B)))  {modal-T[h0]}
-  笏披楳 竊・笆｡(G(竓ｸ(A,B))),G(竓ｸ(笆｡(A),笆｡(B))))  {implies-intro}
+[Test Case] □G(A ⊸ B) → G(□A ⊸ □B)
+✓ Solved!
+        ✓ □(G(⊸(A,B)))  {h0}
+      └─ G(□(⊸(A,B)))  {modal-box-G}
+    └─ G(⊸(□(A),□(B)))  {G-modal-K-linear}
+  └─ →(□(G(⊸(A,B))),G(⊸(□(A),□(B))))  {implies-intro}
 
-[Test Case] 笆｡(A * B) 竊・(笆｡A * 笆｡B)
-笨・Solved!
-          笨・*(A,B)  {h2}
-        笏披楳 *(B,笆｡(A))  {modal-T}
-      笏披楳 竊・*(A,B),*(B,笆｡(A)))  {implies-intro}
-    笏披楳 竊・笆｡(*(A,B)),*(B,笆｡(A)))  {modal-T}
-  笏披楳 竊・笆｡(*(A,B)),*(笆｡(A),笆｡(B)))  {modal-T}
+[Test Case] □(A * B) → (□A * □B)
+✓ Solved!
+      ✓ □(*(A,B))  {h0}
+    └─ *(□(A),□(B))  {modal-dist-sepand}
+  └─ →(□(*(A,B)),*(□(A),□(B)))  {implies-intro}
 
-[Test Case] G(竏x. A(x) 竓ｸ B(x)) 竊・竏x. (G(A(x)) 竓ｸ G(B(x)))
-笨・Solved!
-                  笨・G(竓ｸ(A(x_1),B(x_1)))  {co-induction}
-                笏披楳 竓ｸ(G(A(x_1)),G(B(x_1)))  {G-dist-limplies}
-              笏披楳 G(竓ｸ(A(x_1),B(x_1)))  {G-dist-limplies}
-            笏披楳 X(G(竓ｸ(A(x_1),B(x_1))))  {next-step}
-            笨・竓ｸ(A(x_1),B(x_1))  {h0}
-          笏披楳 竏ｧ(X(G(竓ｸ(A(x_1),B(x_1)))),竓ｸ(A(x_1),B(x_1)))  {product-intro}
-        笏披楳 G(竓ｸ(A(x_1),B(x_1)))  {G-expansion}
-      笏披楳 竓ｸ(G(A(x_1)),G(B(x_1)))  {G-dist-limplies}
-    笏披楳 竏(x,竓ｸ(G(A(x)),G(B(x))))  {forall-intro}
-  笏披楳 竊・G(竏(x,竓ｸ(A(x),B(x)))),竏(x,竓ｸ(G(A(x)),G(B(x)))))  {implies-intro}
+[Test Case] G(∀x. A(x) ⊸ B(x)) → ∀x. (G(A(x)) ⊸ G(B(x)))
+✓ Solved!
+      ✓ G(∀(x,⊸(A(x),B(x))))  {h0}
+    └─ ∀(x,⊸(G(A(x)),G(B(x))))  {modal-dist-forall-limplies}
+  └─ →(G(∀(x,⊸(A(x),B(x)))),∀(x,⊸(G(A(x)),G(B(x)))))  {implies-intro}
 
-[Test Case] 竏x. 笆｡(P(x) 竓ｸ Q(x)) 竊・竏x. (笆｡P(x) 竓ｸ 笆｡Q(x))
-笨・Solved!
-          笨・竓ｸ(笆｡(P(x_0_3)),笆｡(Q(x_0_3)))  {h1}
-        笏披楳 竏(x_0,竓ｸ(笆｡(P(x_0)),笆｡(Q(x_0))))  {forall-intro}
-      笏披楳 竏(x_0,竓ｸ(笆｡(P(x_0)),笆｡(Q(x_0))))  {modal-K-linear[h1]}
-    笏披楳 竊・笆｡(竓ｸ(P(x_0),Q(x_0))),竏(x_0,竓ｸ(笆｡(P(x_0)),笆｡(Q(x_0)))))  {implies-intro}
-  笏披楳 竏(x,竊・笆｡(竓ｸ(P(x),Q(x))),竏(x,竓ｸ(笆｡(P(x)),笆｡(Q(x))))))  {forall-intro}
-[success] Total time: 20 s, completed 2026/02/14 19:43:31
+[Test Case] ∀x. □(P(x) ⊸ Q(x)) → ∀x. (□P(x) ⊸ □Q(x))
+✓ Solved!
+          ✓ □(⊸(P(x_0_2),Q(x_0_2)))  {h1}
+        └─ ⊸(□(P(x_0_2)),□(Q(x_0_2)))  {modal-K-linear}
+      └─ ∀(x_0,⊸(□(P(x_0)),□(Q(x_0))))  {forall-intro}
+    └─ →(□(⊸(P(x_0),Q(x_0))),∀(x_0,⊸(□(P(x_0)),□(Q(x_0)))))  {implies-intro}
+  └─ ∀(x,→(□(⊸(P(x),Q(x))),∀(x,⊸(□(P(x)),□(Q(x))))))  {forall-intro}
+[success] Total time: 1 s, completed 2026/02/19 3:55:10
 [info] running romanesco.Solver.SolverTests.runAllAdditionalTestsSuite 
 ============================================================
 Phase 1 Additional Tests
@@ -526,15 +478,15 @@ Phase 1 Additional Tests
 === Phase 1: Advanced Arithmetic ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 10
-笨・OK: Plus Commutative
-笨・OK: Plus Associative
+✓ OK: Plus Commutative
+✓ OK: Plus Associative
 
 === Phase 1: Advanced Lists ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 10
-笨・OK: Append Associative
-笨・OK: Reverse Reverse
-笨・OK: Map Composition
+✓ OK: Append Associative
+✓ OK: Reverse Reverse
+✓ OK: Map Composition
 ============================================================
 
 ============================================================
@@ -545,33 +497,33 @@ Advanced Test Suite
 === Dependent Type: Vector Tests ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 10
-笨・OK: Vector head extraction
-笨・OK: Vector length preservation
-笨・OK: Vector map identity
+✓ OK: Vector head extraction
+✗ FAIL: Vector length preservation - No proof found
+✗ FAIL: Vector map identity - No proof found
 
 === Inductive Predicate: Graph Reachability ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 10
-笨・OK: Reflexivity
-笨・OK: Edge implies reach
+✓ OK: Reflexivity
+✓ OK: Edge implies reach
 
 === Coinductive: Infinite Streams ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 5
-笨・OK: Stream head of repeat
-笨・OK: Stream bisimulation (self)
+✓ OK: Stream head of repeat
+✓ OK: Stream bisimulation (self)
 
 === Category Theory: Monad Laws ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 5
-笨・OK: List Monad: Left Identity
-笨・OK: List Monad: Right Identity
-笨・OK: List Monad: Associativity
-笨・OK: Maybe Monad: Left Identity
-笨・OK: Maybe Monad: Right Identity
-笨・OK: Maybe Monad: Associativity
+✓ OK: List Monad: Left Identity
+✓ OK: List Monad: Right Identity
+✓ OK: List Monad: Associativity
+✓ OK: Maybe Monad: Left Identity
+✓ OK: Maybe Monad: Right Identity
+✓ OK: Maybe Monad: Associativity
 ============================================================
-[success] Total time: 6 s, completed 2026/02/14 19:43:38
+[success] Total time: 2 s, completed 2026/02/19 3:55:12
 [info] running romanesco.Solver.SolverTests.runPhase1TestsSuite 
 ============================================================
 Phase 1 Additional Tests
@@ -579,17 +531,17 @@ Phase 1 Additional Tests
 === Phase 1: Advanced Arithmetic ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 10
-笨・OK: Plus Commutative
-笨・OK: Plus Associative
+✓ OK: Plus Commutative
+✓ OK: Plus Associative
 
 === Phase 1: Advanced Lists ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 10
-笨・OK: Append Associative
-笨・OK: Reverse Reverse
-笨・OK: Map Composition
+✓ OK: Append Associative
+✓ OK: Reverse Reverse
+✓ OK: Map Composition
 ============================================================
-[success] Total time: 1 s, completed 2026/02/14 19:43:39
+[success] Total time: 1 s, completed 2026/02/19 3:55:13
 [info] running romanesco.Solver.SolverTests.runAdvancedTestsSuite 
 ============================================================
 Advanced Test Suite
@@ -599,148 +551,112 @@ Advanced Test Suite
 === Dependent Type: Vector Tests ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 10
-笨・OK: Vector head extraction
-笨・OK: Vector length preservation
-笨・OK: Vector map identity
+✓ OK: Vector head extraction
+✗ FAIL: Vector length preservation - No proof found
+✗ FAIL: Vector map identity - No proof found
 
 === Inductive Predicate: Graph Reachability ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 10
-笨・OK: Reflexivity
-笨・OK: Edge implies reach
+✓ OK: Reflexivity
+✓ OK: Edge implies reach
 
 === Coinductive: Infinite Streams ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 5
-笨・OK: Stream head of repeat
-笨・OK: Stream bisimulation (self)
+✓ OK: Stream head of repeat
+✓ OK: Stream bisimulation (self)
 
 === Category Theory: Monad Laws ===
 [LOGGER] DISABLED
 [LOGGER] Max log depth set to 5
-笨・OK: List Monad: Left Identity
-笨・OK: List Monad: Right Identity
-笨・OK: List Monad: Associativity
-笨・OK: Maybe Monad: Left Identity
-笨・OK: Maybe Monad: Right Identity
-笨・OK: Maybe Monad: Associativity
+✓ OK: List Monad: Left Identity
+✓ OK: List Monad: Right Identity
+✓ OK: List Monad: Associativity
+✓ OK: Maybe Monad: Left Identity
+✓ OK: Maybe Monad: Right Identity
+✓ OK: Maybe Monad: Associativity
 ============================================================
-[success] Total time: 3 s, completed 2026/02/14 19:43:42
+[success] Total time: 1 s, completed 2026/02/19 3:55:14
 [info] running romanesco.Solver.SolverTests.HoTTAdvancedTest 
 [LOGGER] DISABLED
 === HoTT Phase 1: Transport Computation Test ===
-Case: transport(ﾎｻz. ﾃ・A(z), B(z)), p, pair(u, v)) = pair(transport(ﾎｻz. A(z), p, u), transport(ﾎｻz. B(z), p, v)) ... 笨・OK (Solved)
-Case: transport(ﾎｻz. +(A(z), B(z)), p, inl(u)) = inl(transport(ﾎｻz. A(z), p, u)) ... 笨・OK (Solved)
-Case: transport(ﾎｻz. 竊・A(z), B(z)), p, f) = ﾎｻx. transport(ﾎｻz. B(z), p, f(transport(ﾎｻz. A(z), inv(p), x))) ... 笨・OK (Solved)
-Case: isProp(A) 竊・竏x:A. 竏y:A. path(A, x, y) ... 笨・OK (Solved)
-Case: isProp(A) 竊・isSet(A) ... 笨・OK (Solved)
-Case: (isProp(A) 竏ｧ isProp(B)) 竊・isProp(ﾃ・A, B)) ... 笨・OK (Solved)
-Case: isSet(A) 竊・竏x:A. 竏y:A. 竏p:path(A, x, y). 竏q:path(A, x, y). path(path(A, x, y), p, q) ... 笨・OK (Solved)
-Case: (P(zero) 竏ｧ P(one) 竏ｧ path(Type, P(zero), P(one))) 竊・竏i:Interval. P(i) ... 笨・OK (Solved)
-Case: (P(north) 竏ｧ P(south) 竏ｧ 竏a. path(Type, P(north), P(south))) 竊・竏s:Susp. P(s) ... 笨・OK (Solved)
-Case: comp(A, refl(x), u) = u ... 笨・OK (Solved)
+Case: transport(λz. ×(A(z), B(z)), p, pair(u, v)) = pair(transport(λz. A(z), p, u), transport(λz. B(z), p, v)) ... ✓ OK (Solved)
+Case: transport(λz. +(A(z), B(z)), p, inl(u)) = inl(transport(λz. A(z), p, u)) ... ✓ OK (Solved)
+Case: transport(λz. →(A(z), B(z)), p, f) = λx. transport(λz. B(z), p, f(transport(λz. A(z), inv(p), x))) ... ✓ OK (Solved)
+Case: isProp(A) → ∀x:A. ∀y:A. path(A, x, y) ... ✓ OK (Solved)
+Case: isProp(A) → isSet(A) ... ✓ OK (Solved)
+Case: (isProp(A) ∧ isProp(B)) → isProp(×(A, B)) ... ✓ OK (Solved)
+Case: isSet(A) → ∀x:A. ∀y:A. ∀p:path(A, x, y). ∀q:path(A, x, y). path(path(A, x, y), p, q) ... ✗ FAIL (Should have been solved) - Reason: Watchdog timeout
+Case: (P(zero) ∧ P(one) ∧ path(Type, P(zero), P(one))) → ∀i:Interval. P(i) ... ✓ OK (Solved)
+Case: (P(north) ∧ P(south) ∧ ∀a. path(Type, P(north), P(south))) → ∀s:Susp. P(s) ... ✗ FAIL (Should have been solved) - Reason: No proof found
+Case: comp(A, refl(x), u) = u ... ✓ OK (Solved)
 
 === Phase 5: Proof Mining Test ===
-笨・OK: Complex arithmetic solved with dynamic lemmas
-
-=== Phase 6: HIT DSL Test ===
-笨・OK: Circle defined via DSL and induction proved
-[success] Total time: 4 s, completed 2026/02/14 19:43:46
+✓ OK: Complex arithmetic solved with dynamic lemmas
+[success] Total time: 17 s, completed 2026/02/19 3:55:31
 [info] running romanesco.Solver.SolverTests.UnificationAdvancedTest 
 [LOGGER] DISABLED
 === Advanced Unification Test ===
 [Case: Duplicate Args]
 Unifying: ?1(x,x) = f(x)
-笨・Solution 0: Map(1 -> ﾎｻv_0. ﾎｻv_1. f(v_0))
-  Check: f(x) == f(x)
-笨・Solution 1: Map(1 -> ﾎｻv_0. ﾎｻv_1. f(v_1))
-  Check: f(x) == f(x)
-笨・Solution 2: Map(1 -> ﾎｻv_0. ﾎｻv_1. f(x))
+✓ Solution 0: Map(1 -> λbv0. λbv1. f(bv0))
   Check: f(x) == f(x)
 [Case: Partial Dependency]
 Unifying: ?2(x,y) = f(x)
-笨・Solution 0: Map(2 -> ﾎｻv_0. ﾎｻv_1. f(v_0))
-  Check: f(x) == f(x)
-笨・Solution 1: Map(2 -> ﾎｻv_0. ﾎｻv_1. f(x))
+✓ Solution 0: Map(2 -> λbv0. λbv1. f(bv0))
   Check: f(x) == f(x)
 [Case: Structured Args]
 Unifying: ?3(S(x)) = S(S(x))
-笨・Solution 0: Map(3 -> ﾎｻv_0. S(v_0))
-  Check: S(S(x)) == S(S(x))
-笨・Solution 1: Map(3 -> ﾎｻv_0. S(S(x)))
+✓ Solution 0: Map(3 -> λbv0. S(bv0))
   Check: S(S(x)) == S(S(x))
 [Case: Nested Meta]
 Unifying: ?4(x) = f(?5(x))
-笨・Solution 0: Map(4 -> ﾎｻv_0. f(?5(v_0)))
-  Check: f(?5(x)) == f(?5(x))
-笨・Solution 1: Map(4 -> ﾎｻv_0. f(?5(x)))
+✓ Solution 0: Map(4 -> λbv0. f(?5(bv0)))
   Check: f(?5(x)) == f(?5(x))
 [Case: Non-deterministic Abstraction]
 Unifying: ?6(x,x) = f(x,x)
-笨・Solution 0: Map(6 -> ﾎｻv_0. ﾎｻv_1. f(v_0,v_0))
-  Check: f(x,x) == f(x,x)
-笨・Solution 1: Map(6 -> ﾎｻv_0. ﾎｻv_1. f(v_0,v_1))
-  Check: f(x,x) == f(x,x)
-笨・Solution 2: Map(6 -> ﾎｻv_0. ﾎｻv_1. f(v_0,x))
-  Check: f(x,x) == f(x,x)
-笨・Solution 3: Map(6 -> ﾎｻv_0. ﾎｻv_1. f(v_1,v_0))
-  Check: f(x,x) == f(x,x)
-笨・Solution 4: Map(6 -> ﾎｻv_0. ﾎｻv_1. f(v_1,v_1))
-  Check: f(x,x) == f(x,x)
-笨・Solution 5: Map(6 -> ﾎｻv_0. ﾎｻv_1. f(v_1,x))
-  Check: f(x,x) == f(x,x)
-笨・Solution 6: Map(6 -> ﾎｻv_0. ﾎｻv_1. f(x,v_0))
-  Check: f(x,x) == f(x,x)
-笨・Solution 7: Map(6 -> ﾎｻv_0. ﾎｻv_1. f(x,v_1))
-  Check: f(x,x) == f(x,x)
-笨・Solution 8: Map(6 -> ﾎｻv_0. ﾎｻv_1. f(x,x))
+✓ Solution 0: Map(6 -> λbv0. λbv1. f(bv0,bv0))
   Check: f(x,x) == f(x,x)
 [Case: Pruning]
 Unifying: ?7(x) = f(?8(x,y))
-笨・Solution 0: Map(8 -> ﾎｻmv_0. ﾎｻmv_1. ?8.999(mv_0), 7 -> ﾎｻv_0. f(?8.999(v_0)))
-  Check: f(?8.999(x)) == f(?8.999(x))
-笨・Solution 1: Map(8 -> ﾎｻmv_0. ﾎｻmv_1. ?8.999(mv_0), 7 -> ﾎｻv_0. f(?8.999(x)))
-  Check: f(?8.999(x)) == f(?8.999(x))
-[success] Total time: 0 s, completed 2026/02/14 19:43:46
+✓ Solution 0: Map(8 -> λmv0. λmv1. ?8.888(mv0), 7 -> λbv0. f(?8.888(bv0)))
+  Check: f(?8.888(x)) == f(?8.888(x))
+[success] Total time: 0 s, completed 2026/02/19 3:55:32
 [info] running romanesco.Solver.SolverTests.EnhancedFrameTest 
 [LOGGER] DISABLED
 === Enhanced Frame Inference Test ===
-Case: Basic frame ... 笨・OK
-Case: Points-to frame ... 笨・OK
-Case: Multi-resource frame ... 笨・OK
-Case: Minimal frame (C * D) ... 笨・OK
-Case: Minimal frame (x 竊ｦ 1 * z 竊ｦ 3) ... 笨・OK
-Case: Frame rule application ... 笨・OK
-Case: File handle frame ... 笨・OK
-Case: Lock and memory frame ... 笨・OK
-[success] Total time: 6 s, completed 2026/02/14 19:43:52
+Case: Basic frame ... ✓ OK
+Case: Points-to frame ... ✓ OK
+Case: Multi-resource frame ... ✓ OK
+Case: Minimal frame (C * D) ... ✓ OK
+Case: Minimal frame (x ↦ 1 * z ↦ 3) ... ✓ OK
+Case: Frame rule application ... ✓ OK
+Case: File handle frame ... ✓ OK
+Case: Lock and memory frame ... ✓ OK
+[success] Total time: 7 s, completed 2026/02/19 3:55:39
 [info] running romanesco.Solver.SolverTests.runMathAndVerificationTests 
 === Extended Arithmetic Verification ===
-Case: plus(S(0), S(0)) = S(S(0)) ... 笨・OK
-笨・竓､  {true-intro}
-Case: plus(n, plus(m, k)) = plus(m, plus(n, k)) ... 笨・OK
-    笨・竓､  {true-intro}
-  笏披楳 plus(n,plus(m,k)) = plus(m,plus(k,n))  {plus_comm}
-笏披楳 plus(n,plus(m,k)) = plus(m,plus(n,k))  {plus_comm}
+Case: plus(S(0), S(0)) = S(S(0)) ... ✓ OK
+✓ plus(S(0),S(0)) = S(S(0))  {true-intro}
+Case: plus(n, plus(m, k)) = plus(m, plus(n, k)) ... ✓ OK
+✓ plus(S(0),S(0)) = S(S(0))  {true-intro}
 
 === Hoare Logic Program Verification ===
-Case: {x = 1} skip {x = 1} ... 笨・OK
-    笨・x = 1  {h1}
-  笏披楳 竊・x = 1,x = 1)  {implies-intro}
-笏披楳 triple(x = 1,skip,x = 1)  {hoare-skip}
-Case: {竓､} x := 1 {x = 1} ... 笨・OK
-    笨・竓､  {true-intro}
-  笏披楳 竊・竓､,竓､)  {implies-intro}
-笏披楳 triple(竓､,:=(x,1),x = 1)  {hoare-assign}
-Case: {竓､} x := 1 ; y := 2 {x = 1 竏ｧ y = 2} ... 笨・OK
-          笨・竓､  {reflexivity}
-        笏披楳 竊・竓､,竓､)  {implies-intro}
-      笏披楳 isProp(?3.147)  {prop-path}
-    笏披楳 竊・竓､,path(?3.147,?2.5,?2.6))  {prop-path}
-  笏披楳 triple(竓､,:=(x,1),path(?3.147,?2.5,?2.6))  {hoare-assign}
-        笨・竓､  {reflexivity}
-      笏披楳 x = 1  {rewrite[h2]}
-    笏披楳 竊・path(?3.147,x,1),x = 1)  {implies-intro}
-  笏披楳 triple(path(?3.147,x,1),:=(y,2),竏ｧ(x = 1,y = 2))  {hoare-assign}
-笏披楳 triple(竓､,;(:=(x,1),:=(y,2)),竏ｧ(x = 1,y = 2))  {hoare-seq}
-[success] Total time: 1 s, completed 2026/02/14 19:43:53
+Case: {x = 1} skip {x = 1} ... ✓ OK
+    ✓ x = 1  {h1}
+  └─ →(x = 1,x = 1)  {implies-intro}
+└─ triple(x = 1,skip,x = 1)  {hoare-skip}
+Case: {⊤} x := 1 {x = 1} ... ✓ OK
+    ✓ 1 = 1  {true-intro}
+  └─ →(⊤,1 = 1)  {implies-intro}
+└─ triple(⊤,:=(x,1),x = 1)  {hoare-assign}
+Case: {⊤} x := 1 ; y := 2 {x = 1 ∧ y = 2} ... ✓ OK
+      ✓ 1 = 1  {true-intro}
+    └─ →(⊤,⊤)  {implies-intro}
+  └─ triple(⊤,:=(x,1),x = 1)  {hoare-assign}
+      ✓ x = 1  {h2}
+    └─ →(x = 1,x = 1)  {implies-intro}
+  └─ triple(x = 1,:=(y,2),∧(x = 1,y = 2))  {hoare-assign}
+└─ triple(⊤,;(:=(x,1),:=(y,2)),∧(x = 1,y = 2))  {hoare-seq}
+[success] Total time: 1 s, completed 2026/02/19 3:55:40

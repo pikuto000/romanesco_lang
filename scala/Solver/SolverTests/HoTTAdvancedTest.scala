@@ -100,7 +100,7 @@ object HoTTAdvancedTest {
       case Left(trace) =>
         println(s"✗ FAIL: Still too hard - Reason: ${trace.reason}")
     }
-
+    /* this test currentry disabled: HIT DSL should be integrated into the HoTT plug-in.
     println("\n=== Phase 6: HIT DSL Test ===")
     try {
       val circleDSL = "HIT Circle { base, loop: base -> base }"
@@ -116,6 +116,6 @@ object HoTTAdvancedTest {
       }
     } catch {
       case e: Exception => println(s"Error in HIT DSL: ${e.getMessage}")
-    }
+    }*/
   }
 }

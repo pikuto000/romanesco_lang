@@ -13,6 +13,7 @@ Romanesco 証明エンジン 開発ロードマップ
 - [x] 高階パターンユニフィケーションと動的 Pruning
 
 2. 現在の最優先課題: 究極の難関制覇 (The Ultimate Challenges) 🚀
+- [ ] 前向き推論の強化
 - [ ] **高次等次的帰納法 (HITs) の計算的解決 (S1 Induction)**
     - [ ] キュービカル型理論に基づく Kan Composition (hcomp) の実装
     - [ ] 区間変数 (Interval variables) `i, j` の導入とトランスポートの計算簡約

@@ -59,7 +59,7 @@ class AxiomPlugin extends LogicPlugin {
     // 公理 (Context)
     val axioms = (context.map((_, false)) ++ state.linearContext.map((_, true))).flatMap { case ((name, hyp), isLinear) =>
       val hn = prover.normalize(applySubst(hyp, subst))
-      unify(hn, goal, subst).map { s =>
+      unify(hn, goalNorm, subst).map { s =>
         val nextL = if (isLinear) state.linearContext.filterNot(_._1 == name) else state.linearContext
         Tree.V(SearchNode(exprs, name, depth, Right(ProofResult(ProofTree.Leaf(applySubst(goal, s), name))), s, context, nextL), Vector.empty)
       }

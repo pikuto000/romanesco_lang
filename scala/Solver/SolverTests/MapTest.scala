@@ -48,10 +48,10 @@ import romanesco.Solver.core.LogicSymbols._
   val goalStr = "∀f. ∀g. ∀xs. map(f, map(g, xs)) = map(f ∘ g, xs)"
   println(s"Goal: $goalStr")
   val goal = TestParser.parse(goalStr)
-  val config = ProverConfig(classical = false, rules = allRules)
+  val config = ProverConfig(classical = false, rules = allRules, algebras = StandardRules.defaultAlgebras)
   val prover = new Prover(config)
 
-  prover.prove(goal, rules = allRules) match {
+  prover.prove(goal, rules = allRules, maxDepth = 20, timeoutMs = 60000) match {
     case Right(t) =>
       println("✓ Proof found:")
       println(t.tree.format(1))

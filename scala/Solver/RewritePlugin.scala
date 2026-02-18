@@ -26,7 +26,8 @@ class RewritePlugin extends LogicPlugin {
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
-    val goal = exprs.last
+    // ゴールを正規化してからマッチングする（Rewriterのハードコードルールによる正規化後の形を使う）
+    val goal = prover.normalize(applySubst(exprs.last, subst))
     val results = mutable.ArrayBuffer[Tree[SearchNode]]()
 
     context.foreach { case (name, hyp) =>
@@ -34,9 +35,23 @@ class RewritePlugin extends LogicPlugin {
       val instHyp = applySubst(hyp, subst)
       instHyp match {
         case Expr.App(Expr.Sym(Eq | Path), args) if args.length >= 2 =>
-          val l = args match { case List(_, x, _) if args.length == 3 => x; case List(x, _) => x; case _ => null }
-          val r = args.last
-          if (l != null) {
+          val lRaw = args match { case List(_, x, _) if args.length == 3 => x; case List(x, _) => x; case _ => null }
+          val rRaw = args.last
+          if (lRaw != null) {
+            // IH中のVarをメタ変数化してパターンとして使う（xs_1 と xs_1_2 のような変数名の違いを吸収）
+            var metaCounter = 0
+            val vars = Prover.collectVars(lRaw) ++ Prover.collectVars(rRaw)
+            val varToMeta = vars.map { v =>
+              metaCounter += 1
+              v -> Expr.Meta(MetaId(List(-2, depth * 100 + metaCounter)))
+            }.toMap
+            def varSubst(e: Expr): Expr = e match {
+              case Expr.Var(n) if varToMeta.contains(n) => varToMeta(n)
+              case Expr.App(h, as) => Expr.App(varSubst(h), as.map(varSubst))
+              case _ => e
+            }
+            val l = varSubst(lRaw)
+            val r = varSubst(rRaw)
             // ゴールの中で l にマッチする箇所を探して r で置き換える
             def findAndReplace(expr: Expr): List[(Expr, Subst)] = {
               val direct = unify(expr, l, subst).map(s => (applySubst(r, s), s)).toList

@@ -10,6 +10,7 @@ import LogicSymbols._
 import romanesco.Types.Tree
 import romanesco.Solver.core.Prover
 
+//Todo: HIT DSL関連システムの実装
 class HoTTPlugin extends LogicPlugin {
   override def name: String = "HoTT"
 
@@ -29,7 +30,18 @@ class HoTTPlugin extends LogicPlugin {
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
-    searchPathInduction(exprs, rules, context, state, subst, depth, limit, visited, guarded, prover)
+    searchPathInduction(
+      exprs,
+      rules,
+      context,
+      state,
+      subst,
+      depth,
+      limit,
+      visited,
+      guarded,
+      prover
+    )
   }
 
   private def searchPathInduction(
@@ -50,14 +62,51 @@ class HoTTPlugin extends LogicPlugin {
       context.indices.flatMap { i =>
         prover.checkDeadline()
         context(i) match {
-          case (pName, Expr.App(Expr.Sym(Path), List(_, x, Expr.Var(yName)))) if x != Expr.Var(yName) =>
+          case (pName, Expr.App(Expr.Sym(Path), List(_, x, Expr.Var(yName))))
+              if x != Expr.Var(yName) =>
             val reflX = Expr.App(Expr.Sym(Refl), List(x))
-            val substGoal = Prover.substVar(Prover.substVar(goal, yName, x), pName, reflX)
-            val nextCtx = context.patch(i, Nil, 1).map(h => (h._1, Prover.substVar(Prover.substVar(h._2, yName, x), pName, reflX)))
-            val subTree = prover.search(exprs :+ substGoal, nextCtx, state.incInduction, subst, depth + 1, limit, visited, guarded)
+            val substGoal =
+              Prover.substVar(Prover.substVar(goal, yName, x), pName, reflX)
+            val nextCtx = context
+              .patch(i, Nil, 1)
+              .map(h =>
+                (
+                  h._1,
+                  Prover.substVar(Prover.substVar(h._2, yName, x), pName, reflX)
+                )
+              )
+            val subTree = prover.search(
+              exprs :+ substGoal,
+              nextCtx,
+              state.incInduction,
+              subst,
+              depth + 1,
+              limit,
+              visited,
+              guarded
+            )
             allSuccesses(subTree).map { s =>
-              val result = Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"path-induction[$pName]", List(s.result.toOption.get.tree))))
-              Tree.V(SearchNode(exprs :+ substGoal, s"path-induction[$pName]", depth, result, s.subst, s.context, s.linearContext), Vector(subTree))
+              val result = Right(
+                ProofResult(
+                  ProofTree.Node(
+                    applySubst(goal, s.subst),
+                    s"path-induction[$pName]",
+                    List(s.result.toOption.get.tree)
+                  )
+                )
+              )
+              Tree.V(
+                SearchNode(
+                  exprs :+ substGoal,
+                  s"path-induction[$pName]",
+                  depth,
+                  result,
+                  s.subst,
+                  s.context,
+                  s.linearContext
+                ),
+                Vector(subTree)
+              )
             }
           case _ => Vector.empty
         }
