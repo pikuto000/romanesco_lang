@@ -30,7 +30,7 @@ object CycleTest {
     println(s"Testing loop with Forall: $goal2")
     val res2 = prover.prove(goal2, maxDepth = 10)
     res2 match {
-      case Left(trace) => println(s"Failed: ${trace.reason}")
+      case Left(trace) => println(s"Failed as expected: ${trace.reason}")
       case Right(_)    => println("Error: Solved a looping goal!")
     }
 
@@ -44,7 +44,7 @@ object CycleTest {
     println(s"Testing complex loop: P(a) -> Q(a) -> P(a)")
     val res3 = prover2.prove(sym("P")(sym("a")), maxDepth = 10)
     res3 match {
-      case Left(trace) => println(s"Failed: ${trace.reason}")
+      case Left(trace) => println(s"Failed as expected: ${trace.reason}")
       case Right(_)    => println("Error: Solved a looping goal!")
     }
 
@@ -57,7 +57,7 @@ object CycleTest {
     println(s"Testing growth loop: P(a) -> P(f(a))")
     val res4 = prover3.prove(sym("P")(sym("a")), maxDepth = 10)
     res4 match {
-      case Left(trace) => println(s"Failed: ${trace.reason}")
+      case Left(trace) => println(s"Failed as expected: ${trace.reason}")
       case Right(_)    => println("Error: Solved a growing goal!")
     }
   }
