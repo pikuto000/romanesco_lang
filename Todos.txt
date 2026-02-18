@@ -11,21 +11,29 @@ Romanesco 証明エンジン 開発ロードマップ
 - [x] 依存階層を持つユニバース (Type0, Type1...) とユニバレンス基本規則
 - [x] Hoare論理の基本プログラム検証 (skip, assignment, seq, basic if)
 - [x] 高階パターンユニフィケーションと動的 Pruning
+- [x] **Hoare論理: ループ不変量の自動発見 (While Invariant Discovery)**
+    - [x] 最弱事前条件 (Weakest Precondition: WP) 合成エンジンの導入
+    - [x] 述語抽象化 (Predicate Abstraction) による不変量候補の自動生成
+    - [x] 事後条件からのバックトラッキングによる不変量テンプレートのマッチング
 
-2. 現在の最優先課題: 究極の難関制覇 (The Ultimate Challenges) 🚀
+2. 現在の最優先課題 (Priority:High)🚀
 - [ ] 前向き推論の強化
 - [ ] **高次等次的帰納法 (HITs) の計算的解決 (S1 Induction)**
     - [ ] キュービカル型理論に基づく Kan Composition (hcomp) の実装
     - [ ] 区間変数 (Interval variables) `i, j` の導入とトランスポートの計算簡約
     - [ ] `transport(P, loop, b)` を単なる等式ではなく「次元を上げる計算操作」として定義
-- [ ] **Hoare論理: ループ不変量の自動発見 (While Invariant Discovery)**
-    - [ ] 最弱事前条件 (Weakest Precondition: WP) 合成エンジンの導入
-    - [ ] 述語抽象化 (Predicate Abstraction) による不変量候補の自動生成
-    - [ ] 事後条件からのバックトラッキングによる不変量テンプレートのマッチング
 - [ ] **依存型 Vector の完全検証 (Vector Length/Properties)**
     - [ ] `vlength(vappend(v, w)) = plus(vlength(v), vlength(w))` の完全自動証明
 
 3. 短期・中期的な拡張項目 (Priority: Medium) ⏳
+- [ ] プラグイン指向アーキテクチャの洗練: ハードコードを徹底的に排除し、各機能をプラグイン化することの徹底。また、プラグイン機能の拡張
+    - [ ] プラグインの型による区別の拡張
+        - [ ] Pluginトレイトの新規定義と、それに伴う`romanesco.Solver.core.LogicPlugin`トレイトの変更
+        - [ ] Pluginパックを導入する: プラグインの依存関係を構築することで、同じロジックをコピーする必要性をなくす
+        - [ ] 代数トレイトの新規定義: 代数をPluginトレイトの拡張として定義する
+        - [ ] 正規化のプラグイン化: 代数をPluginトレイトの拡張として、rewriteロジックを定義する。書き換えロジックをわざわざ別で書かなくて良くするため
+    - [ ] プラグイン導入の自動化: プラグインの記述を自動で取り込む機構の定義。
+        - [ ] コンパイル時に、特定のパッケージにあるプラグインを自動で証明器にインポートする機能の追加
 - [ ] 探索木の視覚化 (D3.js / Web UI) の統合: `romanesco.Types.Tree` をそのまま描画
 - [ ] 並列計算・セッション型の形式検証への応用
 - [ ] 証明オブジェクトからの実行可能コード (MIR/LLVM IR) の抽出
