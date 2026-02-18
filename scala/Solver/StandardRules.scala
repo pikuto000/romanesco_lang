@@ -54,8 +54,12 @@ object StandardRules:
   val modalDistForall = CatRule("modal-dist-forall", sym(Box)(sym(Forall)(v("x"), v("P")(v("x")))), sym(Forall)(v("x"), sym(Box)(v("P")(v("x")))))
   val modalDistSepAnd = CatRule("modal-dist-sepand", sym(Box)(sym(SepAnd)(v("A"), v("B"))), sym(SepAnd)(sym(Box)(v("A")), sym(Box)(v("B"))))
   val modalDistForallLImplies = CatRule("modal-dist-forall-limplies", sym(Globally)(sym(Forall)(v("x"), sym(LImplies)(v("A")(v("x")), v("B")(v("x"))))), sym(Forall)(v("x"), sym(LImplies)(sym(Globally)(v("A")(v("x"))), sym(Globally)(v("B")(v("x"))))))
+  // □G(A) → G(□A): BoxとGloballyの交換可能性
+  val modalBoxG = CatRule("modal-box-G", sym(Box)(sym(Globally)(v("A"))), sym(Globally)(sym(Box)(v("A"))))
+  // G(□(A ⊸ B)) → G(□A ⊸ □B): G内部でのmodal-K-linear適用
+  val gModalKLinear = CatRule("G-modal-K-linear", sym(Globally)(sym(Box)(sym(LImplies)(v("A"), v("B")))), sym(Globally)(sym(LImplies)(sym(Box)(v("A")), sym(Box)(v("B")))))
 
-  val modal = List(modalK, modalKLinear, modalT, modalDuality, modalDistTensor, modalDistForall, modalDistSepAnd, modalDistForallLImplies, modal4, modal5)
+  val modal = List(modalK, modalKLinear, modalT, modalDuality, modalDistTensor, modalDistForall, modalDistSepAnd, modalDistForallLImplies, modal4, modal5, modalBoxG, gModalKLinear)
 
   val linearBang = CatRule("linear-bang-elim", sym(Bang)(v("A")), v("A"))
   val linear = List(linearBang)
