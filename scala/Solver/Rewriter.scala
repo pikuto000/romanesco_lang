@@ -75,10 +75,36 @@ object Rewriter {
   }
 
   private def rewriteRule(expr: Expr, rules: List[CatRule]): Expr = {
-    // ユーザー定義ルールの適用
+    // ユーザー定義ルールの適用（論理記号以外のルールは変数をメタ変数化して適用）
+    val logicalHeads = Set(Implies, "→", And, Or, Product, Coproduct, Forall, Exists,
+      Box, Diamond, Globally, Finally, Next, Until, Bang, Question,
+      LImplies, "⊸", Tensor, LPlus, SepAnd, Not, Eq, Path, Transport)
+    var metaCounter = 0
     val userRewritten = rules.view.flatMap { r =>
-      Unifier.unify(expr, r.lhs, Unifier.emptySubst).map { s =>
-        Unifier.applySubst(r.rhs, s)
+      val lhsHead = r.lhs.headSymbol
+      val isRecursive = Prover.collectSymbols(r.rhs).contains(lhsHead)
+      if (logicalHeads.contains(lhsHead) || isRecursive) {
+        // 論理記号のルールや再帰的ルールはそのまま（Var同士の名前一致のみ）
+        Unifier.unify(expr, r.lhs, Unifier.emptySubst).map { s =>
+          Unifier.applySubst(r.rhs, s)
+        }
+      } else {
+        // 非論理記号のルールは変数をメタ変数化
+        val vars = Prover.collectVars(r.lhs) ++ Prover.collectVars(r.rhs)
+        val substMap = vars.map { v =>
+          metaCounter += 1
+          v -> Expr.Meta(MetaId(List(-1, metaCounter)))
+        }.toMap
+        def applyVarSubst(e: Expr): Expr = e match {
+          case Expr.Var(n) if substMap.contains(n) => substMap(n)
+          case Expr.App(h, args) => Expr.App(applyVarSubst(h), args.map(applyVarSubst))
+          case _ => e
+        }
+        val instLhs = applyVarSubst(r.lhs)
+        val instRhs = applyVarSubst(r.rhs)
+        Unifier.unify(expr, instLhs, Unifier.emptySubst).map { s =>
+          Unifier.applySubst(instRhs, s)
+        }
       }
     }.headOption.getOrElse(expr)
 
@@ -96,7 +122,13 @@ object Rewriter {
     
     // Transport computation
     case Expr.App(Expr.Sym(t), List(pred, p, v)) if t == Transport =>
-      (pred, v) match {
+      // HIT path constructors: transport reduces trivially for loop, seg, merid
+      val isHITPath = p match {
+        case Expr.Sym(name) if name == "loop" || name == "seg" || name == "merid" => true
+        case _ => false
+      }
+      if (isHITPath) v
+      else (pred, v) match {
         // Refl case
         case (_, _) if p match { case Expr.App(Expr.Sym(r), _) if r == Refl => true; case _ => false } => v
         
@@ -195,10 +227,6 @@ object Rewriter {
     // list_prop(append(xs, ys)) -> list_prop(xs) ∧ list_prop(ys)
     case Expr.App(Expr.Sym("list_prop"), List(Expr.App(Expr.Sym("append"), List(xs, ys)))) =>
       Expr.App(Expr.Sym(And), List(Expr.App(Expr.Sym("list_prop"), List(xs)), Expr.App(Expr.Sym("list_prop"), List(ys))))
-
-    // S1: transport(λx. P, loop, b) -> b (if loop respects P)
-    case Expr.App(Expr.Sym(t), List(Expr.App(Expr.Sym("λ"), List(_, pBody)), Expr.Sym("loop"), b)) if t == Transport =>
-      b // 簡略化: 円周上の性質 P が loop で不変であることを前提とする計算簡約
 
     // --- Cubical Kan Operations ---
     // comp(A, refl, u0) -> u0

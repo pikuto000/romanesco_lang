@@ -43,8 +43,9 @@ class InductionPlugin extends LogicPlugin {
 
           logger.log(s"Induction check for variable: $vName (type: $typeOpt)")
           
-          val targetAlgebras = StandardRules.defaultAlgebras.filter { a =>
-            val nameMatch = typeOpt.exists(_.toString.equalsIgnoreCase(a.name))
+          val allAlgebras = StandardRules.defaultAlgebras ++ prover.getAlgebras
+          val targetAlgebras = allAlgebras.filter { a =>
+            val nameMatch = typeOpt.exists(t => t.headSymbol.equalsIgnoreCase(a.name))
             val prefixMatch = vName == a.varPrefix || vName.startsWith(a.varPrefix + "_")
             nameMatch || (typeOpt.isEmpty && prefixMatch)
           }
@@ -122,9 +123,11 @@ class InductionPlugin extends LogicPlugin {
             val fromSym = from match { case Expr.Sym(s) => s; case Expr.App(Expr.Sym(s), _) => s; case _ => "" }
             val toSym = to match { case Expr.Sym(s) => s; case Expr.App(Expr.Sym(s), _) => s; case _ => "" }
 
+            val bodyFrom = Prover.substVar(body, vn, from)
+            val bodyTo = Prover.substVar(body, vn, to)
             val transportGoal = Expr.App(Expr.Sym(Eq), List(
-              Expr.App(Expr.Sym(Transport), List(pred, p, from)),
-              to
+              Expr.App(Expr.Sym(Transport), List(pred, p, bodyFrom)),
+              bodyTo
             ))
             
             val subTree = prover.search(exprs :+ transportGoal, context, st.incInduction, s, depth + 1, limit, visited, guarded)

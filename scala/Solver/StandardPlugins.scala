@@ -31,9 +31,10 @@ class AxiomPlugin extends LogicPlugin {
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
     val goal = exprs.last
-    
+    val goalNorm = prover.normalize(applySubst(goal, subst))
+
     // 真 (True)
-    val trueSolve = if (goal == Expr.Sym(True) || goal == Expr.Sym("⊤")) {
+    val trueSolve = if (goalNorm == Expr.Sym(True) || goalNorm == Expr.Sym("⊤")) {
       Vector(Tree.V(SearchNode(exprs, "true-intro", depth, Right(ProofResult(ProofTree.Leaf(goal, "true-intro"))), subst, context, state.linearContext), Vector.empty))
     } else Vector.empty
 
@@ -100,8 +101,10 @@ class IntroductionPlugin extends LogicPlugin {
         }
         if (vName != null) {
           val freshVar = s"${vName}_$depth"
-          val instantiated = Prover.substVar(body, vName, Expr.Var(freshVar))
-          val newCtx = (freshVar, typeOpt.map(Prover.substVar(_, vName, Expr.Var(freshVar))).getOrElse(Expr.Sym("Type"))) :: context
+          val freshVarExpr = Expr.Var(freshVar)
+          val instantiated = Prover.substVar(body, vName, freshVarExpr)
+          val renamedCtx = context.map { case (n, e) => (n, Prover.substVar(e, vName, freshVarExpr)) }
+          val newCtx = (freshVar, typeOpt.map(Prover.substVar(_, vName, freshVarExpr)).getOrElse(Expr.Sym("Type"))) :: renamedCtx
           val subTree = prover.search(exprs :+ instantiated, newCtx, state, subst, depth + 1, limit, visited, guarded)
           allSuccesses(subTree).foreach { s =>
             results += Tree.V(SearchNode(exprs :+ instantiated, "forall-intro", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "forall-intro", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))

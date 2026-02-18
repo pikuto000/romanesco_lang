@@ -118,6 +118,26 @@ class PersistentLogicPlugin extends LogicPlugin {
 
       case _ => ()
     }
+
+    // Forward Modus Ponens for contradiction: if context has →(A, ⊥) and also A, derive ⊥
+    val allHyps = context.map(_._2) ++ state.linearContext.map(_._2)
+    context.foreach { case (name, hyp) =>
+      val normHyp = prover.normalize(applySubst(hyp, subst))
+      normHyp match {
+        case Expr.App(Expr.Sym(op), List(a, Expr.Sym(False | "⊥"))) if op == Implies || op == "→" =>
+          val normA = prover.normalize(applySubst(a, subst))
+          val found = (context ++ state.linearContext).exists { case (_, h) =>
+            val nh = prover.normalize(applySubst(h, subst))
+            Unifier.unify(nh, normA, subst).nonEmpty
+          }
+          if (found) {
+            val result = Right(ProofResult(ProofTree.Leaf(applySubst(goal, subst), s"forward-mp[$name]")))
+            results += Tree.V(SearchNode(exprs, s"forward-mp[$name]", depth, result, subst, context, state.linearContext), Vector.empty)
+          }
+        case _ => ()
+      }
+    }
+
     results.toVector
   }
 }

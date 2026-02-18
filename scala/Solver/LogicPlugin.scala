@@ -47,6 +47,7 @@ trait ProverInterface {
   def addDynamicRule(rule: CatRule): Unit
   def normalize(e: Expr): Expr
   def checkDeadline(): Unit
+  def getAlgebras: List[InitialAlgebra] = Nil
 }
 
 /**
