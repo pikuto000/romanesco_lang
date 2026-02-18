@@ -22,8 +22,8 @@ Romanesco 証明エンジン 開発ロードマップ
     - [ ] キュービカル型理論に基づく Kan Composition (hcomp) の実装
     - [ ] 区間変数 (Interval variables) `i, j` の導入とトランスポートの計算簡約
     - [ ] `transport(P, loop, b)` を単なる等式ではなく「次元を上げる計算操作」として定義
-- [ ] **依存型 Vector の完全検証 (Vector Length/Properties)**
-    - [ ] `vlength(vappend(v, w)) = plus(vlength(v), vlength(w))` の完全自動証明
+- [x] **依存型 Vector の完全検証 (Vector Length/Properties)**
+    - [x] `vlength(vappend(v, w)) = plus(vlength(v), vlength(w))` の完全自動証明
 
 3. 短期・中期的な拡張項目 (Priority: Medium) ⏳
 - [ ] プラグイン指向アーキテクチャの洗練: ハードコードを徹底的に排除し、各機能をプラグイン化することの徹底。また、プラグイン機能の拡張
