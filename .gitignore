@@ -19,3 +19,5 @@ project/project
 project/metals.sbt
 
 project/build.properties
+
+.claude
