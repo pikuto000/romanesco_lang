@@ -100,7 +100,20 @@ object StandardRules:
 
   val cubical = List(hcompTrivial, hcompBase, fillToHcomp)
 
-  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, pathToEquiv, cubeApprox, propPath, setPath, propToSet, propProd) ++ cubical
+  val intervalAlgebra = List(
+    CatRule("face-and-i1", sym(FaceAnd)(sym(I1), v("i")), v("i")),
+    CatRule("face-and-i0", sym(FaceAnd)(sym(I0), v("i")), sym(I0)),
+    CatRule("face-or-i0", sym(FaceOr)(sym(I0), v("i")), v("i")),
+    CatRule("face-or-i1", sym(FaceOr)(sym(I1), v("i")), sym(I1)),
+    CatRule("face-neg-i0", sym(FaceNeg)(sym(I0)), sym(I1)),
+    CatRule("face-neg-i1", sym(FaceNeg)(sym(I1)), sym(I0)),
+    CatRule("face-neg-neg", sym(FaceNeg)(sym(FaceNeg)(v("i"))), v("i")),
+    // ド・モルガンの法則
+    CatRule("face-dm-and", sym(FaceNeg)(sym(FaceAnd)(v("i"), v("j"))), sym(FaceOr)(sym(FaceNeg)(v("i")), sym(FaceNeg)(v("j")))),
+    CatRule("face-dm-or", sym(FaceNeg)(sym(FaceOr)(v("i"), v("j"))), sym(FaceAnd)(sym(FaceNeg)(v("i")), sym(FaceNeg)(v("j"))))
+  )
+
+  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, pathToEquiv, cubeApprox, propPath, setPath, propToSet, propProd) ++ cubical ++ intervalAlgebra
 
   val natPlusRules = List(
     CatRule("plus_0", sym("plus")(sym("0"), v("n")), v("n"), List(v("n"))),

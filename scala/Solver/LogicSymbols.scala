@@ -67,6 +67,7 @@ object LogicSymbols {
 
   // HoTT (Homotopy Type Theory)
   val Path = "path"
+  val PathP = "pathP" // 依存の道型 (Dependent Path)
   val Univ = "Univalence"
   val Type = "Type"
   val Refl = "refl"

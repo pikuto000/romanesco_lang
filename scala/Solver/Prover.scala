@@ -34,6 +34,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
   private val plugins: List[LogicPlugin] = List(
     new AxiomPlugin(), // 基本公理
     new HoTTPlugin(), // HoTT (加速門)
+    new CubicalPlugin(), // Cubical (区間変数・道の計算)
     new IntroductionPlugin(), // 標準導入ルール
     new LinearLogicPlugin(), // 線形・分離論理
     new TemporalLogicPlugin(), // 時相論理
@@ -121,7 +122,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     }
   }
 
-  def normalize(e: Expr): Expr = Rewriter.normalize(e, config.rules)
+  def normalize(e: Expr): Expr = Rewriter.normalize(e, config.rules ++ dynamicRules.values.toList)
 
   def checkDeadline(): Unit = {
     if (System.currentTimeMillis() > deadline) throw new TimeoutException()
