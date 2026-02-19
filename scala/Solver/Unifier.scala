@@ -133,7 +133,7 @@ object Unifier:
           LazyList.empty
 
         case _ => 
-          logger.log(s"[UNIFY FAIL] Incompatible structures: $r1 vs $r2")
+          logger.log(s"[UNIFY FAIL] Incompatible structures: $r1 (${r1.getClass.getSimpleName}) vs $r2 (${r2.getClass.getSimpleName})")
           LazyList.empty
 
       res

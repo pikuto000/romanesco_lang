@@ -75,6 +75,12 @@ object LogicSymbols {
   val Cube = "cube" // 立方体モデル近似
   val Comp = "comp" // 幾何学的合成 (Kan composition)
   val Fill = "fill" // 幾何学的充填 (Kan filling)
+  val I0 = "I0"        // 区間の左端点
+  val I1 = "I1"        // 区間の右端点
+  val HComp = "hcomp"  // Kan合成
+  val FaceAnd = "∧ᶠ"   // 面制約の論理積
+  val FaceOr = "∨ᶠ"    // 面制約の論理和
+  val FaceNeg = "¬ᶠ"   // 面制約の否定
 
   // Hoare Logic
   val Triple = "triple" // {P} C {Q}

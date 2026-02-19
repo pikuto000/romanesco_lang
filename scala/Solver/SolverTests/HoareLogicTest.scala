@@ -36,7 +36,7 @@ object HoareLogicTest {
       print(s"Case: $input ... ")
       try {
         val goal = TestParser.parse(input)
-        val result = prover.prove(goal, maxDepth = 15, timeoutMs = 30000)
+        val result = prover.prove(goal, maxDepth = 15, timeoutMs = 15000)
         result match {
           case Right(_)    => println("✁EOK (Solved)")
           case Left(trace) =>

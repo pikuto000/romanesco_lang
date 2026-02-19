@@ -53,6 +53,7 @@ class HoareLogicPlugin extends LogicPlugin {
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
     val goal = exprs.last
+    prover.checkDeadline()
     val syntaxDirected: Vector[Tree[SearchNode]] = c match {
       case Expr.Sym("skip") =>
         val nextGoal = Expr.App(Expr.Sym(Implies), List(p, q))
@@ -84,6 +85,7 @@ class HoareLogicPlugin extends LogicPlugin {
         val tree2 = prover.search(exprs :+ goal2, context, state, subst, depth + 1, limit, visited, guarded)
         
         allSuccesses(tree2).toVector.flatMap { s2 =>
+          prover.checkDeadline()
           val goal1 = Expr.App(Expr.Sym("triple"), List(p, c1, applySubst(midR, s2.subst)))
           val tree1 = prover.search(exprs :+ goal1, s2.context, state.withLinear(s2.linearContext), s2.subst, depth + 1, limit, visited, guarded)
           allSuccesses(tree1).map { s1 =>
@@ -114,10 +116,12 @@ class HoareLogicPlugin extends LogicPlugin {
         // 1. P → inv (Precondition implies invariant)
         val t1 = prover.search(exprs :+ Expr.App(Expr.Sym(Implies), List(p, inv)), context, state, subst, depth + 1, limit, visited, guarded)
         allSuccesses(t1).toVector.flatMap { s1 =>
+          prover.checkDeadline()
           // 2. {inv ∧ b} c {inv} (Invariant preserved)
           val ctxBody = (s"hInv$depth", prover.normalize(inv)) :: (s"hWhile$depth", prover.normalize(b)) :: s1.context
           val t2 = prover.search(exprs :+ Expr.App(Expr.Sym("triple"), List(inv, c, inv)), ctxBody, state, s1.subst, depth + 1, limit, visited, guarded)
           allSuccesses(t2).toVector.flatMap { s2 =>
+            prover.checkDeadline()
             // 3. inv ∧ ¬b → Q (Invariant and exit condition implies postcondition)
             val t3 = prover.search(exprs :+ Expr.App(Expr.Sym(Implies), List(Expr.App(Expr.Sym(And), List(inv, Expr.App(Expr.Sym(Not), List(b)))), q)), s2.context, state, s2.subst, depth + 1, limit, visited, guarded)
             allSuccesses(t3).map { s3 =>

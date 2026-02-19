@@ -87,6 +87,7 @@ class InductionPlugin extends LogicPlugin {
         LazyList((orderedProofs, s, st))
       
       case c :: tail =>
+        prover.checkDeadline()
         logger.log(s"Solving case ${c.symbol} for ${algebra.name}")
         c.ctorType match {
           case ConstructorType.Point =>

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Romanesco is a multi-logic theorem prover written in Scala 3 (3.8.1) with no external library dependencies. It uses a plugin-based architecture to support category theory, linear logic, Hoare logic, temporal logic, modal logic, and Homotopy Type Theory (HoTT). The project language (comments, docs, commits) is Japanese.
+Romanesco is a multi-logic theorem prover written in Scala 3 (3.8.1) with Scala Native and no external library dependencies. It uses a plugin-based architecture to support category theory, linear logic, Hoare logic, temporal logic, modal logic, and Homotopy Type Theory (HoTT). The project language (comments, docs, commits) is Japanese.
 
 ## Build & Run Commands
 

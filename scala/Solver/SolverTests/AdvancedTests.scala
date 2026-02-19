@@ -148,7 +148,7 @@ object DependentTypeTests {
       logger.info(s"Case: $name ...")
       logger.time(s"$category: $name") {
         val goal = TestParser.parse(goalStr)
-        prover.prove(goal, maxDepth = depth, timeoutMs = 30000) match {
+        prover.prove(goal, maxDepth = depth, timeoutMs = 15000) match {
           case Right(result) =>
             println(s"✓ OK: $name")
           case Left(trace) =>

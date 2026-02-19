@@ -93,7 +93,14 @@ object StandardRules:
   val propToSet = CatRule("prop-to-set", sym("isProp")(v("A")), sym("isSet")(v("A")), List(v("A")))
   val propProd = CatRule("prop-prod", sym(And)(sym("isProp")(v("A")), sym("isProp")(v("B"))), sym("isProp")(sym(Product)(v("A"), v("B"))), List(v("A"), v("B")))
 
-  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, pathToEquiv, cubeApprox, propPath, setPath, propToSet, propProd)
+  // キュービカル型理論規則
+  val hcompTrivial = CatRule("hcomp-trivial", sym(HComp)(v("A"), sym(I1), v("u"), v("u0")), v("u")(sym(I1)), List(v("A"), v("u"), v("u0")))
+  val hcompBase = CatRule("hcomp-base", sym(HComp)(v("A"), sym(I0), v("u"), v("u0")), v("u0"), List(v("A"), v("u"), v("u0")))
+  val fillToHcomp = CatRule("fill-to-hcomp", sym(Fill)(v("A"), v("p"), v("u0")), sym(HComp)(v("A"), v("φ"), v("u"), v("u0")), List(v("A"), v("p"), v("u0"), v("φ"), v("u")))
+
+  val cubical = List(hcompTrivial, hcompBase, fillToHcomp)
+
+  val hott = List(pathRefl, pathInv, univalence, pathConcatRule, pathToEquiv, cubeApprox, propPath, setPath, propToSet, propProd) ++ cubical
 
   val natPlusRules = List(
     CatRule("plus_0", sym("plus")(sym("0"), v("n")), v("n"), List(v("n"))),

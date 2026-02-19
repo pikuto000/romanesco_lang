@@ -120,6 +120,7 @@ class IntroductionPlugin extends LogicPlugin {
       case Expr.App(Expr.Sym(And | Product), List(a, b)) =>
         val treeA = prover.search(exprs :+ a, context, state, subst, depth + 1, limit, visited, guarded)
         allSuccesses(treeA).foreach { sA =>
+          prover.checkDeadline()
           val treeB = prover.search(exprs :+ b, sA.context, state.withLinear(sA.linearContext), sA.subst, depth + 1, limit, visited, guarded)
           allSuccesses(treeB).foreach { sB =>
             val result = Right(ProofResult(ProofTree.Node(applySubst(goal, sB.subst), "product-intro", List(sA.result.toOption.get.tree, sB.result.toOption.get.tree))))
@@ -181,6 +182,7 @@ class UserRulePlugin extends LogicPlugin {
     val appliedRules = prover.applyRules(goal, subst, depth, true)
     
     appliedRules.flatMap { case (rewritten, univs, ruleName, nextS) =>
+      prover.checkDeadline()
       val subTree = prover.search(exprs :+ rewritten, context, state, nextS, depth + 1, limit, visited, guarded)
       allSuccesses(subTree).map { s =>
         Tree.V(SearchNode(exprs :+ rewritten, ruleName, depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), ruleName, List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))

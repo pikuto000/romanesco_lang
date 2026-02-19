@@ -30,7 +30,32 @@ class HoTTPlugin extends LogicPlugin {
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
-    searchPathInduction(
+    import Unifier._
+    val goal = prover.normalize(applySubst(exprs.last, subst))
+    val results = scala.collection.mutable.ArrayBuffer[Tree[SearchNode]]()
+
+    // isSet 直接ゴールマッチ: path(path(A,x,y),p,q) でコンテキストに isSet(A) があれば即解決
+    logger.log(s"HoTT goalHook: goal=$goal, headSymbol=${goal.headSymbol}")
+    goal match {
+      case Expr.App(Expr.Sym(p), List(Expr.App(Expr.Sym(p2), List(a, _, _)), _, _)) if p == Path && p2 == Path =>
+        logger.log(s"isSet-elim candidate: a=$a, context=${context.map(_._2)}")
+        context.foreach {
+          case (name, Expr.App(Expr.Sym("isSet"), List(a2))) =>
+            logger.log(s"isSet-elim: trying unify $a with $a2")
+            Unifier.unify(a, a2, subst).foreach { s =>
+              logger.log(s"isSet-elim SUCCESS: $name")
+              val proof = ProofTree.Leaf(applySubst(goal, s), s"isSet-elim[$name]")
+              results += Tree.V(
+                SearchNode(exprs, s"isSet-elim[$name]", depth, Right(ProofResult(proof)), s, context, state.linearContext),
+                Vector.empty
+              )
+            }
+          case _ => ()
+        }
+      case _ => ()
+    }
+
+    results.toVector ++ searchPathInduction(
       exprs,
       rules,
       context,
@@ -56,6 +81,10 @@ class HoTTPlugin extends LogicPlugin {
       guarded: Boolean,
       prover: ProverInterface
   ): Vector[Tree[SearchNode]] = {
+    import Unifier._
+    val goal = exprs.last
+    val results = scala.collection.mutable.ArrayBuffer[Tree[SearchNode]]()
+
     // isProp(A) -> ∀x, y:A. path(A, x, y)
     // isSet(A)  -> ∀x, y:A. ∀p, q:path(A, x, y). path(path(A, x, y), p, q)
     context.foreach {
@@ -64,11 +93,31 @@ class HoTTPlugin extends LogicPlugin {
         prover.asInstanceOf[Prover].addDynamicRule(rule)
       case (name, Expr.App(Expr.Sym("isSet"), List(a))) =>
         val innerPath = Expr.App(Expr.Sym(Path), List(a, Expr.Var("x"), Expr.Var("y")))
+        // 動的ルール登録（他のプラグインからも利用可能に）
         val rule = CatRule(s"set_$name", Expr.App(Expr.Sym(Path), List(innerPath, Expr.Var("p"), Expr.Var("q"))), Expr.Sym(True), List(Expr.Var("x"), Expr.Var("y"), Expr.Var("p"), Expr.Var("q")))
         prover.asInstanceOf[Prover].addDynamicRule(rule)
+
+        // isSet(A) ゴール加速: ゴールが path(path(A,_,_),_,_) を含む ∀ 量化なら一気に解決
+        def stripForalls(e: Expr): Expr = e match {
+          case Expr.App(Expr.Sym(Forall), List(_, body)) => stripForalls(body)
+          case Expr.App(Expr.Sym(Forall), List(_, _, body)) => stripForalls(body)
+          case other => other
+        }
+        val innerGoal = stripForalls(goal)
+        innerGoal match {
+          case Expr.App(Expr.Sym(p), List(Expr.App(Expr.Sym(p2), List(a2, _, _)), _, _)) if p == Path && p2 == Path =>
+            Unifier.unify(a, a2, subst).foreach { s =>
+              val proof = ProofTree.Leaf(applySubst(goal, s), s"isSet-elim[$name]")
+              results += Tree.V(
+                SearchNode(exprs, s"isSet-elim[$name]", depth, Right(ProofResult(proof)), s, context, state.linearContext),
+                Vector.empty
+              )
+            }
+          case _ => ()
+        }
       case _ => ()
     }
-    Vector.empty
+    results.toVector
   }
 
   private def searchPathInduction(

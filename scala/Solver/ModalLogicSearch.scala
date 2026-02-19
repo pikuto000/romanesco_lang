@@ -29,6 +29,7 @@ class ModalLogicPlugin extends LogicPlugin {
     val goal = exprs.last
     val results = scala.collection.mutable.ArrayBuffer[Tree[SearchNode]]()
 
+    prover.checkDeadline()
     val head = goal.headSymbol.toString
     if (head == Box || head == "□" || head.contains("Box")) {
       val a = goal.asInstanceOf[Expr.App].args.head
@@ -46,6 +47,7 @@ class ModalLogicPlugin extends LogicPlugin {
 
       (context ++ state.linearContext).zipWithIndex.foreach {
         case ((name, hyp), i) =>
+          prover.checkDeadline()
           val isLinear = i >= context.length
           val nh = prover.normalize(applySubst(hyp, subst))
           val hHead = nh.headSymbol.toString
@@ -98,6 +100,7 @@ class ModalLogicPlugin extends LogicPlugin {
 
     (context ++ state.linearContext).zipWithIndex.foreach {
       case ((name, hyp), i) =>
+        prover.checkDeadline()
         val isLinear = i >= context.length
         val nh = prover.normalize(applySubst(hyp, subst))
         val hHead = nh.headSymbol.toString

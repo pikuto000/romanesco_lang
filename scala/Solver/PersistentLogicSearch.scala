@@ -32,6 +32,7 @@ class PersistentLogicPlugin extends LogicPlugin {
     val results = scala.collection.mutable.ArrayBuffer[Tree[SearchNode]]()
 
     context.foreach { case (name, hyp) =>
+      prover.checkDeadline()
       val (premises, conclusion) = decompose(hyp, () => prover.freshMeta(depth))
       unify(conclusion, goal, subst).foreach { s =>
         // 全ての前提を解決する必要がある
@@ -45,6 +46,7 @@ class PersistentLogicPlugin extends LogicPlugin {
             }
         }
 
+        prover.checkDeadline()
         solvePremises(premises, s, context, Nil).foreach { case (finalS, finalCtx, proofs) =>
           val pTree = ProofTree.Node(applySubst(goal, finalS), s"apply[$name]", proofs)
           results += Tree.V(SearchNode(exprs, s"apply[$name]", depth, Right(ProofResult(pTree)), finalS, finalCtx, state.linearContext), Vector.empty) // 簡略化のため subtree は記録しない
@@ -88,6 +90,7 @@ class PersistentLogicPlugin extends LogicPlugin {
 
     context.zipWithIndex.foreach {
       case ((name, Expr.App(Expr.Sym(And | Product), List(a, b))), i) =>
+        prover.checkDeadline()
         val newCtx = context.patch(i, List((s"$name.1", a), (s"$name.2", b)), 1)
         val subTree = prover.search(exprs, newCtx, state, subst, depth + 1, limit, visited, guarded)
         allSuccesses(subTree).foreach { s =>
@@ -96,6 +99,7 @@ class PersistentLogicPlugin extends LogicPlugin {
         }
 
       case ((name, Expr.App(Expr.Sym(Or | Coproduct), List(a, b))), i) =>
+        prover.checkDeadline()
         // OR-elim (Case Analysis)
         val newCtxA = context.patch(i, List((s"$name.l", a)), 1)
         val subTreeA = prover.search(exprs, newCtxA, state, subst, depth + 1, limit, visited, guarded)
@@ -122,6 +126,7 @@ class PersistentLogicPlugin extends LogicPlugin {
     // Forward Modus Ponens for contradiction: if context has →(A, ⊥) and also A, derive ⊥
     val allHyps = context.map(_._2) ++ state.linearContext.map(_._2)
     context.foreach { case (name, hyp) =>
+      prover.checkDeadline()
       val normHyp = prover.normalize(applySubst(hyp, subst))
       normHyp match {
         case Expr.App(Expr.Sym(op), List(a, Expr.Sym(False | "⊥"))) if op == Implies || op == "→" =>

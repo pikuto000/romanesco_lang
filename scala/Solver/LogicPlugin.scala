@@ -48,6 +48,13 @@ trait ProverInterface {
   def normalize(e: Expr): Expr
   def checkDeadline(): Unit
   def getAlgebras: List[InitialAlgebra] = Nil
+
+  /** 前向き推論: LHSにマッチするルールを適用しRHSを導出 */
+  def forwardApplyRules(
+      e: Expr,
+      subst: Unifier.Subst,
+      depth: Int
+  ): List[(Expr, String, Unifier.Subst)]
 }
 
 /**

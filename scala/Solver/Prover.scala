@@ -33,12 +33,13 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
   // 全てのロジックをプラグインとして管理
   private val plugins: List[LogicPlugin] = List(
     new AxiomPlugin(), // 基本公理
+    new HoTTPlugin(), // HoTT (加速門)
     new IntroductionPlugin(), // 標準導入ルール
     new LinearLogicPlugin(), // 線形・分離論理
     new TemporalLogicPlugin(), // 時相論理
     new PersistentLogicPlugin(), // 標準分解ルール
+    new ForwardReasoningPlugin(), // 前向き推論
     new ModalLogicPlugin(), // 様相論理
-    new HoTTPlugin(), // HoTT
     new HoareLogicPlugin(), // Hoare論理
     new UserRulePlugin(), // ユーザー定義ルール
     new InductionPlugin(), // 帰納法
@@ -66,6 +67,13 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     allRules.groupBy(_.rhs.headSymbol)
   }
 
+  private lazy val forwardRuleIndex = {
+    val allRules =
+      if (config.classical) config.rules ++ StandardRules.classical
+      else config.rules
+    allRules.groupBy(_.lhs.headSymbol)
+  }
+
   def applyRules(
       e: Expr,
       subst: Subst,
@@ -82,6 +90,28 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
           (
             normalize(applySubst(instRule.lhs, s)),
             instRule.universals,
+            rule.name,
+            s
+          )
+        )
+        .toList
+    }
+  }
+
+  def forwardApplyRules(
+      e: Expr,
+      subst: Subst,
+      depth: Int
+  ): List[(Expr, String, Subst)] = {
+    val candidates = forwardRuleIndex.getOrElse(e.headSymbol, Nil) ++
+      dynamicRules.values.filter(r => r.lhs.headSymbol == e.headSymbol)
+
+    candidates.flatMap { rule =>
+      val (instRule, _) = Prover.instantiate(rule, () => freshMeta(depth))
+      unify(e, instRule.lhs, subst)
+        .map(s =>
+          (
+            normalize(applySubst(instRule.rhs, s)),
             rule.name,
             s
           )
@@ -108,11 +138,13 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       initialGoal: Option[Goal] = None
   ): Either[FailTrace, ProofResult] = {
 
+    val startTime = System.nanoTime()
     deadline = System.currentTimeMillis() + timeoutMs
+    println(f"  [prove] timeout=${timeoutMs}ms, maxDepth=$maxDepth, goal=${goal.toString.take(80)}")
 
     val startGoal = initialGoal.getOrElse(Goal(Nil, Nil, goal))
 
-    boundary {
+    val res = boundary {
       try {
         val result = (1 to maxDepth).view.flatMap { d =>
           checkDeadline()
@@ -146,6 +178,10 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       }
     }
 
+    val elapsed = (System.nanoTime() - startTime) / 1_000_000.0
+    println(f"  [time] ${elapsed}%.1fms - ${if (res.isRight) "solved" else "failed"}: ${goal.toString.take(80)}")
+
+    res
   }
 
   protected[core] def findSuccess(tree: Tree[SearchNode]): Option[SearchNode] =
@@ -554,6 +590,12 @@ object Prover {
     case Expr.Var(n)       => Set(n)
     case Expr.App(h, args) => collectVars(h) ++ args.flatMap(collectVars)
     case _                 => Set.empty
+  }
+  def freeVars(e: Expr): Set[String] = e match {
+    case Expr.Var(n) => Set(n)
+    case Expr.App(Expr.Sym("λ"), List(Expr.Var(v), body)) => freeVars(body) - v
+    case Expr.App(f, args) => freeVars(f) ++ args.flatMap(freeVars).toSet
+    case _ => Set.empty
   }
   def collectSymbols(e: Expr): Set[String] = e match {
     case Expr.Sym(n)       => Set(n)

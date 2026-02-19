@@ -78,7 +78,8 @@ object Rewriter {
     // ユーザー定義ルールの適用（論理記号以外のルールは変数をメタ変数化して適用）
     val logicalHeads = Set(Implies, "→", And, Or, Product, Coproduct, Forall, Exists,
       Box, Diamond, Globally, Finally, Next, Until, Bang, Question,
-      LImplies, "⊸", Tensor, LPlus, SepAnd, Not, Eq, Path, Transport)
+      LImplies, "⊸", Tensor, LPlus, SepAnd, Not, Eq, Path, Transport,
+      "isProp", "isSet")
     var metaCounter = 0
     val userRewritten = rules.view.flatMap { r =>
       val lhsHead = r.lhs.headSymbol
@@ -122,13 +123,18 @@ object Rewriter {
     
     // Transport computation
     case Expr.App(Expr.Sym(t), List(pred, p, v)) if t == Transport =>
-      // HIT path constructors: transport reduces trivially for loop, seg, merid
+      // HIT path constructors: transport reduces trivially only when P doesn't depend on the path variable
       val isHITPath = p match {
         case Expr.Sym(name) if name == "loop" || name == "seg" || name == "merid" => true
         case Expr.App(Expr.Sym(name), _) if name == "loop" || name == "seg" || name == "merid" => true
         case _ => false
       }
-      if (isHITPath) v
+      // P が道変数に依存しない場合のみ簡約
+      val predIndependent = pred match {
+        case Expr.App(Expr.Sym("λ"), List(Expr.Var(z), body)) => !Prover.freeVars(body).contains(z)
+        case _ => false
+      }
+      if (isHITPath && predIndependent) v
       else (pred, v) match {
         // Refl case
         case (_, _) if p match { case Expr.App(Expr.Sym(r), _) if r == Refl => true; case _ => false } => v
@@ -229,7 +235,34 @@ object Rewriter {
     case Expr.App(Expr.Sym("list_prop"), List(Expr.App(Expr.Sym("append"), List(xs, ys)))) =>
       Expr.App(Expr.Sym(And), List(Expr.App(Expr.Sym("list_prop"), List(xs)), Expr.App(Expr.Sym("list_prop"), List(ys))))
 
+    // --- 面制約の正規化 ---
+    case Expr.App(Expr.Sym(op), List(Expr.Sym(i1), phi)) if op == FaceAnd && i1 == I1 => phi
+    case Expr.App(Expr.Sym(op), List(phi, Expr.Sym(i1))) if op == FaceAnd && i1 == I1 => phi
+    case Expr.App(Expr.Sym(op), List(Expr.Sym(i0), _)) if op == FaceAnd && i0 == I0 => Expr.Sym(I0)
+    case Expr.App(Expr.Sym(op), List(_, Expr.Sym(i0))) if op == FaceAnd && i0 == I0 => Expr.Sym(I0)
+    case Expr.App(Expr.Sym(op), List(Expr.Sym(i0), phi)) if op == FaceOr && i0 == I0 => phi
+    case Expr.App(Expr.Sym(op), List(phi, Expr.Sym(i0))) if op == FaceOr && i0 == I0 => phi
+    case Expr.App(Expr.Sym(op), List(Expr.Sym(i1), _)) if op == FaceOr && i1 == I1 => Expr.Sym(I1)
+    case Expr.App(Expr.Sym(op), List(_, Expr.Sym(i1))) if op == FaceOr && i1 == I1 => Expr.Sym(I1)
+    case Expr.App(Expr.Sym(op), List(Expr.Sym(i0))) if op == FaceNeg && i0 == I0 => Expr.Sym(I1)
+    case Expr.App(Expr.Sym(op), List(Expr.Sym(i1))) if op == FaceNeg && i1 == I1 => Expr.Sym(I0)
+    case Expr.App(Expr.Sym(op), List(Expr.App(Expr.Sym(op2), List(phi)))) if op == FaceNeg && op2 == FaceNeg => phi
+
     // --- Cubical Kan Operations ---
+    // hcomp(A, I1, u, u0) -> u(I1): 制約が真なら境界値
+    case Expr.App(Expr.Sym(hc), List(_, Expr.Sym(i1), u, _)) if hc == HComp && i1 == I1 =>
+      Expr.App(u, List(Expr.Sym(I1)))
+    // hcomp(A, I0, u, u0) -> u0: 制約が偽ならベース値
+    case Expr.App(Expr.Sym(hc), List(_, Expr.Sym(i0), _, u0)) if hc == HComp && i0 == I0 => u0
+    // hcomp(A×B, φ, u, pair(a,b)) -> pair(hcomp(A,φ,λi.π₁(u(i)),a), hcomp(B,φ,λi.π₂(u(i)),b))
+    case Expr.App(Expr.Sym(hc), List(Expr.App(Expr.Sym(prod), List(a, b)), phi, u, Expr.App(Expr.Sym(pair), List(u0a, u0b))))
+        if hc == HComp && (prod == Product || prod == "×") && pair == Pair =>
+      val iVar = Expr.Var("i_hc")
+      Expr.App(Expr.Sym(Pair), List(
+        Expr.App(Expr.Sym(HComp), List(a, phi, Expr.App(Expr.Sym("λ"), List(iVar, Expr.App(Expr.Sym(Proj1), List(Expr.App(u, List(iVar)))))), u0a)),
+        Expr.App(Expr.Sym(HComp), List(b, phi, Expr.App(Expr.Sym("λ"), List(iVar, Expr.App(Expr.Sym(Proj2), List(Expr.App(u, List(iVar)))))), u0b))
+      ))
+
     // comp(A, refl, u0) -> u0
     case Expr.App(Expr.Sym(c), List(_, Expr.App(Expr.Sym(r), _), u0)) if c == Comp && r == Refl => u0
     // fill(A, refl, u0) -> refl (approximation)
