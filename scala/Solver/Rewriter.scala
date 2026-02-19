@@ -75,37 +75,24 @@ object Rewriter {
   }
 
   private def rewriteRule(expr: Expr, rules: List[CatRule]): Expr = {
-    // ユーザー定義ルールの適用（論理記号以外のルールは変数をメタ変数化して適用）
-    val logicalHeads = Set(Implies, "→", And, Or, Product, Coproduct, Forall, Exists,
-      Box, Diamond, Globally, Finally, Next, Until, Bang, Question,
-      LImplies, "⊸", Tensor, LPlus, SepAnd, Not, Eq, Path, Transport,
-      "isProp", "isSet")
+    // ユーザー定義ルールの適用
     var metaCounter = 0
     val userRewritten = rules.view.flatMap { r =>
-      val lhsHead = r.lhs.headSymbol
-      val isRecursive = Prover.collectSymbols(r.rhs).contains(lhsHead)
-      if (logicalHeads.contains(lhsHead) || isRecursive) {
-        // 論理記号のルールや再帰的ルールはそのまま（Var同士の名前一致のみ）
-        Unifier.unify(expr, r.lhs, Unifier.emptySubst).map { s =>
-          Unifier.applySubst(r.rhs, s)
-        }
-      } else {
-        // 非論理記号のルールは変数をメタ変数化
-        val vars = Prover.collectVars(r.lhs) ++ Prover.collectVars(r.rhs)
-        val substMap = vars.map { v =>
-          metaCounter += 1
-          v -> Expr.Meta(MetaId(List(-1, metaCounter)))
-        }.toMap
-        def applyVarSubst(e: Expr): Expr = e match {
-          case Expr.Var(n) if substMap.contains(n) => substMap(n)
-          case Expr.App(h, args) => Expr.App(applyVarSubst(h), args.map(applyVarSubst))
-          case _ => e
-        }
-        val instLhs = applyVarSubst(r.lhs)
-        val instRhs = applyVarSubst(r.rhs)
-        Unifier.unify(expr, instLhs, Unifier.emptySubst).map { s =>
-          Unifier.applySubst(instRhs, s)
-        }
+      // 全てのルールで変数をメタ変数化して適用（Var同士の名前一致のみに頼らない）
+      val vars = Prover.collectVars(r.lhs) ++ Prover.collectVars(r.rhs)
+      val substMap = vars.map { v =>
+        metaCounter += 1
+        v -> Expr.Meta(MetaId(List(-1, metaCounter)))
+      }.toMap
+      def applyVarSubst(e: Expr): Expr = e match {
+        case Expr.Var(n) if substMap.contains(n) => substMap(n)
+        case Expr.App(h, args) => Expr.App(applyVarSubst(h), args.map(applyVarSubst))
+        case _ => e
+      }
+      val instLhs = applyVarSubst(r.lhs)
+      val instRhs = applyVarSubst(r.rhs)
+      Unifier.unify(expr, instLhs, Unifier.emptySubst).map { s =>
+        Unifier.applySubst(instRhs, s)
       }
     }.headOption.getOrElse(expr)
 
