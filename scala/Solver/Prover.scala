@@ -52,7 +52,8 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
 
   // addHIT removed: HIT DSL should be integrated into the HoTT plug-in.
 
-  override def getAlgebras: List[InitialAlgebra] = config.algebras ++ dynamicAlgebras.toList
+  override def getAlgebras: List[InitialAlgebra] =
+    config.algebras ++ dynamicAlgebras.toList
 
   def addDynamicRule(rule: CatRule): Unit = {
     if (!dynamicRules.contains(rule.toString)) {
@@ -140,7 +141,9 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
 
     val startTime = System.nanoTime()
     deadline = System.currentTimeMillis() + timeoutMs
-    println(f"  [prove] timeout=${timeoutMs}ms, maxDepth=$maxDepth, goal=${goal.toString.take(80)}")
+    println(
+      f"  [prove] timeout=${timeoutMs}ms, maxDepth=$maxDepth, goal=${goal.toString}"
+    )
 
     val startGoal = initialGoal.getOrElse(Goal(Nil, Nil, goal))
 
@@ -179,7 +182,9 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     }
 
     val elapsed = (System.nanoTime() - startTime) / 1_000_000.0
-    println(f"  [time] ${elapsed}%.1fms - ${if (res.isRight) "solved" else "failed"}: ${goal.toString.take(80)}")
+    println(f"  [time] ${elapsed}%.1fms - ${
+        if (res.isRight) "solved" else "failed"
+      }: ${goal.toString.take(80)}")
 
     res
   }
@@ -335,52 +340,33 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
 
     if (
       visited.exists(v =>
-        v._1 == currentGoalCan && v._2 == contextExprs && v._3 == linearExprs && v._4 == state
+        v._1 == currentGoalCan && v._2 == contextExprs && v._3 == linearExprs
       )
     ) {
-
       if (guarded) {
-
         logger.log(s"Co-induction: $currentGoalRaw")
-
         val p = ProofTree.Leaf(currentGoalRaw, "co-induction")
-
         logger.decreaseDepth()
-
         return Tree.V(
           SearchNode(
             exprs,
-
             "co-induction",
-
             depth,
-
             Right(ProofResult(p)),
-
             subst,
-
             context,
-
             state.linearContext
           ),
-
           Vector.empty
         )
-
       }
-
       logger.log(s"Cycle detected: $currentGoalRaw")
-
       logger.decreaseDepth()
-
       return Tree.V(
         SearchNode(
           exprs,
-
           "cycle",
-
           depth,
-
           Left(
             FailTrace(
               Goal(context, state.linearContext, currentGoal),
@@ -388,17 +374,12 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
               depth
             )
           ),
-
           subst,
-
           context,
-
           state.linearContext
         ),
-
         Vector.empty
       )
-
     }
 
     // 発散検知
@@ -592,10 +573,10 @@ object Prover {
     case _                 => Set.empty
   }
   def freeVars(e: Expr): Set[String] = e match {
-    case Expr.Var(n) => Set(n)
+    case Expr.Var(n)                                      => Set(n)
     case Expr.App(Expr.Sym("λ"), List(Expr.Var(v), body)) => freeVars(body) - v
     case Expr.App(f, args) => freeVars(f) ++ args.flatMap(freeVars).toSet
-    case _ => Set.empty
+    case _                 => Set.empty
   }
   def collectSymbols(e: Expr): Set[String] = e match {
     case Expr.Sym(n)       => Set(n)

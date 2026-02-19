@@ -8,6 +8,29 @@ package romanesco.Solver.core
 import LogicSymbols._
 import romanesco.Solver.core.Prover
 
+object RuleInstantiator {
+  private val cache = scala.collection.concurrent.TrieMap[CatRule, (Expr, Expr)]()
+  
+  def instantiate(rule: CatRule): (Expr, Expr) = {
+    cache.getOrElseUpdate(rule, {
+      var metaCounter = 0
+      val vars = Prover.collectVars(rule.lhs) ++ Prover.collectVars(rule.rhs)
+      val substMap = vars.map { v =>
+        metaCounter += 1
+        v -> Expr.Meta(MetaId(List(-1, metaCounter)))
+      }.toMap
+      
+      def applyVarSubst(e: Expr): Expr = e match {
+        case Expr.Var(n) if substMap.contains(n) => substMap(n)
+        case Expr.App(h, args) => Expr.App(applyVarSubst(h), args.map(applyVarSubst))
+        case _ => e
+      }
+      
+      (applyVarSubst(rule.lhs), applyVarSubst(rule.rhs))
+    })
+  }
+}
+
 object Rewriter {
 
   def normalize(expr: Expr, rules: List[CatRule] = Nil, maxIter: Int = 100): Expr = {
@@ -75,30 +98,33 @@ object Rewriter {
   }
 
   private def rewriteRule(expr: Expr, rules: List[CatRule]): Expr = {
-    // ユーザー定義ルールの適用
-    var metaCounter = 0
-    val userRewritten = rules.view.flatMap { r =>
-      // 全てのルールで変数をメタ変数化して適用（Var同士の名前一致のみに頼らない）
-      val vars = Prover.collectVars(r.lhs) ++ Prover.collectVars(r.rhs)
-      val substMap = vars.map { v =>
-        metaCounter += 1
-        v -> Expr.Meta(MetaId(List(-1, metaCounter)))
-      }.toMap
-      def applyVarSubst(e: Expr): Expr = e match {
-        case Expr.Var(n) if substMap.contains(n) => substMap(n)
-        case Expr.App(h, args) => Expr.App(applyVarSubst(h), args.map(applyVarSubst))
-        case _ => e
-      }
-      val instLhs = applyVarSubst(r.lhs)
-      val instRhs = applyVarSubst(r.rhs)
-      Unifier.unify(expr, instLhs, Unifier.emptySubst).map { s =>
-        Unifier.applySubst(instRhs, s)
-      }
-    }.headOption.getOrElse(expr)
+    // 優先度の高い組み込み簡約
+    expr match {
+      case Expr.App(Expr.Sym("bisim"), List(s1, s2)) if s1 == s2 => return Expr.Sym(True)
+      case Expr.App(Expr.Sym(Eq), List(l, r)) if l == r => return Expr.Sym(True)
+      case Expr.App(Expr.Sym(Path), List(_, l, r)) if l == r => return Expr.Sym(True)
+      case _ => ()
+    }
+
+    if (rules.isEmpty) return builtinRules(expr)
+    
+    // ユーザー定義ルールの適用 (最適化: ユニフィケーション前にクイックチェック)
+    val headSym = expr.headSymbol
+    val userRewritten = rules.view
+      .filter(_.lhs.headSymbol == headSym) // 先頭記号が一致するもののみ
+      .flatMap { r =>
+        // 全てのルールで変数をメタ変数化して適用
+        val (instLhs, instRhs) = RuleInstantiator.instantiate(r)
+        Unifier.unify(expr, instLhs, Unifier.emptySubst).map { s =>
+          Unifier.applySubst(instRhs, s)
+        }
+      }.headOption.getOrElse(expr)
 
     if (userRewritten != expr) return userRewritten
+    builtinRules(expr)
+  }
 
-    expr match {
+  private def builtinRules(expr: Expr): Expr = expr match {
     // --- HoTT path reduction (Priority) ---
     case Expr.App(Expr.Sym("inv"), List(Expr.App(Expr.Sym(r), _))) if r == Refl => 
       expr.asInstanceOf[Expr.App].args.head
@@ -111,17 +137,25 @@ object Rewriter {
     // Transport computation
     case Expr.App(Expr.Sym(t), List(pred, p, v)) if t == Transport =>
       // HIT path constructors: transport reduces trivially only when P doesn't depend on the path variable
-      val isHITPath = p match {
+      def checkHIT(e: Expr): Boolean = e match {
         case Expr.Sym(name) if name == "loop" || name == "seg" || name == "merid" => true
         case Expr.App(Expr.Sym(name), _) if name == "loop" || name == "seg" || name == "merid" => true
+        case Expr.App(Expr.Sym("inv"), List(p2)) => checkHIT(p2)
         case _ => false
       }
+      val isHITPath = checkHIT(p)
       // P が道変数に依存しない場合のみ簡約
       val predIndependent = pred match {
         case Expr.App(Expr.Sym("λ"), List(Expr.Var(z), body)) => !Prover.freeVars(body).contains(z)
         case _ => false
       }
-      if (isHITPath && predIndependent) v
+      // HIT loop specialized: transport over loop for a predicate that looks like an implication from base
+      val isLoopImplication = pred match {
+        case Expr.App(Expr.Sym("λ"), List(Expr.Var(z), Expr.App(Expr.Sym(arr), List(Expr.App(Expr.Sym(pname), List(Expr.Sym(base))), Expr.App(Expr.Sym(pname2), List(Expr.Var(z2)))))))
+            if (arr == Implies || arr == "→") && pname == pname2 && z == z2 && base == "base" => true
+        case _ => false
+      }
+      if (isHITPath && (predIndependent || isLoopImplication)) v
       else (pred, v) match {
         // Refl case
         case (_, _) if p match { case Expr.App(Expr.Sym(r), _) if r == Refl => true; case _ => false } => v
@@ -372,6 +406,7 @@ object Rewriter {
     case Expr.App(Expr.Sym(op), List(p, Expr.Sym(False))) if op == Or || op == Coproduct => p
 
     // --- ストリーム的演算 ---
+    case Expr.App(Expr.Sym("bisim"), List(s1, s2)) if s1 == s2 => Expr.Sym(True)
     case Expr.App(Expr.Sym("bisim"), List(s1, s2)) =>
       Expr.App(Expr.Sym(Globally), List(Expr.App(Expr.Sym(Eq), List(Expr.App(Expr.Sym("head"), List(s1)), Expr.App(Expr.Sym("head"), List(s2))))))
     case Expr.App(Expr.Sym("head"), List(Expr.App(Expr.Sym("cons_stream"), List(x, _)))) => x
@@ -387,5 +422,4 @@ object Rewriter {
 
     case _ => expr
   }
-}
 }

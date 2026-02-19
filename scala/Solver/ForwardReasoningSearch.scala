@@ -32,15 +32,15 @@ class ForwardReasoningPlugin extends LogicPlugin {
     val alreadyDerived = state.custom.getOrElse("forwardDerived", Set.empty[Expr])
       .asInstanceOf[Set[Expr]]
 
-    val allHyps = context ++ state.linearContext
+    val allHyps = context // 線形コンテキストは含めない
     val derived = scala.collection.mutable.LinkedHashSet[(String, Expr)]()
     val derivedExprs = scala.collection.mutable.Set[Expr]()
     derivedExprs ++= alreadyDerived
 
-    // 飽和ループ（最大3回）
+    // 飽和ループ（最大1回）
     var currentCtx = allHyps
     var iteration = 0
-    val maxIterations = 3
+    val maxIterations = 1
 
     while (iteration < maxIterations) {
       prover.checkDeadline()

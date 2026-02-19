@@ -17,7 +17,7 @@ object DebugAssoc {
 
     println("=== Debug: Path Associativity ===")
     val goal = TestParser.parse(
-      "∀x. ∀y. ∀z. ∀w. ∀p:path(A,x,y). ∀q:path(A,y,z). ∀r:path(A,z,w). concat(concat(p, q), r) = concat(p, concat(q, r))"
+      "∀x . ∀y . ∀z . ∀w . ∀p : path ( A , x , y ) . ∀q : path ( A , y , z ) . ∀r : path ( A , z , w ) . concat ( concat ( p , q ) , r) = concat ( p , concat ( q , r) )"
     )
     val result = prover.prove(goal, maxDepth = 25)
     result match {

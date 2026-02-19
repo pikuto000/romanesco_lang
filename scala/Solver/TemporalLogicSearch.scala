@@ -66,6 +66,7 @@ class TemporalLogicPlugin extends LogicPlugin {
       case Next =>
         // X(A) -> ステップを進めて A を証明
         val nextCtx = context.flatMap {
+          case (n, Expr.Var(v)) => Some((n, Expr.Var(v))) // 変数パラメータを維持
           case (n, Expr.App(Expr.Sym(Globally), List(p))) => Some((n, Expr.App(Expr.Sym(Globally), List(p))))
           case (n, Expr.App(Expr.Sym(Next), List(p))) => Some((s"next:$n", p))
           case _ => None
