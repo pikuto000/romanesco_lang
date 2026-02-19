@@ -11,6 +11,7 @@ import romanesco.Solver.core.Prover
 
 class ModalLogicPlugin extends LogicPlugin {
   override def name: String = "ModalLogic"
+  override def priority: Int = 70
 
   import Unifier._
 

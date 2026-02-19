@@ -289,7 +289,9 @@ case class ProverConfig(
     generateLemmas: Boolean = true,
     lemmaMode: LemmaGenerationMode = LemmaGenerationMode.EqualityOnly,
     excludeTrivialLemmas: Boolean = true,
-    enabledDomains: Option[Set[String]] = None
+    enabledDomains: Option[Set[String]] = None,
+    pluginPacks: List[PluginPack] = Nil,       // 空ならデフォルト全パック
+    disabledPlugins: Set[String] = Set.empty
 )
 
 object ProverConfig {

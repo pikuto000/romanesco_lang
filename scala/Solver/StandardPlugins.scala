@@ -15,6 +15,7 @@ import romanesco.Solver.core.Prover
  */
 class AxiomPlugin extends LogicPlugin {
   override def name: String = "Axiom"
+  override def priority: Int = 10
 
   import Unifier._
 
@@ -74,6 +75,7 @@ class AxiomPlugin extends LogicPlugin {
  */
 class IntroductionPlugin extends LogicPlugin {
   override def name: String = "Introduction"
+  override def priority: Int = 50
 
   import Unifier._
 
@@ -163,6 +165,7 @@ class IntroductionPlugin extends LogicPlugin {
  */
 class UserRulePlugin extends LogicPlugin {
   override def name: String = "UserRule"
+  override def priority: Int = 200
 
   import Unifier._
 

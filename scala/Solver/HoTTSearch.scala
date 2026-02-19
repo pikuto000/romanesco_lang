@@ -13,6 +13,7 @@ import romanesco.Solver.core.Prover
 //Todo: HIT DSL関連システムの実装
 class HoTTPlugin extends LogicPlugin {
   override def name: String = "HoTT"
+  override def priority: Int = 20
 
   import Unifier._
 

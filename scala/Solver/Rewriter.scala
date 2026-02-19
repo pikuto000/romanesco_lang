@@ -32,6 +32,11 @@ object RuleInstantiator {
 }
 
 object Rewriter {
+  var normalizationPlugins: List[Plugin] = PluginRegistry.allPlugins
+
+  def registerNormalizationPlugins(plugins: List[Plugin]): Unit = {
+    normalizationPlugins = PluginRegistry.resolvePluginOrder(plugins)
+  }
 
   def normalize(expr: Expr, rules: List[CatRule] = Nil, maxIter: Int = 100): Expr = {
     def loop(e: Expr, iter: Int): Expr = {
@@ -341,36 +346,6 @@ object Rewriter {
     case Expr.App(Expr.Sym(op), List(Expr.Sym(p2), Expr.App(Expr.Sym(p), List(f, g)))) 
         if op == Compose && p2 == Proj2 && p == Pair => g
 
-    // --- 自然数の演算 ---
-    case Expr.App(Expr.Sym("plus"), List(Expr.Sym(z), m)) if z == Zero || z == Initial => m
-    case Expr.App(Expr.Sym("plus"), List(Expr.App(Expr.Sym(s), List(n)), m)) if s == Succ =>
-      Expr.App(Expr.Sym(Succ), List(Expr.App(Expr.Sym("plus"), List(n, m))))
-    case Expr.App(Expr.Sym("plus"), List(n, Expr.Sym(z))) if z == Zero || z == Initial => n
-    case Expr.App(Expr.Sym("plus"), List(n, Expr.App(Expr.Sym(s), List(m)))) if s == Succ =>
-      Expr.App(Expr.Sym(Succ), List(Expr.App(Expr.Sym("plus"), List(n, m))))
-    case Expr.App(Expr.Sym("plus"), List(Expr.App(Expr.Sym("plus"), List(a, b)), c)) =>
-      Expr.App(Expr.Sym("plus"), List(a, Expr.App(Expr.Sym("plus"), List(b, c))))
-
-    // --- リスト的演算 ---
-    case Expr.App(Expr.Sym("append"), List(Expr.Sym("nil"), ys)) => ys
-    case Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("cons"), List(x, xs)), ys)) =>
-      Expr.App(Expr.Sym("cons"), List(x, Expr.App(Expr.Sym("append"), List(xs, ys))))
-    case Expr.App(Expr.Sym("append"), List(xs, Expr.Sym("nil"))) => xs
-    case Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("append"), List(xs, ys)), zs)) =>
-      Expr.App(Expr.Sym("append"), List(xs, Expr.App(Expr.Sym("append"), List(ys, zs))))
-
-    case Expr.App(Expr.Sym("reverse"), List(Expr.App(Expr.Sym("reverse"), List(t)))) => t
-    case Expr.App(Expr.Sym("mirror"), List(Expr.App(Expr.Sym("mirror"), List(t)))) => t
-    case Expr.App(Expr.Sym("reverse"), List(Expr.Sym("nil"))) => Expr.Sym("nil")
-    case Expr.App(Expr.Sym("reverse"), List(Expr.App(Expr.Sym("cons"), List(x, xs)))) =>
-      Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("reverse"), List(xs)), Expr.App(Expr.Sym("cons"), List(x, Expr.Sym("nil")))))
-    case Expr.App(Expr.Sym("reverse"), List(Expr.App(Expr.Sym("append"), List(xs, ys)))) =>
-      Expr.App(Expr.Sym("append"), List(Expr.App(Expr.Sym("reverse"), List(ys)), Expr.App(Expr.Sym("reverse"), List(xs))))
-
-    case Expr.App(Expr.Sym("map"), List(_, Expr.Sym("nil"))) => Expr.Sym("nil")
-    case Expr.App(Expr.Sym("map"), List(f, Expr.App(Expr.Sym("cons"), List(x, xs)))) =>
-      Expr.App(Expr.Sym("cons"), List(Expr.App(f, List(x)), Expr.App(Expr.Sym("map"), List(f, xs))))
-
     // --- ベクトルの演算 ---
     case Expr.App(Expr.Sym("vlength"), List(Expr.Sym("vnil"))) => Expr.Sym("0")
     case Expr.App(Expr.Sym("vlength"), List(Expr.App(Expr.Sym("vcons"), List(_, _, n)))) => Expr.App(Expr.Sym("S"), List(n))
@@ -450,6 +425,7 @@ object Rewriter {
     case Expr.App(Expr.Sym("tail"), List(Expr.App(Expr.Sym("map_stream"), List(f, s)))) =>
       Expr.App(Expr.Sym("map_stream"), List(f, Expr.App(Expr.Sym("tail"), List(s))))
 
-    case _ => expr
+    case other =>
+      normalizationPlugins.view.flatMap(_.normalizeHook(other)).headOption.getOrElse(other)
   }
 }

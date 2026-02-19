@@ -11,6 +11,7 @@ import romanesco.Utils.Debug.logger
 
 class ForwardReasoningPlugin extends LogicPlugin {
   override def name: String = "ForwardReasoning"
+  override def priority: Int = 80
 
   import Unifier._
 

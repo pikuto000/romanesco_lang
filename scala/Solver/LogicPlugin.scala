@@ -60,8 +60,7 @@ trait ProverInterface {
 /**
  * 各論理体系のプラグイン
  */
-trait LogicPlugin {
-  def name: String
+trait LogicPlugin extends Plugin {
   
   def getGoalHooks(
       exprs: Vector[Expr],

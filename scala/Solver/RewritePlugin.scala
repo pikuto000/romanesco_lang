@@ -11,6 +11,7 @@ import scala.collection.mutable
 
 class RewritePlugin extends LogicPlugin {
   override def name: String = "Rewrite"
+  override def priority: Int = 180
 
   import Unifier._
 

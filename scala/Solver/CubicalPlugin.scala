@@ -11,6 +11,7 @@ import romanesco.Solver.core.Prover
 
 class CubicalPlugin extends LogicPlugin {
   override def name: String = "Cubical"
+  override def priority: Int = 21
 
   import Unifier._
 

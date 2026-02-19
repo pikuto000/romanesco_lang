@@ -10,6 +10,7 @@ import romanesco.Types.Tree
 
 class TemporalLogicPlugin extends LogicPlugin {
   override def name: String = "TemporalLogic"
+  override def priority: Int = 71
 
   import Unifier._
 

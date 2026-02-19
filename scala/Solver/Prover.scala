@@ -31,21 +31,35 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
   ]()
 
   // 全てのロジックをプラグインとして管理
-  private val plugins: List[LogicPlugin] = List(
-    new AxiomPlugin(), // 基本公理
-    new HoTTPlugin(), // HoTT (加速門)
-    new CubicalPlugin(), // Cubical (区間変数・道の計算)
-    new IntroductionPlugin(), // 標準導入ルール
-    new LinearLogicPlugin(), // 線形・分離論理
-    new TemporalLogicPlugin(), // 時相論理
-    new PersistentLogicPlugin(), // 標準分解ルール
-    new ForwardReasoningPlugin(), // 前向き推論
-    new ModalLogicPlugin(), // 様相論理
-    new HoareLogicPlugin(), // Hoare論理
-    new UserRulePlugin(), // ユーザー定義ルール
-    new InductionPlugin(), // 帰納法
-    new RewritePlugin() // 書き換え
-  )
+  private val plugins: List[LogicPlugin] = initializePlugins(config)
+
+  private def initializePlugins(config: ProverConfig): List[LogicPlugin] = {
+    val packs = if (config.pluginPacks.isEmpty) {
+      List(StandardPluginPack, HoTTPluginPack, ResourceLogicPack, ModalTemporalPack, AdvancedReasoningPack, AlgebraPluginPack)
+    } else {
+      config.pluginPacks
+    }
+
+    // パックの依存関係を解決してフラット化
+    def collectPlugins(ps: List[PluginPack], visited: Set[String]): List[LogicPlugin] = {
+      ps.flatMap { p =>
+        if (visited.contains(p.name)) Nil
+        else {
+          val deps = p.dependencies.flatMap(dName => List(StandardPluginPack, HoTTPluginPack, ResourceLogicPack, ModalTemporalPack, AdvancedReasoningPack, AlgebraPluginPack).find(_.name == dName))
+          collectPlugins(deps, visited + p.name) ++ p.plugins
+        }
+      }.distinctBy(_.name)
+    }
+
+    val allPlugins = collectPlugins(packs, Set.empty)
+    val filtered = allPlugins.filterNot(p => config.disabledPlugins.contains(p.name))
+    val sorted = PluginRegistry.resolvePluginOrder(filtered).collect { case p: LogicPlugin => p }
+    
+    // Rewriterに正規化プラグインを登録
+    Rewriter.registerNormalizationPlugins(sorted)
+    
+    sorted
+  }
 
   def freshMeta(depth: Int): Expr = {
     Expr.Meta(MetaId(List(depth, Prover.globalMetaCounter.incrementAndGet())))
@@ -54,7 +68,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
   // addHIT removed: HIT DSL should be integrated into the HoTT plug-in.
 
   override def getAlgebras: List[InitialAlgebra] =
-    config.algebras ++ dynamicAlgebras.toList
+    config.algebras ++ dynamicAlgebras.toList ++ plugins.flatMap(_.providedAlgebras)
 
   def addDynamicRule(rule: CatRule): Unit = {
     if (!dynamicRules.contains(rule.toString)) {
@@ -64,15 +78,15 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
 
   private lazy val backwardRuleIndex = {
     val allRules =
-      if (config.classical) config.rules ++ StandardRules.classical
-      else config.rules
+      (if (config.classical) config.rules ++ StandardRules.classical
+      else config.rules) ++ plugins.flatMap(_.providedRules)
     allRules.groupBy(_.rhs.headSymbol)
   }
 
   private lazy val forwardRuleIndex = {
     val allRules =
-      if (config.classical) config.rules ++ StandardRules.classical
-      else config.rules
+      (if (config.classical) config.rules ++ StandardRules.classical
+      else config.rules) ++ plugins.flatMap(_.providedRules)
     allRules.groupBy(_.lhs.headSymbol)
   }
 

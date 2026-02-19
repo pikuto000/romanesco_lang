@@ -11,6 +11,7 @@ import romanesco.Solver.core.Prover
 
 class PersistentLogicPlugin extends LogicPlugin {
   override def name: String = "PersistentLogic"
+  override def priority: Int = 60
 
   import Unifier._
 

@@ -12,6 +12,7 @@ import romanesco.Solver.core.Prover
 
 class HoareLogicPlugin extends LogicPlugin {
   override def name: String = "HoareLogic"
+  override def priority: Int = 41
 
   import Unifier._
 

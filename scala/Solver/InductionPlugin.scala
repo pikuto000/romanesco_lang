@@ -12,6 +12,7 @@ import romanesco.Solver.core.Prover
 
 class InductionPlugin extends LogicPlugin {
   override def name: String = "Induction"
+  override def priority: Int = 150
 
   import Unifier._
 

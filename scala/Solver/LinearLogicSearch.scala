@@ -12,6 +12,7 @@ import romanesco.Solver.core.Prover
 
 class LinearLogicPlugin extends LogicPlugin {
   override def name: String = "LinearLogic"
+  override def priority: Int = 40
   
   import Unifier._
 
