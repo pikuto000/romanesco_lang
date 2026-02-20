@@ -46,8 +46,10 @@ class LLVMCodeGen:
         stringLiterals += ((name, s))
         name
 
-  /** バイトコード列からLLVM IRモジュール全体を生成 */
-  def generate(code: Array[Op], entryName: String = "main"): String =
+  /** バイトコード列からLLVM IRモジュール全体を生成
+    * @param embedRuntime trueの場合、ランタイム関数の実装をIRに埋め込む（lli実行可能）
+    */
+  def generate(code: Array[Op], entryName: String = "main", embedRuntime: Boolean = false): String =
     regCounter = 0
     labelCounter = 0
     closureCounter = 0
@@ -58,7 +60,7 @@ class LLVMCodeGen:
     val entryBody = compileFunction(code, entryName, Nil)
     functions += entryBody
 
-    buildModule()
+    buildModule(embedRuntime)
 
   /** Op列を1つのLLVM IR関数にコンパイル */
   private def compileFunction(
@@ -95,7 +97,7 @@ class LLVMCodeGen:
           val strName = registerStringLiteral(s)
           val strLen = s.length
           val r = freshReg()
-          emit(s"$r = call %Value @rt_make_literal(i8* getelementptr inbounds ([${strLen + 1} x i8], [${strLen + 1} x i8]* $strName, i64 0, i64 0))")
+          emit(s"$r = call %Value @rt_make_literal(ptr $strName)")
           pushStack(r.toString)
 
         case Op.PushConst(Value.Unit) =>
@@ -118,20 +120,15 @@ class LLVMCodeGen:
 
         case Op.MakeClosure(body, arity) =>
           val closureName = freshClosureName()
-          // クロージャのbodyを別関数としてコンパイル
-          // 引数: env (i8*), arg (%Value)
-          val closureParams = locals.toList ++ List("%arg")
           val closureBody = compileClosureFunction(body, closureName, locals.toList, arity)
           functions += closureBody
-          // 環境の生成
           val envSize = locals.size
           val envR = freshReg()
-          emit(s"$envR = call i8* @rt_alloc_env(i32 $envSize)")
-          // 環境に現在のローカルを保存
+          emit(s"$envR = call ptr @rt_alloc_env(i32 $envSize)")
           for (local, i) <- locals.zipWithIndex do
-            emit(s"call void @rt_env_store(i8* $envR, i32 $i, %Value $local)")
+            emit(s"call void @rt_env_store(ptr $envR, i32 $i, %Value $local)")
           val r = freshReg()
-          emit(s"$r = call %Value @rt_make_closure(i8* bitcast (%Value (i8*, %Value)* $closureName to i8*), i8* $envR, i32 $arity)")
+          emit(s"$r = call %Value @rt_make_closure(ptr $closureName, ptr $envR, i32 $arity)")
           pushStack(r.toString)
 
         case Op.Apply =>
@@ -257,7 +254,7 @@ class LLVMCodeGen:
     // 環境からキャプチャされた変数を復元
     for i <- capturedLocals.indices do
       val r = freshReg()
-      emit(s"$r = call %Value @rt_env_load(i8* %env, i32 $i)")
+      emit(s"$r = call %Value @rt_env_load(ptr %env, i32 $i)")
       locals += r.toString
 
     // 引数を追加
@@ -273,9 +270,8 @@ class LLVMCodeGen:
 
         case Op.PushConst(Value.Literal(s)) =>
           val strName = registerStringLiteral(s)
-          val strLen = s.length
           val r = freshReg()
-          emit(s"$r = call %Value @rt_make_literal(i8* getelementptr inbounds ([${strLen + 1} x i8], [${strLen + 1} x i8]* $strName, i64 0, i64 0))")
+          emit(s"$r = call %Value @rt_make_literal(ptr $strName)")
           stack += r.toString
 
         case Op.PushConst(Value.Unit) =>
@@ -335,19 +331,27 @@ class LLVMCodeGen:
     regCounter = savedReg + regCounter
 
     val cleanName = if name.startsWith("@") then name.drop(1) else name
-    s"define %Value @$cleanName(i8* %env, %Value %arg) {\nentry:\n${lines.mkString("\n")}\n}"
+    s"define %Value @$cleanName(ptr %env, %Value %arg) {\nentry:\n${lines.mkString("\n")}\n}"
 
   /** モジュール全体を組み立て */
-  private def buildModule(): String =
+  private def buildModule(embedRuntime: Boolean = false): String =
     val sb = new StringBuilder()
 
     sb ++= "; ==========================================\n"
     sb ++= "; Romanesco LLVM IR (自動生成)\n"
     sb ++= "; ==========================================\n\n"
 
-    // 値型の定義
-    sb ++= "; 値型: {tag: i8, payload: i8*}\n"
-    sb ++= "%Value = type { i8, i8* }\n\n"
+    if embedRuntime then
+      // ランタイム実装を埋め込み（%Value型定義含む）
+      sb ++= runtimeImplementation
+      sb ++= "\n"
+    else
+      // 値型の定義
+      sb ++= "; 値型: {tag: i8, payload: ptr}\n"
+      sb ++= "%Value = type { i8, ptr }\n\n"
+      // ランタイム関数の宣言のみ
+      sb ++= runtimeDeclarations
+      sb ++= "\n"
 
     // 文字列リテラル
     if stringLiterals.nonEmpty then
@@ -362,10 +366,6 @@ class LLVMCodeGen:
         sb ++= s"$name = private unnamed_addr constant [${value.length + 1} x i8] c\"$escaped\\00\"\n"
       sb ++= "\n"
 
-    // ランタイム関数の宣言
-    sb ++= runtimeDeclarations
-    sb ++= "\n"
-
     // 生成された関数
     for fn <- functions do
       sb ++= fn
@@ -377,7 +377,7 @@ class LLVMCodeGen:
   private val runtimeDeclarations: String =
     """; ランタイムヘルパー関数（外部リンク）
 declare %Value @rt_make_int(i64)
-declare %Value @rt_make_literal(i8*)
+declare %Value @rt_make_literal(ptr)
 declare %Value @rt_make_unit()
 declare %Value @rt_make_pair(%Value, %Value)
 declare %Value @rt_proj1(%Value)
@@ -386,9 +386,160 @@ declare %Value @rt_make_inl(%Value)
 declare %Value @rt_make_inr(%Value)
 declare i8 @rt_get_tag(%Value)
 declare %Value @rt_get_inner(%Value)
-declare %Value @rt_make_closure(i8*, i8*, i32)
+declare %Value @rt_make_closure(ptr, ptr, i32)
 declare %Value @rt_apply(%Value, %Value)
-declare i8* @rt_alloc_env(i32)
-declare void @rt_env_store(i8*, i32, %Value)
-declare %Value @rt_env_load(i8*, i32)
+declare ptr @rt_alloc_env(i32)
+declare void @rt_env_store(ptr, i32, %Value)
+declare %Value @rt_env_load(ptr, i32)
+"""
+
+  /** ランタイム関数の実装（埋め込みモード用） */
+  private val runtimeImplementation: String =
+    """; ==========================================
+; Romanesco ランタイムライブラリ（埋め込み）
+; ==========================================
+
+%Value = type { i8, ptr }
+%Closure = type { ptr, ptr, i32 }
+%Pair = type { %Value, %Value }
+
+declare ptr @malloc(i64)
+declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
+
+define %Value @rt_make_int(i64 %n) {
+  %ptr = call ptr @malloc(i64 8)
+  store i64 %n, ptr %ptr
+  %v1 = insertvalue %Value undef, i8 0, 0
+  %v2 = insertvalue %Value %v1, ptr %ptr, 1
+  ret %Value %v2
+}
+
+define %Value @rt_make_literal(ptr %s) {
+  %v1 = insertvalue %Value undef, i8 1, 0
+  %v2 = insertvalue %Value %v1, ptr %s, 1
+  ret %Value %v2
+}
+
+define %Value @rt_make_unit() {
+  %v1 = insertvalue %Value undef, i8 6, 0
+  %v2 = insertvalue %Value %v1, ptr null, 1
+  ret %Value %v2
+}
+
+define %Value @rt_make_pair(%Value %a, %Value %b) {
+  %ptr = call ptr @malloc(i64 24)
+  %p1 = getelementptr %Pair, ptr %ptr, i32 0, i32 0
+  store %Value %a, ptr %p1
+  %p2 = getelementptr %Pair, ptr %ptr, i32 0, i32 1
+  store %Value %b, ptr %p2
+  %v1 = insertvalue %Value undef, i8 3, 0
+  %v2 = insertvalue %Value %v1, ptr %ptr, 1
+  ret %Value %v2
+}
+
+define %Value @rt_proj1(%Value %p) {
+  %ptr = extractvalue %Value %p, 1
+  %vptr = getelementptr %Pair, ptr %ptr, i32 0, i32 0
+  %v = load %Value, ptr %vptr
+  ret %Value %v
+}
+
+define %Value @rt_proj2(%Value %p) {
+  %ptr = extractvalue %Value %p, 1
+  %vptr = getelementptr %Pair, ptr %ptr, i32 0, i32 1
+  %v = load %Value, ptr %vptr
+  ret %Value %v
+}
+
+define %Value @rt_make_inl(%Value %inner) {
+  %ptr = call ptr @malloc(i64 16)
+  store %Value %inner, ptr %ptr
+  %v1 = insertvalue %Value undef, i8 4, 0
+  %v2 = insertvalue %Value %v1, ptr %ptr, 1
+  ret %Value %v2
+}
+
+define %Value @rt_make_inr(%Value %inner) {
+  %ptr = call ptr @malloc(i64 16)
+  store %Value %inner, ptr %ptr
+  %v1 = insertvalue %Value undef, i8 5, 0
+  %v2 = insertvalue %Value %v1, ptr %ptr, 1
+  ret %Value %v2
+}
+
+define i8 @rt_get_tag(%Value %v) {
+  %tag = extractvalue %Value %v, 0
+  ret i8 %tag
+}
+
+define %Value @rt_get_inner(%Value %v) {
+  %ptr = extractvalue %Value %v, 1
+  %inner = load %Value, ptr %ptr
+  ret %Value %inner
+}
+
+define %Value @rt_make_closure(ptr %func, ptr %env, i32 %arity) {
+  %ptr = call ptr @malloc(i64 24)
+  %f = getelementptr %Closure, ptr %ptr, i32 0, i32 0
+  store ptr %func, ptr %f
+  %e = getelementptr %Closure, ptr %ptr, i32 0, i32 1
+  store ptr %env, ptr %e
+  %a = getelementptr %Closure, ptr %ptr, i32 0, i32 2
+  store i32 %arity, ptr %a
+  %v1 = insertvalue %Value undef, i8 2, 0
+  %v2 = insertvalue %Value %v1, ptr %ptr, 1
+  ret %Value %v2
+}
+
+define %Value @rt_apply(%Value %fn, %Value %arg) {
+entry:
+  %ptr = extractvalue %Value %fn, 1
+  %fpp = getelementptr %Closure, ptr %ptr, i32 0, i32 0
+  %funcPtr = load ptr, ptr %fpp
+  %epp = getelementptr %Closure, ptr %ptr, i32 0, i32 1
+  %env = load ptr, ptr %epp
+  %app = getelementptr %Closure, ptr %ptr, i32 0, i32 2
+  %arity = load i32, ptr %app
+  %is_one = icmp eq i32 %arity, 1
+  br i1 %is_one, label %direct_call, label %partial_apply
+direct_call:
+  %result = call %Value %funcPtr(ptr %env, %Value %arg)
+  ret %Value %result
+partial_apply:
+  %env_size = load i32, ptr %env
+  %new_size = add i32 %env_size, 1
+  %new_env = call ptr @rt_alloc_env(i32 %new_size)
+  %src_data = getelementptr i8, ptr %env, i32 4
+  %dst_data = getelementptr i8, ptr %new_env, i32 4
+  %copy_bytes = mul i32 %env_size, 16
+  %copy_i64 = zext i32 %copy_bytes to i64
+  call void @llvm.memcpy.p0.p0.i64(ptr %dst_data, ptr %src_data, i64 %copy_i64, i1 false)
+  call void @rt_env_store(ptr %new_env, i32 %env_size, %Value %arg)
+  %new_arity = sub i32 %arity, 1
+  %new_closure = call %Value @rt_make_closure(ptr %funcPtr, ptr %new_env, i32 %new_arity)
+  ret %Value %new_closure
+}
+
+define ptr @rt_alloc_env(i32 %n) {
+  %val_size = mul i32 %n, 16
+  %total_i32 = add i32 %val_size, 4
+  %total = zext i32 %total_i32 to i64
+  %ptr = call ptr @malloc(i64 %total)
+  store i32 %n, ptr %ptr
+  ret ptr %ptr
+}
+
+define void @rt_env_store(ptr %env, i32 %idx, %Value %val) {
+  %data = getelementptr i8, ptr %env, i32 4
+  %vptr = getelementptr %Value, ptr %data, i32 %idx
+  store %Value %val, ptr %vptr
+  ret void
+}
+
+define %Value @rt_env_load(ptr %env, i32 %idx) {
+  %data = getelementptr i8, ptr %env, i32 4
+  %vptr = getelementptr %Value, ptr %data, i32 %idx
+  %v = load %Value, ptr %vptr
+  ret %Value %v
+}
 """
