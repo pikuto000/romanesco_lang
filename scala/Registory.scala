@@ -21,7 +21,7 @@ final class Registory {
   private var macroHistory: Vector[Macro[Any, Any]] =
     Vector()
 
-  private var interpreterHistory: Vector[Interpreter] =
+  private var interpreterHistory: Vector[romanesco.Runtime.VM] =
     Vector()
 
   /* ========= current ========= */
@@ -35,7 +35,7 @@ final class Registory {
   def currentMacro: Macro[Any, Any] =
     macroHistory.last
 
-  def currentInterpreter: Interpreter =
+  def currentVM: romanesco.Runtime.VM =
     interpreterHistory.last
 
   /* ========= random access ========= */
@@ -67,11 +67,11 @@ final class Registory {
     macroHistory(address)
   }
 
-  def anyInterpreter(fromLast: Int = 0): Interpreter = {
+  def anyVM(fromLast: Int = 0): romanesco.Runtime.VM = {
     val address = interpreterHistory.size - 1 - fromLast
     if (address < 0 || address >= interpreterHistory.size)
       throw new RuntimeException(
-        s"Interpreter history address $address is out of range"
+        s"VM history address $address is out of range"
       )
     interpreterHistory(address)
   }
@@ -94,8 +94,8 @@ final class Registory {
     macroHistory = macroHistory :+ new Macro(init, expander, expandrule)
   }
 
-  def pushInterpreter(interpreter: Interpreter): Unit = {
-    interpreterHistory = interpreterHistory :+ interpreter
+  def pushVM(vm: romanesco.Runtime.VM): Unit = {
+    interpreterHistory = interpreterHistory :+ vm
   }
 
   /* ========= dump ========= */
