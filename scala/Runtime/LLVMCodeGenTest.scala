@@ -33,7 +33,7 @@ package romanesco.Runtime
 
   test("モジュール構造: %Value型とランタイム宣言が含まれる") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.IntVal(42)), Op.Return))
+    val ir = gen.generate(Array(Op.PushConst(Value.Atom(42)), Op.Return))
     assertContains(ir, "%Value = type { i8, ptr }")
     assertContains(ir, "declare %Value @rt_make_int(i64)")
     assertContains(ir, "define %Value @main()")
@@ -41,14 +41,14 @@ package romanesco.Runtime
 
   test("PushConst(IntVal) + Return: rt_make_intの呼び出し") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.IntVal(42)), Op.Return))
+    val ir = gen.generate(Array(Op.PushConst(Value.Atom(42)), Op.Return))
     assertContains(ir, "@rt_make_int(i64 42)")
     assertContains(ir, "ret %Value")
   }
 
   test("PushConst(Literal): 文字列リテラルとrt_make_literal") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.Literal("hello")), Op.Return))
+    val ir = gen.generate(Array(Op.PushConst(Value.Atom("hello")), Op.Return))
     assertContains(ir, "c\"hello\\00\"")
     assertContains(ir, "@rt_make_literal")
   }
@@ -64,8 +64,8 @@ package romanesco.Runtime
   test("MakePair: rt_make_pairの呼び出し") {
     val gen = new LLVMCodeGen()
     val ir = gen.generate(Array(
-      Op.PushConst(Value.IntVal(1)),
-      Op.PushConst(Value.IntVal(2)),
+      Op.PushConst(Value.Atom(1)),
+      Op.PushConst(Value.Atom(2)),
       Op.MakePair,
       Op.Return
     ))
@@ -77,8 +77,8 @@ package romanesco.Runtime
   test("Proj1: rt_proj1の呼び出し") {
     val gen = new LLVMCodeGen()
     val ir = gen.generate(Array(
-      Op.PushConst(Value.IntVal(1)),
-      Op.PushConst(Value.IntVal(2)),
+      Op.PushConst(Value.Atom(1)),
+      Op.PushConst(Value.Atom(2)),
       Op.MakePair,
       Op.Proj1,
       Op.Return
@@ -89,8 +89,8 @@ package romanesco.Runtime
   test("Proj2: rt_proj2の呼び出し") {
     val gen = new LLVMCodeGen()
     val ir = gen.generate(Array(
-      Op.PushConst(Value.IntVal(1)),
-      Op.PushConst(Value.IntVal(2)),
+      Op.PushConst(Value.Atom(1)),
+      Op.PushConst(Value.Atom(2)),
       Op.MakePair,
       Op.Proj2,
       Op.Return
@@ -103,7 +103,7 @@ package romanesco.Runtime
   test("MakeInl: rt_make_inlの呼び出し") {
     val gen = new LLVMCodeGen()
     val ir = gen.generate(Array(
-      Op.PushConst(Value.IntVal(1)),
+      Op.PushConst(Value.Atom(1)),
       Op.MakeInl,
       Op.Return
     ))
@@ -113,7 +113,7 @@ package romanesco.Runtime
   test("MakeInr: rt_make_inrの呼び出し") {
     val gen = new LLVMCodeGen()
     val ir = gen.generate(Array(
-      Op.PushConst(Value.IntVal(1)),
+      Op.PushConst(Value.Atom(1)),
       Op.MakeInr,
       Op.Return
     ))
@@ -140,7 +140,7 @@ package romanesco.Runtime
     val idBody = Array[Op](Op.PushVar(0), Op.Return)
     val ir = gen.generate(Array(
       Op.MakeClosure(idBody, 1),
-      Op.PushConst(Value.IntVal(42)),
+      Op.PushConst(Value.Atom(42)),
       Op.Apply,
       Op.Return
     ))
@@ -154,7 +154,7 @@ package romanesco.Runtime
     val fBody = Array[Op](Op.PushVar(0), Op.Return)
     val gBody = Array[Op](Op.PushVar(0), Op.Return)
     val ir = gen.generate(Array(
-      Op.PushConst(Value.IntVal(1)),
+      Op.PushConst(Value.Atom(1)),
       Op.MakeInl,
       Op.MakeClosure(fBody, 1),
       Op.MakeClosure(gBody, 1),
@@ -171,7 +171,7 @@ package romanesco.Runtime
 
   test("embedRuntime: ランタイム関数の定義が含まれる") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.IntVal(42)), Op.Return), embedRuntime = true)
+    val ir = gen.generate(Array(Op.PushConst(Value.Atom(42)), Op.Return), embedRuntime = true)
     assertContains(ir, "define %Value @rt_make_int(i64 %n)")
     assertContains(ir, "define %Value @rt_make_pair(%Value %a, %Value %b)")
     assertContains(ir, "define %Value @rt_apply(%Value %fn, %Value %arg)")
@@ -182,7 +182,7 @@ package romanesco.Runtime
 
   test("embedRuntime: %Closure, %Pair型が定義されている") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.IntVal(1)), Op.Return), embedRuntime = true)
+    val ir = gen.generate(Array(Op.PushConst(Value.Atom(1)), Op.Return), embedRuntime = true)
     assertContains(ir, "%Closure = type")
     assertContains(ir, "%Pair = type")
   }
@@ -193,9 +193,9 @@ package romanesco.Runtime
     val gen = new LLVMCodeGen()
     val idBody = Array[Op](Op.PushVar(0), Op.Return)
     val ir = gen.generate(Array(
-      Op.PushConst(Value.IntVal(42)),
+      Op.PushConst(Value.Atom(42)),
       Op.MakeClosure(idBody, 1),
-      Op.PushConst(Value.IntVal(42)),
+      Op.PushConst(Value.Atom(42)),
       Op.Apply,
       Op.Return
     ), embedRuntime = true)
@@ -249,13 +249,13 @@ default_case:
     println("\n--- lli実行テスト ---")
 
     test("lli: 整数定数42を返す") {
-      runWithLli(Array(Op.PushConst(Value.IntVal(42)), Op.Return), 42)
+      runWithLli(Array(Op.PushConst(Value.Atom(42)), Op.Return), 42)
     }
 
     test("lli: pair(10, 20)のproj1 → 10") {
       runWithLli(Array(
-        Op.PushConst(Value.IntVal(10)),
-        Op.PushConst(Value.IntVal(20)),
+        Op.PushConst(Value.Atom(10)),
+        Op.PushConst(Value.Atom(20)),
         Op.MakePair,
         Op.Proj1,
         Op.Return
@@ -264,8 +264,8 @@ default_case:
 
     test("lli: pair(10, 20)のproj2 → 20") {
       runWithLli(Array(
-        Op.PushConst(Value.IntVal(10)),
-        Op.PushConst(Value.IntVal(20)),
+        Op.PushConst(Value.Atom(10)),
+        Op.PushConst(Value.Atom(20)),
         Op.MakePair,
         Op.Proj2,
         Op.Return
@@ -276,7 +276,7 @@ default_case:
       val idBody = Array[Op](Op.PushVar(0), Op.Return)
       runWithLli(Array(
         Op.MakeClosure(idBody, 1),
-        Op.PushConst(Value.IntVal(7)),
+        Op.PushConst(Value.Atom(7)),
         Op.Apply,
         Op.Return
       ), 7)

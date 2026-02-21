@@ -88,14 +88,18 @@ class LLVMCodeGen:
 
     for op <- code do
       op match
-        case Op.PushConst(Value.IntVal(n)) =>
+        case Op.PushConst(Value.Atom(n: Int)) =>
           val r = freshReg()
           emit(s"$r = call %Value @rt_make_int(i64 $n)")
           pushStack(r.toString)
 
-        case Op.PushConst(Value.Literal(s)) =>
+        case Op.PushConst(Value.Atom(n: Long)) =>
+          val r = freshReg()
+          emit(s"$r = call %Value @rt_make_int(i64 $n)")
+          pushStack(r.toString)
+
+        case Op.PushConst(Value.Atom(s: String)) =>
           val strName = registerStringLiteral(s)
-          val strLen = s.length
           val r = freshReg()
           emit(s"$r = call %Value @rt_make_literal(ptr $strName)")
           pushStack(r.toString)
@@ -263,12 +267,17 @@ class LLVMCodeGen:
     // body をコンパイル（再帰的にcompileFunctionを使わず直接展開）
     for op <- body do
       op match
-        case Op.PushConst(Value.IntVal(n)) =>
+        case Op.PushConst(Value.Atom(n: Int)) =>
           val r = freshReg()
           emit(s"$r = call %Value @rt_make_int(i64 $n)")
           stack += r.toString
 
-        case Op.PushConst(Value.Literal(s)) =>
+        case Op.PushConst(Value.Atom(n: Long)) =>
+          val r = freshReg()
+          emit(s"$r = call %Value @rt_make_int(i64 $n)")
+          stack += r.toString
+
+        case Op.PushConst(Value.Atom(s: String)) =>
           val strName = registerStringLiteral(s)
           val r = freshReg()
           emit(s"$r = call %Value @rt_make_literal(ptr $strName)")

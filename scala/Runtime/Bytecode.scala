@@ -23,8 +23,7 @@ enum Op:
 
 /** VM上の値 */
 enum Value:
-  case Literal(name: String)                              // 定数・シンボル
-  case IntVal(n: Int)                                     // 整数値
+  case Atom(value: Any)                                   // 不透明な定数（整数、文字列等）
   case Closure(body: Array[Op], env: Array[Value], arity: Int) // クロージャ
   case PairVal(fst: Value, snd: Value)                    // 積型
   case InlVal(v: Value)                                   // 余積（左）
@@ -32,8 +31,7 @@ enum Value:
   case Unit                                               // 単位型（⊤ / Terminal）
 
   override def toString: String = this match
-    case Literal(n)    => n
-    case IntVal(n)     => n.toString
+    case Atom(v)       => v.toString
     case Closure(_, _, a) => s"<closure/$a>"
     case PairVal(a, b) => s"($a, $b)"
     case InlVal(v)     => s"inl($v)"
