@@ -20,6 +20,7 @@ enum Op:
   case MakeInr                       // 余積（右）
   case Case(inlBranch: Array[Op], inrBranch: Array[Op]) // 場合分け
   case Pop                           // スタックトップを破棄
+  case Free(rid: Int)                // リソースIDを指定して深いfree
 
 /** VM上の値 */
 enum Value:
