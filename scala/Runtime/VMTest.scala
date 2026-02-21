@@ -30,17 +30,17 @@ package romanesco.Runtime
 
   test("PushConst + Return: 定数を返す") {
     val result = vm.run(Array(
-      Op.PushConst(Value.IntVal(42)),
+      Op.PushConst(Value.Atom(42)),
       Op.Return
     ))
-    assertEquals(result, Value.IntVal(42))
+    assertEquals(result, Value.Atom(42))
   }
 
   test("PushConst: リテラルを返す") {
     val result = vm.run(Array(
-      Op.PushConst(Value.Literal("hello"))
+      Op.PushConst(Value.Atom("hello"))
     ))
-    assertEquals(result, Value.Literal("hello"))
+    assertEquals(result, Value.Atom("hello"))
   }
 
   test("空コード: Unitを返す") {
@@ -52,35 +52,35 @@ package romanesco.Runtime
 
   test("MakePair + Proj1") {
     val result = vm.run(Array(
-      Op.PushConst(Value.Literal("a")),
-      Op.PushConst(Value.Literal("b")),
+      Op.PushConst(Value.Atom("a")),
+      Op.PushConst(Value.Atom("b")),
       Op.MakePair,
       Op.Proj1
     ))
-    assertEquals(result, Value.Literal("a"))
+    assertEquals(result, Value.Atom("a"))
   }
 
   test("MakePair + Proj2") {
     val result = vm.run(Array(
-      Op.PushConst(Value.Literal("a")),
-      Op.PushConst(Value.Literal("b")),
+      Op.PushConst(Value.Atom("a")),
+      Op.PushConst(Value.Atom("b")),
       Op.MakePair,
       Op.Proj2
     ))
-    assertEquals(result, Value.Literal("b"))
+    assertEquals(result, Value.Atom("b"))
   }
 
   test("ネストしたペア: pair(pair(1,2), 3)のProj1.Proj2") {
     val result = vm.run(Array(
-      Op.PushConst(Value.IntVal(1)),
-      Op.PushConst(Value.IntVal(2)),
+      Op.PushConst(Value.Atom(1)),
+      Op.PushConst(Value.Atom(2)),
       Op.MakePair,
-      Op.PushConst(Value.IntVal(3)),
+      Op.PushConst(Value.Atom(3)),
       Op.MakePair,
       Op.Proj1,
       Op.Proj2
     ))
-    assertEquals(result, Value.IntVal(2))
+    assertEquals(result, Value.Atom(2))
   }
 
   // --- クロージャ ---
@@ -89,20 +89,20 @@ package romanesco.Runtime
     val idBody = Array[Op](Op.PushVar(0), Op.Return)
     val result = vm.run(Array(
       Op.MakeClosure(idBody, 1),
-      Op.PushConst(Value.IntVal(42)),
+      Op.PushConst(Value.Atom(42)),
       Op.Apply
     ))
-    assertEquals(result, Value.IntVal(42))
+    assertEquals(result, Value.Atom(42))
   }
 
   test("定数関数: (λx. 99)(42) = 99") {
-    val constBody = Array[Op](Op.PushConst(Value.IntVal(99)), Op.Return)
+    val constBody = Array[Op](Op.PushConst(Value.Atom(99)), Op.Return)
     val result = vm.run(Array(
       Op.MakeClosure(constBody, 1),
-      Op.PushConst(Value.IntVal(42)),
+      Op.PushConst(Value.Atom(42)),
       Op.Apply
     ))
-    assertEquals(result, Value.IntVal(99))
+    assertEquals(result, Value.Atom(99))
   }
 
   test("クロージャのenv捕捉: 外側の変数を参照") {
@@ -111,44 +111,44 @@ package romanesco.Runtime
     val innerBody = Array[Op](Op.PushVar(0), Op.Return) // env[0] = x
     val outerBody = Array[Op](
       Op.MakeClosure(innerBody, 1), // env = [x]
-      Op.PushConst(Value.IntVal(0)),
+      Op.PushConst(Value.Atom(0)),
       Op.Apply,
       Op.Return
     )
     val result = vm.run(Array(
       Op.MakeClosure(outerBody, 1),
-      Op.PushConst(Value.Literal("captured")),
+      Op.PushConst(Value.Atom("captured")),
       Op.Apply
     ))
-    assertEquals(result, Value.Literal("captured"))
+    assertEquals(result, Value.Atom("captured"))
   }
 
   // --- 余積とCase ---
 
   test("Case(inl(x), f, g) = f(x)") {
     val fBody = Array[Op](Op.PushVar(0), Op.Return) // f = id
-    val gBody = Array[Op](Op.PushConst(Value.Literal("wrong")), Op.Return)
+    val gBody = Array[Op](Op.PushConst(Value.Atom("wrong")), Op.Return)
     val result = vm.run(Array(
-      Op.PushConst(Value.Literal("left_val")),
+      Op.PushConst(Value.Atom("left_val")),
       Op.MakeInl,
       Op.MakeClosure(fBody, 1),
       Op.MakeClosure(gBody, 1),
       Op.Case(Array.empty, Array.empty)
     ))
-    assertEquals(result, Value.Literal("left_val"))
+    assertEquals(result, Value.Atom("left_val"))
   }
 
   test("Case(inr(y), f, g) = g(y)") {
-    val fBody = Array[Op](Op.PushConst(Value.Literal("wrong")), Op.Return)
+    val fBody = Array[Op](Op.PushConst(Value.Atom("wrong")), Op.Return)
     val gBody = Array[Op](Op.PushVar(0), Op.Return) // g = id
     val result = vm.run(Array(
-      Op.PushConst(Value.Literal("right_val")),
+      Op.PushConst(Value.Atom("right_val")),
       Op.MakeInr,
       Op.MakeClosure(fBody, 1),
       Op.MakeClosure(gBody, 1),
       Op.Case(Array.empty, Array.empty)
     ))
-    assertEquals(result, Value.Literal("right_val"))
+    assertEquals(result, Value.Atom("right_val"))
   }
 
   // --- 部分適用 ---
@@ -163,12 +163,12 @@ package romanesco.Runtime
     )
     val result = vm.run(Array(
       Op.MakeClosure(body, 2),
-      Op.PushConst(Value.Literal("a")),
+      Op.PushConst(Value.Atom("a")),
       Op.Apply,  // 部分適用 → closure/1
-      Op.PushConst(Value.Literal("b")),
+      Op.PushConst(Value.Atom("b")),
       Op.Apply   // 完全適用
     ))
-    assertEquals(result, Value.PairVal(Value.Literal("a"), Value.Literal("b")))
+    assertEquals(result, Value.PairVal(Value.Atom("a"), Value.Atom("b")))
   }
 
   // --- エラーケース ---
@@ -176,8 +176,8 @@ package romanesco.Runtime
   test("関数でない値へのApplyはエラー") {
     try
       vm.run(Array(
-        Op.PushConst(Value.IntVal(1)),
-        Op.PushConst(Value.IntVal(2)),
+        Op.PushConst(Value.Atom(1)),
+        Op.PushConst(Value.Atom(2)),
         Op.Apply
       ))
       throw AssertionError("例外が発生すべき")
@@ -188,7 +188,7 @@ package romanesco.Runtime
   test("Proj1: ペアでない値はエラー") {
     try
       vm.run(Array(
-        Op.PushConst(Value.IntVal(1)),
+        Op.PushConst(Value.Atom(1)),
         Op.Proj1
       ))
       throw AssertionError("例外が発生すべき")

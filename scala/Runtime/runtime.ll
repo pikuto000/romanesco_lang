@@ -4,8 +4,8 @@
 ; ==========================================
 ;
 ; Value型: { i8 tag, ptr payload }
-;   tag 0 = IntVal   (payload: i64へのポインタ)
-;   tag 1 = Literal  (payload: i8文字列ポインタ)
+;   tag 0 = Atom(Int/Long)  (payload: i64へのポインタ)
+;   tag 1 = Atom(String)    (payload: i8文字列ポインタ)
 ;   tag 2 = Closure  (payload: { ptr funcPtr, ptr env, i32 arity }へのポインタ)
 ;   tag 3 = Pair     (payload: { %Value, %Value }へのポインタ)
 ;   tag 4 = Inl      (payload: %Valueへのポインタ)
