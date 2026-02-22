@@ -180,13 +180,22 @@ class LinearLogicPlugin extends LogicPlugin {
     val goal = exprs.last
     val linearContext = state.linearContext
     
-    // a. 破壊的分解 (A ⊗ B |- A, B)
-    val tensorDestruct = linearContext.zipWithIndex.flatMap {
-      case ((name, Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b))), i) =>
-        val newL = linearContext.filterNot(_._1 == name) ++ List((s"$name.1", a), (s"$name.2", b))
-        val subTree = prover.search(exprs, context, state.withLinear(newL), subst, depth + 1, limit, visited, guarded)
-        allSuccesses(subTree).map { s =>
-          Tree.V(SearchNode(exprs, s"tensor-destruct[$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"tensor-destruct[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
+    // a. 破壊的・非破壊的分解 (A ⊗ B |- A, B)
+    val tensorDestruct = (linearContext.map(h => (h, true)) ++ context.map(h => (h, false))).zipWithIndex.flatMap {
+      case (((name, Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b))), isLinear), i) =>
+        if (isLinear) {
+          val newL = linearContext.filterNot(_._1 == name) ++ List((s"$name.1", a), (s"$name.2", b))
+          val subTree = prover.search(exprs, context, state.withLinear(newL), subst, depth + 1, limit, visited, guarded)
+          allSuccesses(subTree).map { s =>
+            Tree.V(SearchNode(exprs, s"tensor-destruct[$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"tensor-destruct[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
+          }
+        } else {
+          // 通常コンテキストの場合、元のリソースを残したまま分解 (非破壊)
+          val newCtx = (s"$name.1", a) :: (s"$name.2", b) :: context.filterNot(_._1 == name)
+          val subTree = prover.search(exprs, newCtx, state, subst, depth + 1, limit, visited, guarded)
+          allSuccesses(subTree).map { s =>
+            Tree.V(SearchNode(exprs, s"tensor-is-ﾃ夕$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"tensor-is-ﾃ夕$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
+          }
         }
       case _ => None
     }.toVector
