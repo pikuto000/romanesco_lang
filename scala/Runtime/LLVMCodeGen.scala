@@ -88,6 +88,7 @@ class LLVMCodeGen:
           case Op.Proj2(d, s) => update(d); update(s)
           case Op.MakeInl(d, s) => update(d); update(s)
           case Op.MakeInr(d, s) => update(d); update(s)
+          case Op.Borrow(d, s) => update(d); update(s)
           case Op.Case(d, s, _, _) => update(d); update(s)
           case Op.Add(d, l, r) => update(d); update(l); update(r)
           case Op.Sub(d, l, r) => update(d); update(l); update(r)
@@ -411,6 +412,13 @@ class LLVMCodeGen:
         case Op.Add(dst, lhs, rhs) => compileBinOpLinear(dst, lhs, rhs, "add", analysis, lines, useArrayRegs)
         case Op.Sub(dst, lhs, rhs) => compileBinOpLinear(dst, lhs, rhs, "sub", analysis, lines, useArrayRegs)
         case Op.Mul(dst, lhs, rhs) => compileBinOpLinear(dst, lhs, rhs, "mul", analysis, lines, useArrayRegs)
+
+        case Op.Borrow(dst, src) =>
+           val srcPtr = getRegPtr(src)
+           val dstPtr = getRegPtr(dst)
+           val v = freshReg()
+           emit(s"$v = load %Value, ptr $srcPtr")
+           emit(s"store %Value $v, ptr $dstPtr")
 
         case Op.Free(reg) =>
            val v = consumeReg(reg)

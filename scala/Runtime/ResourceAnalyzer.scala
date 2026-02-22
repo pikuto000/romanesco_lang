@@ -1,57 +1,26 @@
 // ==========================================
 // ResourceAnalyzer.scala
-// バイトコードの抽象実行によるリソース追跡 (Linear Mode)
+// 究極の簡潔版リソース追跡
 // ==========================================
 
 package romanesco.Runtime
 
 import scala.collection.mutable
 
-/** リソースの種別 */
 enum ResourceKind:
-  case Atom
-  case PairStruct
-  case InlStruct
-  case InrStruct
-  case Shell
-  case UnitRes
+  case Atom, PairStruct, InlStruct, InrStruct, Shell, UnitRes
 
-/** リソース情報 */
-case class Resource(
-    id: Int,
-    kind: ResourceKind,
-    children: Set[Int] = Set.empty,
-    initialChildren: Set[Int] = Set.empty,
-    allocSite: Int = -1
-)
+case class Resource(id: Int, kind: ResourceKind, children: Set[Int] = Set.empty, initialChildren: Set[Int] = Set.empty, allocSite: Int = -1)
 
-/** 抽象実行の状態 */
-case class ResourceState(
-    resources: Map[Int, Resource] = Map.empty,
-    regs: Map[Int, Int] = Map.empty,
-    nextId: Int = 0
-):
+case class ResourceState(resources: Map[Int, Resource] = Map.empty, regs: Map[Int, Int] = Map.empty, nextId: Int = 0):
   def alloc(kind: ResourceKind, children: Set[Int], site: Int): (ResourceState, Int) =
     val rid = nextId
     val r = Resource(rid, kind, children, children, site)
     (copy(resources = resources + (rid -> r), nextId = nextId + 1), rid)
-
   def setReg(reg: Int, rid: Int): ResourceState = copy(regs = regs + (reg -> rid))
   def clearReg(reg: Int): ResourceState = copy(regs = regs - reg)
   def getReg(reg: Int): Option[Int] = regs.get(reg)
 
-  /** 親リソースから子を抽出（所有権移動） */
-  def extractChild(parentId: Int, childId: Int): ResourceState =
-    resources.get(parentId) match
-      case Some(r) =>
-        val newChildren = r.children - childId
-        val updated = r.copy(
-          children = newChildren
-        )
-        copy(resources = resources + (parentId -> updated))
-      case None => this
-
-/** 解析結果 */
 case class AnalysisResult(
     finalState: ResourceState,
     returnedResource: Option[Int],
@@ -64,143 +33,61 @@ case class AnalysisResult(
     garbageResources.toList.flatMap(rid => finalState.resources.get(rid)).sortBy(_.id)
 
 class ResourceAnalyzer:
-
   def analyze(code: Array[Op]): AnalysisResult =
     var state = ResourceState()
-    val lostAt = mutable.Map[Int, Set[Int]]()
     val regsAt = mutable.Map[Int, Map[Int, Int]]()
+    val garbage = mutable.Set[Int]()
 
     for (op, idx) <- code.zipWithIndex do
       regsAt(idx) = state.regs
-      val reachableBefore = allReachable(state)
-      
       state = op match
-        case Op.LoadConst(dst, Value.Atom(_)) =>
+        case Op.LoadConst(dst, _) =>
           val (s, rid) = state.alloc(ResourceKind.Atom, Set.empty, idx)
           s.setReg(dst, rid)
-
-        case Op.LoadConst(dst, Value.Unit) =>
-          val (s, rid) = state.alloc(ResourceKind.UnitRes, Set.empty, idx)
-          s.setReg(dst, rid)
-
+        case Op.Free(reg) => state.clearReg(reg)
         case Op.Move(dst, src) =>
-          val s = state.getReg(src)
-          val state2 = state.clearReg(src)
-          s match
-            case Some(rid) => state2.setReg(dst, rid)
-            case None => state2
-
+          val rid = state.getReg(src)
+          val s2 = state.clearReg(src)
+          rid.map(s2.setReg(dst, _)).getOrElse(s2)
         case Op.MakePair(dst, fst, snd) =>
-          val fstId = state.getReg(fst).getOrElse(-1)
-          val sndId = state.getReg(snd).getOrElse(-1)
-          val children = Set(fstId, sndId).filter(_ >= 0)
-          val state2 = state.clearReg(fst).clearReg(snd)
-          val (s, rid) = state2.alloc(ResourceKind.PairStruct, children, idx)
+          val fId = state.getReg(fst).getOrElse(-1)
+          val sId = state.getReg(snd).getOrElse(-1)
+          val (s, rid) = state.clearReg(fst).clearReg(snd).alloc(ResourceKind.PairStruct, Set(fId, sId).filter(_>=0), idx)
           s.setReg(dst, rid)
-
         case Op.Proj1(dst, src) =>
-          val res = for {
-            pairId <- state.getReg(src)
-            pairRes <- state.resources.get(pairId)
-            if pairRes.initialChildren.size >= 2
-          } yield (pairRes.initialChildren.min, pairRes.initialChildren.max)
-          
-          val state2 = state.clearReg(src)
-          res match
-            case Some((fstId, sndId)) => 
-              state2.setReg(dst, fstId).setReg(src, sndId)
-            case None => state2
-
+          val res = for { pId <- state.getReg(src); r <- state.resources.get(pId) if r.initialChildren.size >= 2 } yield (r.initialChildren.min, r.initialChildren.max)
+          val s2 = state.clearReg(src)
+          res.map(ids => s2.setReg(dst, ids._1).setReg(src, ids._2)).getOrElse(s2)
         case Op.Proj2(dst, src) =>
-          val res = for {
-            pairId <- state.getReg(src)
-            pairRes <- state.resources.get(pairId)
-            if pairRes.initialChildren.size >= 2
-          } yield (pairRes.initialChildren.min, pairRes.initialChildren.max)
-          
-          val state2 = state.clearReg(src)
-          res match
-            case Some((fstId, sndId)) => 
-              state2.setReg(dst, sndId).setReg(src, fstId)
-            case None => state2
-
-        case Op.Add(dst, lhs, rhs) =>
-          val children = state.getReg(lhs).toSet ++ state.getReg(rhs).toSet
-          var s2 = state.clearReg(lhs).clearReg(rhs)
-          val (s3, rid) = s2.alloc(ResourceKind.Atom, children, idx)
-          s3.setReg(dst, rid)
-
-        case Op.Sub(dst, lhs, rhs) =>
-          val children = state.getReg(lhs).toSet ++ state.getReg(rhs).toSet
-          var s2 = state.clearReg(lhs).clearReg(rhs)
-          val (s3, rid) = s2.alloc(ResourceKind.Atom, children, idx)
-          s3.setReg(dst, rid)
-
-        case Op.Mul(dst, lhs, rhs) =>
-          val children = state.getReg(lhs).toSet ++ state.getReg(rhs).toSet
-          var s2 = state.clearReg(lhs).clearReg(rhs)
-          val (s3, rid) = s2.alloc(ResourceKind.Atom, children, idx)
-          s3.setReg(dst, rid)
-
-        case Op.Call(dst, f, args) =>
-          val children = state.getReg(f).toSet ++ args.flatMap(state.getReg)
-          var s2 = state.clearReg(f)
-          args.foreach(a => s2 = s2.clearReg(a))
-          val (s3, rid) = s2.alloc(ResourceKind.Atom, children, idx)
-          s3.setReg(dst, rid)
-
-        case Op.MakeInl(dst, src) =>
-          val innerId = state.getReg(src).getOrElse(-1)
-          val state2 = state.clearReg(src)
-          val children = if innerId >= 0 then Set(innerId) else Set.empty[Int]
-          val (s, rid) = state2.alloc(ResourceKind.InlStruct, children, idx)
+          val res = for { pId <- state.getReg(src); r <- state.resources.get(pId) if r.initialChildren.size >= 2 } yield (r.initialChildren.min, r.initialChildren.max)
+          val s2 = state.clearReg(src)
+          res.map(ids => s2.setReg(dst, ids._2).setReg(src, ids._1)).getOrElse(s2)
+        case Op.Add(dst, l, r) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
           s.setReg(dst, rid)
-
-        case Op.MakeInr(dst, src) =>
-          val innerId = state.getReg(src).getOrElse(-1)
-          val state2 = state.clearReg(src)
-          val children = if innerId >= 0 then Set(innerId) else Set.empty[Int]
-          val (s, rid) = state2.alloc(ResourceKind.InrStruct, children, idx)
+        case Op.Sub(dst, l, r) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
           s.setReg(dst, rid)
-        
-        case Op.MakeClosure(dst, _, captures, _) =>
-          val children = captures.flatMap(state.getReg).toSet
-          var s2 = state
-          captures.foreach(c => s2 = s2.clearReg(c))
-          val (s3, rid) = s2.alloc(ResourceKind.Atom, children, idx)
-          s3.setReg(dst, rid)
-
-        case Op.Case(dst, scrutinee, _, _) =>
-          val inner = for {
-            pId <- state.getReg(scrutinee)
-            pRes <- state.resources.get(pId)
-            if pRes.initialChildren.nonEmpty
-          } yield pRes.initialChildren.head
-          
-          val s2 = state.clearReg(scrutinee)
-          inner match
-            case Some(id) => s2.setReg(dst, id)
-            case None => s2
-
+        case Op.Mul(dst, l, r) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
+        case Op.Borrow(dst, src) => state.getReg(src).map(state.setReg(dst, _)).getOrElse(state)
         case Op.Return(src) =>
-          // Return means EVERY register is cleared (lost to this function scope)
+          // Return 直前の全有効リソースのうち、src に入っているもの以外をリークとして記録
+          // ただし、src と同じ ID が他のレジスタにあっても、それは共有参照なのでリークとはみなさない
+          val returnedRid = state.getReg(src)
+          val others = state.regs.filter(_._1 != src).values.toSet
+          val trueLeaks = returnedRid match {
+            case Some(rid) => others - rid
+            case None => others
+          }
+          garbage ++= trueLeaks
           state.copy(regs = Map.empty)
-
         case _ => state
 
-      val reachableAfter = allReachable(state)
-      val lost = (reachableBefore -- reachableAfter).filter { rid =>
-        state.resources.get(rid).exists(_.kind != ResourceKind.UnitRes)
-      }
-      if lost.nonEmpty then lostAt(idx) = lost
-
-    val totalLost = lostAt.values.flatten.toSet
-    AnalysisResult(state, None, totalLost, lostAt.toMap, regsAt.toMap, state.regs)
+    AnalysisResult(state, None, garbage.toSet, Map.empty, regsAt.toMap, state.regs)
 
   private def allReachable(state: ResourceState): Set[Int] =
     state.regs.values.toSet.flatMap(rid => transitiveOwned(state, rid) + rid)
-
   private def transitiveOwned(state: ResourceState, rid: Int): Set[Int] =
-    state.resources.get(rid) match
-      case Some(r) => r.children ++ r.children.flatMap(c => transitiveOwned(state, c))
-      case None => Set.empty
+    state.resources.get(rid).map(r => r.children ++ r.children.flatMap(transitiveOwned(state, _))).getOrElse(Set.empty)

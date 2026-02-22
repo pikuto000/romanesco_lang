@@ -161,6 +161,10 @@ class VM(
           setReg(dst, Value.Atom(res))
           pc += 1
 
+        case Op.Borrow(dst, src) =>
+          setReg(dst, getReg(src))
+          pc += 1
+    
     retVal
 
   private def setRegAt(regs: ArrayBuffer[Value], idx: Int, v: Value): Unit =

@@ -163,9 +163,28 @@ class ForwardReasoningPlugin extends LogicPlugin {
       }
     }
 
-    if (derived.isEmpty) return Vector.empty
+    // f. 線形コンテキストの等価書き換え (HoTT/Path 等の活用)
+    val linearRewrites = context.flatMap {
+      case (name, Expr.App(Expr.Sym(Eq), List(a, b))) =>
+        state.linearContext.indices.flatMap { li =>
+          val (lName, lHyp) = state.linearContext(li)
+          if (lHyp.contains(a)) {
+            val rewritten = substituteExpr(lHyp, a, b)
+            if (rewritten != lHyp) {
+              val newLinear = state.linearContext.patch(li, List((s"$lName.rw", rewritten)), 1)
+              val subTree = prover.search(exprs, context, state.withLinear(newLinear), subst, depth + 1, limit, visited, guarded)
+              allSuccesses(subTree).map { s =>
+                Tree.V(SearchNode(exprs, s"linear-rewrite[$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"linear-rewrite[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
+              }
+            } else Nil
+          } else Nil
+        }
+      case _ => Nil
+    }.toVector
 
-    logger.log(s"ForwardReasoning: ${derived.size} new facts derived")
+    if (derived.isEmpty && linearRewrites.isEmpty) return Vector.empty
+
+    logger.log(s"ForwardReasoning: ${derived.size} new facts, ${linearRewrites.size} linear rewrites")
 
     // 導出した事実をコンテキストに追加して後続探索
     val enrichedCtx = context ++ derived.toList
@@ -174,7 +193,7 @@ class ForwardReasoningPlugin extends LogicPlugin {
     )
 
     val subTree = prover.search(exprs, enrichedCtx, newState, subst, depth + 1, limit, visited, guarded)
-    allSuccesses(subTree).map { s =>
+    val forwardBranches = allSuccesses(subTree).map { s =>
       val proofChildren = List(s.result.toOption.get.tree)
       val result = Right(ProofResult(
         ProofTree.Node(applySubst(goal, s.subst), "forward-reasoning", proofChildren)
@@ -184,6 +203,8 @@ class ForwardReasoningPlugin extends LogicPlugin {
         Vector(subTree)
       )
     }.toVector
+
+    forwardBranches ++ linearRewrites
   }
 
   /** 式中のサブ式を置換 */

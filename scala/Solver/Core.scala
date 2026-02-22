@@ -212,7 +212,8 @@ case class FailTrace(
     children: List[FailTrace] = Nil,
     failureType: String = "Normal", // "Unify", "Depth", "Cycle", etc.
     attemptedRules: List[String] = Nil,
-    unificationFailures: List[(Expr, Expr)] = Nil
+    unificationFailures: List[(Expr, Expr)] = Nil,
+    residualLinearContext: List[(String, Expr)] = Nil
 ):
   def format(indent: Int = 0): String =
     val sp = "  " * indent
@@ -220,6 +221,9 @@ case class FailTrace(
     var base =
       s"$sp$typeMark (Depth $depth) Goal: ${goal.target}\n$sp  Reason: $reason"
 
+    if (residualLinearContext.nonEmpty) {
+      base += s"\n$sp  Leaked Resources: ${residualLinearContext.map(_._2).mkString(", ")}"
+    }
     if (attemptedRules.nonEmpty) {
       base += s"\n$sp  Attempted Rules: ${attemptedRules.mkString(", ")}"
     }

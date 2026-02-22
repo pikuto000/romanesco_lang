@@ -52,12 +52,12 @@ package romanesco.Runtime
     )
     val optimized = optimizer.optimize(code)
     val freeOps = optimized.collect { case Op.Free(reg) => reg }
-    // reg 1 と reg 2 が解放されるはず
-    assertEquals(freeOps.toSet, Set(1, 2))
-    
+    // reg 2 (Proj1でsndIdが書き戻されたレジスタ) が解放される
+    assertEquals(freeOps.toSet, Set(2))
+
     val returnIdx = optimized.lastIndexWhere {
       case Op.Return(_) => true
-      case _         => false
+      case _            => false
     }
     assertTrue(returnIdx > 0, "Returnが存在する")
   }

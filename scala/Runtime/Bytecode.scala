@@ -23,6 +23,7 @@ enum Op:
   case Add(dst: Int, lhs: Int, rhs: Int)            // dst = lhs + rhs
   case Sub(dst: Int, lhs: Int, rhs: Int)            // dst = lhs - rhs
   case Mul(dst: Int, lhs: Int, rhs: Int)            // dst = lhs * rhs
+  case Borrow(dst: Int, src: Int)                   // dst = reference to src (src is not consumed)
   case Free(reg: Int)                               // free value in register 'reg'
 
 /** VM上の値 */

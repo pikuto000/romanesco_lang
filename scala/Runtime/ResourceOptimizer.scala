@@ -1,136 +1,95 @@
 // ==========================================
 // ResourceOptimizer.scala
-// リソース解析に基づくFree命令の挿入と検証 (Linear Mode)
+// Omni-Logic Verification Engine (Refined Symbolic Refutation)
 // ==========================================
 
 package romanesco.Runtime
 
-import romanesco.Solver.core.{Expr, CatRule, Goal, ProverConfig, Prover}
+import romanesco.Solver.core._
 import scala.collection.mutable
 import scala.util.boundary
 
-/** リソース最適化器
-  * 解析パスでゴミリソースを特定し、Free命令を挿入する。
-  */
-class ResourceOptimizer:
+class ResourceOptimizer(val logic: ResourceLogic = new OmniResourceLogic()):
 
   private val analyzer = new ResourceAnalyzer()
 
-  /** バイトコードにFree命令を挿入して返す */
   def optimize(code: Array[Op]): Array[Op] =
     val result = analyzer.analyze(code)
     if result.lostAt.isEmpty then return code
-
     val newCode = new mutable.ArrayBuffer[Op]()
-
     for (op, idx) <- code.zipWithIndex do
       val lostRids = result.lostAt.getOrElse(idx, Set.empty)
       val regsBefore = result.regsAt(idx)
+      
+      // 命令の直前に Free を挿入するべきレジスタを特定
+      val regsToFree = mutable.Set[Int]()
+      
+      // その命令で上書きされるレジスタを Free する
+      def checkOverwrite(dst: Int) =
+        if (regsBefore.contains(dst) && lostRids.contains(regsBefore(dst))) regsToFree += dst
 
-      // 命令の実行前に解放すべきもの
+      // その命令の「入力」として使われ、かつ消滅するレジスタを Free する
+      def checkInput(src: Int) =
+        if (regsBefore.contains(src) && lostRids.contains(regsBefore(src))) regsToFree += src
+
       op match
-        case Op.LoadConst(dst, _) =>
-          regsBefore.get(dst).foreach(rid => if lostRids.contains(rid) then newCode += Op.Free(dst))
-        case Op.Move(dst, _) =>
-          regsBefore.get(dst).foreach(rid => if lostRids.contains(rid) then newCode += Op.Free(dst))
+        case Op.LoadConst(dst, _) => checkOverwrite(dst)
+        case Op.Move(dst, src) => checkOverwrite(dst); checkInput(src)
+        case Op.MakePair(dst, fst, snd) => checkOverwrite(dst); checkInput(fst); checkInput(snd)
+        case Op.Proj1(dst, src) => checkOverwrite(dst); checkInput(src)
+        case Op.Proj2(dst, src) => checkOverwrite(dst); checkInput(src)
         case Op.Return(src) =>
-          // Return時、src以外の全レジスタのリソースを解放
-          for (reg, rid) <- regsBefore if reg != src && lostRids.contains(rid) do
-            newCode += Op.Free(reg)
+          // Returnの直前に、返り値以外の全レジスタを Free する
+          for ((reg, rid) <- regsBefore if reg != src && lostRids.contains(rid)) {
+            regsToFree += reg
+          }
         case _ => ()
-
+      
+      for (reg <- regsToFree.toList.sorted) {
+        newCode += Op.Free(reg)
+      }
+      
       newCode += op
-    
     newCode.toArray
 
   def verify(code: Array[Op]): Either[String, Unit] = boundary:
     val analysis = analyzer.analyze(code)
-    val state = analysis.finalState
-    
-    var linearContext = mutable.Set[Int]()
-    val currentRegs = mutable.Map[Int, Int]()
+    val axioms = logic.buildVerificationRules(code, analysis)
 
-    for (op, idx) <- code.zipWithIndex do
-      op match
-        case Op.LoadConst(dst, _) =>
-          if currentRegs.contains(dst) then return Left(s"Overwrite detected without Free: reg $dst at op $idx")
-          analysis.finalState.resources.values.find(_.allocSite == idx) match
-            case Some(res) => linearContext.add(res.id); currentRegs(dst) = res.id
-            case None => ()
+    val config = ProverConfig(
+      rules = axioms,
+      pluginPacks = List(
+        // プログラム検証に必須の最小限のパックのみを使用
+        romanesco.Solver.core.ResourceLogicPack, // LinearLogic 等
+        romanesco.Solver.core.AdvancedReasoningPack // ForwardReasoning 等
+      ),
+      maxParallelism = 8,
+      maxComplexity = 5000
+    )
+    val prover = new Prover(config)
 
-        case Op.Move(dst, src) =>
-          if currentRegs.contains(dst) then return Left(s"Overwrite detected without Free: reg $dst at op $idx")
-          currentRegs.remove(src).foreach(rid => currentRegs(dst) = rid)
+    // --- パス 1: 安全性証明 (逆向き探索) ---
+    val safetyGoal = Expr.App(Expr.Sym("⊸"), List(
+      Expr.App(Expr.Sym("⊗"), List(Expr.App(Expr.Sym("At"), List(Expr.Sym("0"))), Expr.Sym("emp"))),
+      Expr.App(Expr.Sym("⊗"), List(Expr.Sym("SafeTermination"), Expr.Sym("emp")))
+    ))
 
-        case Op.Add(dst, l, r) =>
-          if currentRegs.contains(dst) then return Left(s"Overwrite detected without Free: reg $dst at op $idx")
-          val lRid = currentRegs.remove(l); val rRid = currentRegs.remove(r)
-          analysis.finalState.resources.values.find(_.allocSite == idx).foreach { res =>
-            lRid.foreach(linearContext.remove); rRid.foreach(linearContext.remove); linearContext.add(res.id); currentRegs(dst) = res.id
-          }
+    prover.prove(safetyGoal, axioms, maxDepth = code.length * 2 + 10) match
+      case Right(_) => 
+        println("  ✓ Safety Proof Succeeded: No leaks or double-frees.")
+        return Right(())
+      case Left(trace) => 
+        println("  ! Safety Proof Failed. Analyzing residue...")
+        if (trace.residualLinearContext.nonEmpty) {
+          val leaks = trace.residualLinearContext.map(_._2).mkString(", ")
+          return Left(s"検証失敗: リソースリークまたは不正な終了状態を検出しました。 残存資源: $leaks")
+        } else {
+          println(s"  Trace Reason: ${trace.reason}")
+          // フォールバック: シンボリック反証 (既存のロジック)
+        }
 
-        case Op.Sub(dst, l, r) =>
-          if currentRegs.contains(dst) then return Left(s"Overwrite detected without Free: reg $dst at op $idx")
-          val lRid = currentRegs.remove(l); val rRid = currentRegs.remove(r)
-          analysis.finalState.resources.values.find(_.allocSite == idx).foreach { res =>
-            lRid.foreach(linearContext.remove); rRid.foreach(linearContext.remove); linearContext.add(res.id); currentRegs(dst) = res.id
-          }
+    if (analysis.garbageResources.nonEmpty) {
+      return Left(s"反証成功: 以下のリソースが解放されずに残っています: ${analysis.garbageResources.toList.sorted.map(id => s"r$id").mkString(", ")}")
+    }
 
-        case Op.Mul(dst, l, r) =>
-          if currentRegs.contains(dst) then return Left(s"Overwrite detected without Free: reg $dst at op $idx")
-          val lRid = currentRegs.remove(l); val rRid = currentRegs.remove(r)
-          analysis.finalState.resources.values.find(_.allocSite == idx).foreach { res =>
-            lRid.foreach(linearContext.remove); rRid.foreach(linearContext.remove); linearContext.add(res.id); currentRegs(dst) = res.id
-          }
-
-        case Op.MakePair(dst, lhs, rhs) =>
-          if currentRegs.contains(dst) then return Left(s"Overwrite detected without Free: reg $dst at op $idx")
-          val lRid = currentRegs.remove(lhs); val rRid = currentRegs.remove(rhs)
-          analysis.finalState.resources.values.find(_.allocSite == idx).foreach { res =>
-            lRid.foreach(linearContext.remove); rRid.foreach(linearContext.remove); linearContext.add(res.id); currentRegs(dst) = res.id
-          }
-
-        case Op.Proj1(dst, src) =>
-          if currentRegs.contains(dst) then return Left(s"Overwrite detected without Free: reg $dst at op $idx")
-          currentRegs.remove(src) match
-            case Some(pairRid) =>
-              analysis.finalState.resources.get(pairRid).foreach { p =>
-                linearContext.remove(pairRid)
-                val fstRid = p.initialChildren.min; val sndRid = p.initialChildren.max
-                linearContext.add(fstRid); linearContext.add(sndRid)
-                currentRegs(dst) = fstRid; currentRegs(src) = sndRid
-              }
-            case None => ()
-
-        case Op.Proj2(dst, src) =>
-          if currentRegs.contains(dst) then return Left(s"Overwrite detected without Free: reg $dst at op $idx")
-          currentRegs.remove(src) match
-            case Some(pairRid) =>
-              analysis.finalState.resources.get(pairRid).foreach { p =>
-                linearContext.remove(pairRid)
-                val fstRid = p.initialChildren.min; val sndRid = p.initialChildren.max
-                linearContext.add(fstRid); linearContext.add(sndRid)
-                currentRegs(dst) = sndRid; currentRegs(src) = fstRid
-              }
-            case None => ()
-
-        case Op.Free(reg) =>
-          currentRegs.remove(reg).foreach { rid =>
-            if !linearContext.contains(rid) then boundary.break(Left(s"Double Free: r$rid at op $idx"))
-            (transitiveOwnedIds(analysis.finalState, rid) + rid).foreach(linearContext.remove)
-          }
-
-        case Op.Return(src) =>
-          val retRid = currentRegs.remove(src)
-          retRid.foreach(rid => (transitiveOwnedIds(analysis.finalState, rid) + rid).foreach(linearContext.remove))
-          if linearContext.nonEmpty then
-            boundary.break(Left(s"Memory Leak: Unfreed resources: ${linearContext.map(id => s"r$id").mkString(", ")}"))
-
-        case _ => ()
-    
-    Right(())
-
-  private def transitiveOwnedIds(state: ResourceState, rid: Int): Set[Int] =
-    state.resources.get(rid) match
-      case Some(r) => r.children ++ r.children.flatMap(c => transitiveOwnedIds(state, c))
-      case None => Set.empty
+    Left("検証失敗: 安全性を証明できませんでした。")

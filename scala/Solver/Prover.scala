@@ -520,18 +520,28 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
         s.result
       case None =>
         logger.log(s"Fail: $currentGoalRaw")
+        // 最も深い失敗を報告する (デバッグ性を高めるため)
+        val allFailures = branches.toVector.flatMap {
+          case Tree.V(node, _) => node.result.left.toOption
+          case _ => None
+        }
+        val bestFailure = if (allFailures.isEmpty) {
+          FailTrace(
+            Goal(context, state.linearContext, currentGoal),
+            "All branches failed",
+            depth,
+            residualLinearContext = state.linearContext
+          )
+        } else {
+          allFailures.maxBy(_.depth)
+        }
+
         // 失敗をキャッシュに保存 (現在の残り深さを記録)
         globalFailureCache.put(
           (currentGoalCan, contextExprs, linearExprs, guarded),
           limit - depth
         )
-        Left(
-          FailTrace(
-            Goal(context, state.linearContext, currentGoal),
-            "All branches failed",
-            depth
-          )
-        )
+        Left(bestFailure)
     }
     val ruleName = if (branches.isEmpty) "failure" else "choice"
 
