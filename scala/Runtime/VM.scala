@@ -1,6 +1,6 @@
 // ==========================================
 // VM.scala
-// スタックベースのバイトコードインタプリタ
+// レジスタベースのバイトコードインタプリタ (Linear Logic Mode)
 // ==========================================
 
 package romanesco.Runtime
@@ -9,152 +9,161 @@ import scala.collection.mutable.ArrayBuffer
 
 class VMError(msg: String) extends RuntimeException(msg)
 
-class VM(maxStackSize: Int = 1024, maxFrameDepth: Int = 256):
-  private val stack = new ArrayBuffer[Value](64)
-  private val frames = new ArrayBuffer[Frame](16)
-
-  private def push(v: Value): Unit =
-    if stack.size >= maxStackSize then
-      throw VMError(s"スタックオーバーフロー (上限: $maxStackSize)")
-    stack += v
-
-  private def pop(): Value =
-    if stack.isEmpty then
-      throw VMError("空スタックからのpop")
-    stack.remove(stack.size - 1)
-
-  private def peek(): Value =
-    if stack.isEmpty then
-      throw VMError("空スタックのpeek")
-    stack.last
-
-  /** バイトコード列を実行し、結果を返す */
+class VM(
+  maxDepth: Int = 1000,
+  infiniteRegisters: Boolean = false,
+  initialRegSize: Int = 32
+):
+  
   def run(code: Array[Op]): Value =
-    stack.clear()
-    frames.clear()
-    exec(code, Array.empty[Value])
-    if stack.isEmpty then Value.Unit
-    else pop()
+    exec(code, initialRegs(), 0)
 
-  /** 指定コードをローカル変数環境で実行 */
-  private def exec(code: Array[Op], locals: Array[Value]): Unit =
+  private def initialRegs(): ArrayBuffer[Value] =
+    val regs = new ArrayBuffer[Value](initialRegSize)
+    for _ <- 0 until initialRegSize do regs += Value.Unit
+    regs
+
+  private def exec(code: Array[Op], regs: ArrayBuffer[Value], depth: Int): Value =
+    if depth > maxDepth then throw VMError("スタックオーバーフロー")
+    
     var pc = 0
-    var currentLocals = locals
+    var retVal: Value = Value.Unit
+
+    def getReg(idx: Int): Value =
+      if idx < 0 then throw VMError(s"負のレジスタインデックス: $idx")
+      if idx >= regs.length then
+        if infiniteRegisters then Value.Unit
+        else throw VMError(s"レジスタ読み取り範囲外: $idx (上限: ${regs.length})")
+      else regs(idx)
+
+    def setReg(idx: Int, v: Value): Unit =
+      if idx < 0 then throw VMError(s"負のレジスタインデックス: $idx")
+      if idx >= regs.length then
+        if infiniteRegisters then
+          while regs.length <= idx do regs += Value.Unit
+        else throw VMError(s"レジスタ読み取り範囲外: $idx (上限: ${regs.length})")
+      regs(idx) = v
+
+    def consumeReg(idx: Int): Value =
+      val v = getReg(idx)
+      setReg(idx, Value.Unit)
+      v
 
     while pc < code.length do
       val op = code(pc)
       op match
-        case Op.PushConst(v) =>
-          push(v)
+        case Op.Move(dst, src) =>
+          setReg(dst, consumeReg(src))
           pc += 1
 
-        case Op.PushVar(idx) =>
-          if idx < 0 || idx >= currentLocals.length then
-            throw VMError(s"変数インデックス範囲外: $idx (locals=${currentLocals.length})")
-          push(currentLocals(idx))
+        case Op.LoadConst(dst, v) =>
+          setReg(dst, v)
           pc += 1
 
-        case Op.StoreVar(idx) =>
-          val v = pop()
-          if idx < 0 || idx >= currentLocals.length then
-            throw VMError(s"変数インデックス範囲外: $idx (locals=${currentLocals.length})")
-          currentLocals(idx) = v
+        case Op.MakeClosure(dst, body, captures, arity) =>
+          val env = captures.map(idx => consumeReg(idx))
+          setReg(dst, Value.Closure(body, env, arity))
           pc += 1
 
-        case Op.MakeClosure(body, arity) =>
-          // 現在の環境をキャプチャ
-          val env = currentLocals.clone()
-          push(Value.Closure(body, env, arity))
-          pc += 1
-
-        case Op.Apply =>
-          val arg = pop()
-          val fn = pop()
-          fn match
+        case Op.Call(dst, funcIdx, argIdxs) =>
+          val func = consumeReg(funcIdx)
+          val args = argIdxs.map(idx => consumeReg(idx))
+          func match
             case Value.Closure(body, env, arity) =>
-              if arity == 1 then
-                // 引数をenvの末尾に追加して実行
-                val newLocals = env :+ arg
-                if frames.size >= maxFrameDepth then
-                  throw VMError(s"フレーム深さ上限超過 (上限: $maxFrameDepth)")
-                // 現在のフレームを保存
-                frames += Frame(pc + 1, code, currentLocals, stack.size)
-                exec(body, newLocals)
-                // フレーム復帰
-                val frame = frames.remove(frames.size - 1)
-                currentLocals = frame.locals
-                pc = frame.returnAddr
-                // exec内でスタックに結果が積まれている
-              else if arity > 1 then
-                // 部分適用: arityを1減らしたクロージャを返す
-                val newEnv = env :+ arg
-                push(Value.Closure(body, newEnv, arity - 1))
-                pc += 1
-              else
-                throw VMError(s"arity 0 のクロージャへの適用")
+              val newRegs = ArrayBuffer.from(env ++ args)
+              if !infiniteRegisters then
+                while newRegs.length < initialRegSize do newRegs += Value.Unit
+              val res = exec(body, newRegs, depth + 1)
+              setReg(dst, res)
+              retVal = res
             case _ =>
-              throw VMError(s"関数でない値への適用: $fn")
+              throw VMError(s"関数でない値へのCall: $func")
+          pc += 1
+          
+        case Op.Return(src) =>
+          return consumeReg(src)
 
-        case Op.Return =>
-          // exec呼び出しから戻る
-          return
-
-        case Op.MakePair =>
-          val snd = pop()
-          val fst = pop()
-          push(Value.PairVal(fst, snd))
+        case Op.MakePair(dst, fst, snd) =>
+          setReg(dst, Value.PairVal(consumeReg(fst), consumeReg(snd)))
           pc += 1
 
-        case Op.Proj1 =>
-          pop() match
-            case Value.PairVal(fst, _) => push(fst)
+        case Op.Proj1(dst, src) =>
+          consumeReg(src) match
+            case Value.PairVal(f, s) => 
+              setReg(dst, f)
+              setReg(src, s) // ペアを分解して第2要素を元のレジスタに戻す
             case v => throw VMError(s"Proj1: ペアでない値: $v")
           pc += 1
-
-        case Op.Proj2 =>
-          pop() match
-            case Value.PairVal(_, snd) => push(snd)
+          
+        case Op.Proj2(dst, src) =>
+          consumeReg(src) match
+            case Value.PairVal(f, s) => 
+              setReg(dst, s)
+              setReg(src, f) // 第1要素を戻す
             case v => throw VMError(s"Proj2: ペアでない値: $v")
           pc += 1
 
-        case Op.MakeInl =>
-          push(Value.InlVal(pop()))
+        case Op.MakeInl(dst, src) =>
+          setReg(dst, Value.InlVal(consumeReg(src)))
           pc += 1
 
-        case Op.MakeInr =>
-          push(Value.InrVal(pop()))
+        case Op.MakeInr(dst, src) =>
+          setReg(dst, Value.InrVal(consumeReg(src)))
           pc += 1
 
-        case Op.Case(inlBranch, inrBranch) =>
-          val gFn = pop()
-          val fFn = pop()
-          val scrutinee = pop()
-          scrutinee match
-            case Value.InlVal(v) =>
-              // fを適用
-              push(fFn)
-              push(v)
-              push(Value.Unit) // Applyの結果用にダミー不要、直接Apply
-              // Apply命令を模倣
-              stack.remove(stack.size - 1) // ダミー削除
-              fFn match
-                case Value.Closure(body, env, 1) =>
-                  val newLocals = env :+ v
-                  exec(body, newLocals)
-                case _ =>
-                  // inlBranchを直接実行（fFnがクロージャでない場合）
-                  exec(inlBranch, currentLocals :+ v)
-            case Value.InrVal(v) =>
-              gFn match
-                case Value.Closure(body, env, 1) =>
-                  val newLocals = env :+ v
-                  exec(body, newLocals)
-                case _ =>
-                  exec(inrBranch, currentLocals :+ v)
-            case v =>
-              throw VMError(s"Case: inl/inrでない値: $v")
+        case Op.Case(dst, scrutinee, inlBranch, inrBranch) =>
+           val res = consumeReg(scrutinee) match
+             case Value.InlVal(v) =>
+               val newRegs = regs.clone()
+               setRegAt(newRegs, dst, v)
+               exec(inlBranch, newRegs, depth + 1)
+             case Value.InrVal(v) =>
+               val newRegs = regs.clone()
+               setRegAt(newRegs, dst, v)
+               exec(inrBranch, newRegs, depth + 1)
+             case v =>
+               throw VMError(s"Case: inl/inrでない値: $v")
+           setReg(dst, res)
+           retVal = res
+           pc += 1
+
+        case Op.Free(reg) =>
+           setReg(reg, Value.Unit)
+           pc += 1
+
+        case Op.Add(dst, lhs, rhs) =>
+          val res = (consumeReg(lhs), consumeReg(rhs)) match
+            case (Value.Atom(a: Int), Value.Atom(b: Int)) => a.toLong + b.toLong
+            case (Value.Atom(a: Long), Value.Atom(b: Long)) => a + b
+            case (Value.Atom(a: Int), Value.Atom(b: Long)) => a.toLong + b
+            case (Value.Atom(a: Long), Value.Atom(b: Int)) => a + b.toLong
+            case _ => throw VMError(s"数値でない値の加算")
+          setReg(dst, Value.Atom(res))
           pc += 1
 
-        case Op.Pop =>
-          pop()
+        case Op.Sub(dst, lhs, rhs) =>
+          val res = (consumeReg(lhs), consumeReg(rhs)) match
+            case (Value.Atom(a: Int), Value.Atom(b: Int)) => a.toLong - b.toLong
+            case (Value.Atom(a: Long), Value.Atom(b: Long)) => a - b
+            case (Value.Atom(a: Int), Value.Atom(b: Long)) => a.toLong - b
+            case (Value.Atom(a: Long), Value.Atom(b: Int)) => a - b.toLong
+            case _ => throw VMError(s"数値でない値の減算")
+          setReg(dst, Value.Atom(res))
           pc += 1
+
+        case Op.Mul(dst, lhs, rhs) =>
+          val res = (consumeReg(lhs), consumeReg(rhs)) match
+            case (Value.Atom(a: Int), Value.Atom(b: Int)) => a.toLong * b.toLong
+            case (Value.Atom(a: Long), Value.Atom(b: Long)) => a * b
+            case (Value.Atom(a: Int), Value.Atom(b: Long)) => a.toLong * b
+            case (Value.Atom(a: Long), Value.Atom(b: Int)) => a * b.toLong
+            case _ => throw VMError(s"数値でない値の乗算")
+          setReg(dst, Value.Atom(res))
+          pc += 1
+
+    retVal
+
+  private def setRegAt(regs: ArrayBuffer[Value], idx: Int, v: Value): Unit =
+    if idx >= regs.length then
+      if infiniteRegisters then while regs.length <= idx do regs += Value.Unit
+    regs(idx) = v

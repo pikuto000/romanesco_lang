@@ -1,26 +1,29 @@
 // ==========================================
 // Bytecode.scala
-// バイトコード命令セットと値型の定義
+// バイトコード命令セットと値型の定義（レジスタマシン版）
 // ==========================================
 
 package romanesco.Runtime
 
-/** バイトコード命令 */
+/** バイトコード命令
+  * レジスタは Int で指定されるインデックス。
+  */
 enum Op:
-  case PushConst(value: Value)       // 定数をスタックに積む
-  case PushVar(index: Int)           // ローカル変数を積む
-  case StoreVar(index: Int)          // スタックトップをローカル変数に格納
-  case MakeClosure(body: Array[Op], arity: Int) // クロージャ生成
-  case Apply                         // f(arg) を評価
-  case Return                        // 関数から戻る
-  case MakePair                      // pair(a, b) を生成
-  case Proj1                         // 第一射影
-  case Proj2                         // 第二射影
-  case MakeInl                       // 余積（左）
-  case MakeInr                       // 余積（右）
-  case Case(inlBranch: Array[Op], inrBranch: Array[Op]) // 場合分け
-  case Pop                           // スタックトップを破棄
-  case Free(rid: Int)                // リソースIDを指定して深いfree
+  case Move(dst: Int, src: Int)                     // dst = src
+  case LoadConst(dst: Int, value: Value)            // dst = value
+  case MakeClosure(dst: Int, body: Array[Op], captures: Array[Int], arity: Int) // dst = closure(body, captures)
+  case Call(dst: Int, func: Int, args: Array[Int])  // dst = func(args...)
+  case Return(src: Int)                             // return src
+  case MakePair(dst: Int, fst: Int, snd: Int)       // dst = (fst, snd)
+  case Proj1(dst: Int, src: Int)                    // dst = src._1
+  case Proj2(dst: Int, src: Int)                    // dst = src._2
+  case MakeInl(dst: Int, src: Int)                  // dst = inl(src)
+  case MakeInr(dst: Int, src: Int)                  // dst = inr(src)
+  case Case(dst: Int, scrutinee: Int, inlBranch: Array[Op], inrBranch: Array[Op]) // dst = case scrutinee of ...
+  case Add(dst: Int, lhs: Int, rhs: Int)            // dst = lhs + rhs
+  case Sub(dst: Int, lhs: Int, rhs: Int)            // dst = lhs - rhs
+  case Mul(dst: Int, lhs: Int, rhs: Int)            // dst = lhs * rhs
+  case Free(reg: Int)                               // free value in register 'reg'
 
 /** VM上の値 */
 enum Value:
@@ -42,7 +45,6 @@ enum Value:
 /** コールフレーム */
 case class Frame(
     returnAddr: Int,          // 呼び出し元の命令位置
-    code: Array[Op],          // 呼び出し元のコード
-    locals: Array[Value],     // ローカル変数
-    stackBase: Int            // フレーム開始時のスタック位置
+    code: Array[Op],          // 現在のコード
+    regs: Array[Value]        // レジスタファイル
 )

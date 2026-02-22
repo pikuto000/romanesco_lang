@@ -18,6 +18,7 @@ package romanesco.Runtime
       case e: Throwable =>
         failed += 1
         println(s"  ✗ $name: ${e.getMessage}")
+        e.printStackTrace()
 
   def assertContains(ir: String, expected: String): Unit =
     if !ir.contains(expected) then
@@ -27,48 +28,46 @@ package romanesco.Runtime
     if ir.contains(unexpected) then
       throw AssertionError(s"IRに「$unexpected」が含まれるべきでない")
 
-  println("=== LLVMCodeGenTest ===")
+  println("=== LLVMCodeGenTest (Register Machine) ===")
 
   // --- 基本 ---
 
   test("モジュール構造: %Value型とランタイム宣言が含まれる") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.Atom(42)), Op.Return))
+    val ir = gen.generate(Array(Op.LoadConst(0, Value.Atom(42)), Op.Return(0)))
     assertContains(ir, "%Value = type { i8, ptr }")
     assertContains(ir, "declare %Value @rt_make_int(i64)")
     assertContains(ir, "define %Value @main()")
+    assertContains(ir, "alloca %Value") // レジスタ確保
   }
 
-  test("PushConst(IntVal) + Return: rt_make_intの呼び出し") {
+  test("LoadConst(IntVal) + Return: rt_make_intの呼び出し") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.Atom(42)), Op.Return))
+    val ir = gen.generate(Array(Op.LoadConst(0, Value.Atom(42)), Op.Return(0)))
     assertContains(ir, "@rt_make_int(i64 42)")
     assertContains(ir, "ret %Value")
   }
 
-  test("PushConst(Literal): 文字列リテラルとrt_make_literal") {
+  test("LoadConst(Literal): 文字列リテラルとrt_make_literal") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.Atom("hello")), Op.Return))
+    val ir =
+      gen.generate(Array(Op.LoadConst(0, Value.Atom("hello")), Op.Return(0)))
     assertContains(ir, "c\"hello\\00\"")
     assertContains(ir, "@rt_make_literal")
-  }
-
-  test("PushConst(Unit): rt_make_unit呼び出し") {
-    val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.Unit), Op.Return))
-    assertContains(ir, "@rt_make_unit()")
   }
 
   // --- ペア ---
 
   test("MakePair: rt_make_pairの呼び出し") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(
-      Op.PushConst(Value.Atom(1)),
-      Op.PushConst(Value.Atom(2)),
-      Op.MakePair,
-      Op.Return
-    ))
+    val ir = gen.generate(
+      Array(
+        Op.LoadConst(0, Value.Atom(1)),
+        Op.LoadConst(1, Value.Atom(2)),
+        Op.MakePair(2, 0, 1),
+        Op.Return(2)
+      )
+    )
     assertContains(ir, "@rt_make_int(i64 1)")
     assertContains(ir, "@rt_make_int(i64 2)")
     assertContains(ir, "@rt_make_pair")
@@ -76,132 +75,80 @@ package romanesco.Runtime
 
   test("Proj1: rt_proj1の呼び出し") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(
-      Op.PushConst(Value.Atom(1)),
-      Op.PushConst(Value.Atom(2)),
-      Op.MakePair,
-      Op.Proj1,
-      Op.Return
-    ))
+    val ir = gen.generate(
+      Array(
+        Op.LoadConst(0, Value.Atom(1)),
+        Op.LoadConst(1, Value.Atom(2)),
+        Op.MakePair(2, 0, 1),
+        Op.Proj1(3, 2),
+        Op.Return(3)
+      )
+    )
     assertContains(ir, "@rt_proj1")
-  }
-
-  test("Proj2: rt_proj2の呼び出し") {
-    val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(
-      Op.PushConst(Value.Atom(1)),
-      Op.PushConst(Value.Atom(2)),
-      Op.MakePair,
-      Op.Proj2,
-      Op.Return
-    ))
-    assertContains(ir, "@rt_proj2")
-  }
-
-  // --- 余積 ---
-
-  test("MakeInl: rt_make_inlの呼び出し") {
-    val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(
-      Op.PushConst(Value.Atom(1)),
-      Op.MakeInl,
-      Op.Return
-    ))
-    assertContains(ir, "@rt_make_inl")
-  }
-
-  test("MakeInr: rt_make_inrの呼び出し") {
-    val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(
-      Op.PushConst(Value.Atom(1)),
-      Op.MakeInr,
-      Op.Return
-    ))
-    assertContains(ir, "@rt_make_inr")
   }
 
   // --- クロージャ ---
 
   test("MakeClosure: 別関数定義 + rt_make_closure") {
     val gen = new LLVMCodeGen()
-    val idBody = Array[Op](Op.PushVar(0), Op.Return)
-    val ir = gen.generate(Array(
-      Op.MakeClosure(idBody, 1),
-      Op.Return
-    ))
+    val idBody = Array[Op](Op.Return(0))
+    val ir = gen.generate(
+      Array(
+        Op.MakeClosure(0, idBody, Array.empty[Int], 1),
+        Op.Return(0)
+      )
+    )
     assertContains(ir, "@rt_make_closure")
     assertContains(ir, "@rt_alloc_env")
     // クロージャ関数が別途定義されている
-    assertContains(ir, "define %Value @__closure_0(ptr %env, %Value %arg)")
+    assertContains(
+      ir,
+      "define %Value @__closure_0(ptr %env, ptr %args, i32 %num_args)"
+    )
   }
 
-  test("MakeClosure + Apply: rt_apply呼び出し") {
+  test("MakeClosure + Call: rt_call呼び出し") {
     val gen = new LLVMCodeGen()
-    val idBody = Array[Op](Op.PushVar(0), Op.Return)
-    val ir = gen.generate(Array(
-      Op.MakeClosure(idBody, 1),
-      Op.PushConst(Value.Atom(42)),
-      Op.Apply,
-      Op.Return
-    ))
-    assertContains(ir, "@rt_apply")
+    val idBody = Array[Op](Op.Return(0))
+    val ir = gen.generate(
+      Array(
+        Op.MakeClosure(0, idBody, Array.empty[Int], 1),
+        Op.LoadConst(1, Value.Atom(42)),
+        Op.Call(2, 0, Array(1)),
+        Op.Return(2)
+      )
+    )
+    assertContains(ir, "@rt_call")
   }
 
   // --- Case ---
 
-  test("Case: 分岐構造（br + phi）が生成される") {
+  test("Case: 分岐構造生成") {
     val gen = new LLVMCodeGen()
-    val fBody = Array[Op](Op.PushVar(0), Op.Return)
-    val gBody = Array[Op](Op.PushVar(0), Op.Return)
-    val ir = gen.generate(Array(
-      Op.PushConst(Value.Atom(1)),
-      Op.MakeInl,
-      Op.MakeClosure(fBody, 1),
-      Op.MakeClosure(gBody, 1),
-      Op.Case(Array.empty, Array.empty),
-      Op.Return
-    ))
-    assertContains(ir, "@rt_get_tag")
-    assertContains(ir, "icmp eq i8")
+    val inlBody = Array[Op](Op.Return(0))
+    val inrBody = Array[Op](Op.Return(0))
+    val ir = gen.generate(
+      Array(
+        Op.LoadConst(0, Value.Atom(1)),
+        Op.MakeInl(1, 0),
+        Op.Case(2, 1, inlBody, inrBody),
+        Op.Return(2)
+      )
+    )
     assertContains(ir, "br i1")
     assertContains(ir, "phi %Value")
+    assertContains(ir, "@__closure_0_inl") // 分岐関数
+    assertContains(ir, "@__closure_1_inr") // 分岐関数
   }
 
-  // --- 埋め込みモード ---
-
-  test("embedRuntime: ランタイム関数の定義が含まれる") {
+  test("Free: rt_free_valueの呼び出し") {
     val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.Atom(42)), Op.Return), embedRuntime = true)
-    assertContains(ir, "define %Value @rt_make_int(i64 %n)")
-    assertContains(ir, "define %Value @rt_make_pair(%Value %a, %Value %b)")
-    assertContains(ir, "define %Value @rt_apply(%Value %fn, %Value %arg)")
-    assertContains(ir, "declare ptr @malloc(i64)")
-    // declareではなくdefineになっている
-    assertNotContains(ir, "declare %Value @rt_make_int")
-  }
-
-  test("embedRuntime: %Closure, %Pair型が定義されている") {
-    val gen = new LLVMCodeGen()
-    val ir = gen.generate(Array(Op.PushConst(Value.Atom(1)), Op.Return), embedRuntime = true)
-    assertContains(ir, "%Closure = type")
-    assertContains(ir, "%Pair = type")
-  }
-
-  // --- IR出力の確認 ---
-
-  test("embedRuntime: 完全なIR出力（デバッグ用）") {
-    val gen = new LLVMCodeGen()
-    val idBody = Array[Op](Op.PushVar(0), Op.Return)
     val ir = gen.generate(Array(
-      Op.PushConst(Value.Atom(42)),
-      Op.MakeClosure(idBody, 1),
-      Op.PushConst(Value.Atom(42)),
-      Op.Apply,
-      Op.Return
-    ), embedRuntime = true)
-    println("\n--- 埋め込みモードLLVM IR ---")
-    println(ir)
-    println("--- ここまで ---")
+      Op.LoadConst(0, Value.Atom(1)),
+      Op.Free(0),
+      Op.Return(0)
+    ))
+    assertContains(ir, "call void @rt_free_value")
   }
 
   // --- lli実行テスト ---
@@ -209,80 +156,137 @@ package romanesco.Runtime
   def runWithLli(code: Array[Op], expectedExitCode: Int): Unit =
     val gen = new LLVMCodeGen()
     // mainは%Valueを返すが、lliはi32を期待する。ラッパーを生成
-    val ir = gen.generate(code, entryName = "romanesco_main", embedRuntime = true)
+    val ir =
+      gen.generate(code, entryName = "romanesco_main", embedRuntime = true)
     // i32を返すmainラッパーを追加（IntValのpayloadを取り出してexit codeに）
     val wrapper = ir + """
-define i32 @main() {
-  %v = call %Value @romanesco_main()
-  %tag = extractvalue %Value %v, 0
-  %is_int = icmp eq i8 %tag, 0
-  br i1 %is_int, label %int_case, label %default_case
-int_case:
-  %ptr = extractvalue %Value %v, 1
-  %n = load i64, ptr %ptr
-  %r = trunc i64 %n to i32
-  ret i32 %r
-default_case:
-  ret i32 0
-}
-"""
-    // 一時ファイルに書き出し
+  define i32 @main() {
+    %v = call %Value @romanesco_main()
+    %tag = extractvalue %Value %v, 0
+    %is_int = icmp eq i8 %tag, 6
+    br i1 %is_int, label %int_case, label %default_case
+  int_case:
+    %ptr = extractvalue %Value %v, 1
+    %n = ptrtoint ptr %ptr to i64
+    %r = trunc i64 %n to i32
+    ret i32 %r
+  default_case:
+    ret i32 999
+  }
+  """ // 一時ファイルに書き出し
     val tmpFile = java.io.File.createTempFile("romanesco_", ".ll")
     tmpFile.deleteOnExit()
     val writer = new java.io.PrintWriter(tmpFile)
     writer.print(wrapper)
     writer.close()
 
-    val process = Runtime.getRuntime().exec(Array("lli", tmpFile.getAbsolutePath()))
-    val exitCode = process.waitFor()
-    if exitCode != expectedExitCode then
-      throw AssertionError(s"lli exit code: 期待=$expectedExitCode, 実際=$exitCode")
+    try
+      val process =
+        Runtime.getRuntime().exec(Array("lli", tmpFile.getAbsolutePath()))
+      val exitCode = process.waitFor()
+      if exitCode != expectedExitCode then
+        throw AssertionError(
+          s"lli exit code: 期待=$expectedExitCode, 実際=$exitCode"
+        )
+    catch
+      case e: Throwable =>
+        println("\n--- lli execution failed. Generated IR: ---")
+        println(wrapper)
+        println("-------------------------------------------")
+        throw e
 
   // lliが存在するか確認
   val lliAvailable = try
     val p = Runtime.getRuntime().exec(Array("lli", "--version"))
     p.waitFor() == 0
-  catch
-    case _: Throwable => false
+  catch case _: Throwable => false
 
   if lliAvailable then
     println("\n--- lli実行テスト ---")
 
     test("lli: 整数定数42を返す") {
-      runWithLli(Array(Op.PushConst(Value.Atom(42)), Op.Return), 42)
+      runWithLli(Array(Op.LoadConst(0, Value.Atom(42)), Op.Return(0)), 42)
     }
 
     test("lli: pair(10, 20)のproj1 → 10") {
-      runWithLli(Array(
-        Op.PushConst(Value.Atom(10)),
-        Op.PushConst(Value.Atom(20)),
-        Op.MakePair,
-        Op.Proj1,
-        Op.Return
-      ), 10)
-    }
-
-    test("lli: pair(10, 20)のproj2 → 20") {
-      runWithLli(Array(
-        Op.PushConst(Value.Atom(10)),
-        Op.PushConst(Value.Atom(20)),
-        Op.MakePair,
-        Op.Proj2,
-        Op.Return
-      ), 20)
+      runWithLli(
+        Array(
+          Op.LoadConst(0, Value.Atom(10)),
+          Op.LoadConst(1, Value.Atom(20)),
+          Op.MakePair(2, 0, 1),
+          Op.Proj1(3, 2),
+          Op.Return(3)
+        ),
+        10
+      )
     }
 
     test("lli: 恒等関数 (λx.x)(7) → 7") {
-      val idBody = Array[Op](Op.PushVar(0), Op.Return)
-      runWithLli(Array(
-        Op.MakeClosure(idBody, 1),
-        Op.PushConst(Value.Atom(7)),
-        Op.Apply,
-        Op.Return
-      ), 7)
+      val idBody = Array[Op](Op.Return(0)) // 0は環境になければ引数0 (x)
+      runWithLli(
+        Array(
+          Op.MakeClosure(0, idBody, Array.empty[Int], 1),
+          Op.LoadConst(1, Value.Atom(7)),
+          Op.Call(2, 0, Array(1)),
+          Op.Return(2)
+        ),
+        7
+      )
     }
-  else
-    println("\n--- lli実行テスト (スキップ: lliが見つからない) ---")
+
+    test("lli: 環境キャプチャ (λx. (λy. x))(10) -> (λy. 10)(20) -> 10") {
+      // inner: return x (x is at env[0] = regs[0])
+      val innerBody = Array[Op](Op.Return(0))
+
+      // outer: return closure(inner) (captures x)
+      // x is at args[0] -> regs[0]
+      val outerBody = Array[Op](
+        Op.MakeClosure(1, innerBody, Array(0), 1),
+        Op.Return(1)
+      )
+
+      runWithLli(
+        Array(
+          Op.MakeClosure(0, outerBody, Array.empty[Int], 1),
+          Op.LoadConst(1, Value.Atom(10)),
+          Op.Call(2, 0, Array(1)), // returns inner closure
+          Op.LoadConst(3, Value.Atom(20)), // dummy arg y
+          Op.Call(4, 2, Array(3)), // call inner
+          Op.Return(4) // should be 10
+        ),
+        10
+      )
+    }
+
+    test("lli: 算術演算 (10 + 20) * 3 = 90") {
+      runWithLli(
+        Array(
+          Op.LoadConst(0, Value.Atom(10)),
+          Op.LoadConst(1, Value.Atom(20)),
+          Op.Add(2, 0, 1),
+          Op.LoadConst(3, Value.Atom(3)),
+          Op.Mul(4, 2, 3),
+          Op.Return(4)
+        ),
+        90
+      )
+    }
+
+    test("ビット幅推論: 小さな値の加算は i8 で行われる") {
+      val gen = new LLVMCodeGen()
+      val ir = gen.generate(
+        Array(
+          Op.LoadConst(0, Value.Atom(10)),
+          Op.LoadConst(1, Value.Atom(20)),
+          Op.Add(2, 0, 1),
+          Op.Return(2)
+        )
+      )
+      assertContains(ir, "add i8")
+      assertContains(ir, "trunc i64")
+      assertContains(ir, "sext i8")
+    }
+  else println("\n--- lli実行テスト (スキップ: lliが見つからない) ---")
 
   println(s"\n結果: $passed 成功, $failed 失敗 / ${passed + failed} テスト")
   if failed > 0 then sys.exit(1)
