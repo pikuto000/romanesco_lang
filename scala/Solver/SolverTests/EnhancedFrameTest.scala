@@ -20,17 +20,37 @@ object EnhancedFrameTest {
       ("∃F. (A * B ⊸ A * F)", true, 10, "Basic frame"),
       ("∃F. (x ↦ 1 * y ↦ 2 ⊸ x ↦ 1 * F)", true, 10, "Points-to frame"),
       ("∃F. (A * B * C ⊸ B * F)", true, 10, "Multi-resource frame"),
-      
+
       // 新規テスト（最小フレーム）
       ("∃F. (A * B * C * D ⊸ A * B * F)", true, 15, "Minimal frame (C * D)"),
-      ("∃F. (x ↦ 1 * y ↦ 2 * z ↦ 3 ⊸ y ↦ 2 * F)", true, 15, "Minimal frame (x ↦ 1 * z ↦ 3)"),
-      
+      (
+        "∃F. (x ↦ 1 * y ↦ 2 * z ↦ 3 ⊸ y ↦ 2 * F)",
+        true,
+        15,
+        "Minimal frame (x ↦ 1 * z ↦ 3)"
+      ),
+
       // フレームルール
-      ("(x ↦ 1 ⊸ x ↦ 2) → (x ↦ 1 * y ↦ 3 ⊸ x ↦ 2 * y ↦ 3)", true, 20, "Frame rule application"),
-      
+      (
+        "(x ↦ 1 ⊸ x ↦ 2) → (x ↦ 1 * y ↦ 3 ⊸ x ↦ 2 * y ↦ 3)",
+        true,
+        20,
+        "Frame rule application"
+      ),
+
       // プログラム検証風
-      ("∃F. (file_exists(f) * buffer(b) ⊸ file_open(f) * F)", true, 15, "File handle frame"),
-      ("∃F. (lock_free(l) * x ↦ 1 ⊸ lock_held(l) * x ↦ 1 * F)", true, 15, "Lock and memory frame")
+      (
+        "∃F. (file_exists(f) * buffer(b) ⊸ file_open(f) * F)",
+        true,
+        15,
+        "File handle frame"
+      ),
+      (
+        "∃F. (lock_free(l) * x ↦ 1 ⊸ lock_held(l) * x ↦ 1 * F)",
+        true,
+        15,
+        "Lock and memory frame"
+      )
     )
 
     testCases.foreach { case (input, expected, depth, description) =>

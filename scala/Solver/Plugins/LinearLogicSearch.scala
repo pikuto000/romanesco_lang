@@ -1,6 +1,6 @@
 // ==========================================
 // LinearLogicSearch.scala
-// 線形論理・分離論理固有の探索ロジック (Plugin 化・完全Treeベース)
+// 線形論理・分離論理固有の探索ロジック (Integrated Forward-Backward Model)
 // ==========================================
 
 package romanesco.Solver.core
@@ -21,6 +21,19 @@ class LinearLogicPlugin extends LogicPlugin {
   private def isEffectivelyEmpty(ctx: List[(String, Expr)]): Boolean =
     ctx.forall(_._2 == Expr.Sym("emp"))
 
+  private def flatten(e: Expr): List[Expr] = e match {
+    case Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)) => flatten(a) ++ flatten(b)
+    case _ => List(e)
+  }
+
+  private def withFlattened(name: String, e: Expr, ctx: List[(String, Expr)]): List[(String, Expr)] = {
+    val items = flatten(e)
+    if (items.length == 1 && items.head == e) (name, e) :: ctx
+    else {
+      items.zipWithIndex.map { case (item, i) => (s"$name.$i", item) } ++ ctx
+    }
+  }
+
   override def getGoalHooks(
       exprs: Vector[Expr],
       rules: List[CatRule],
@@ -35,99 +48,104 @@ class LinearLogicPlugin extends LogicPlugin {
   ): Vector[Tree[SearchNode]] = {
     val goal = exprs.last
     val linearContext = state.linearContext
-    
-    
-    val linearBackchain = linearContext.flatMap { case (name, hyp) =>
-      val (premises, conclusion) = decompose(hyp, () => prover.freshMeta(depth))
-      unify(conclusion, goal, subst).flatMap { s =>
-        val remainingLinear = linearContext.filterNot(_._1 == name)
-        
-        def solvePremises(ps: List[Expr], currentS: Subst, currentL: List[(String, Expr)], currentCtx: List[(String, Expr)], solved: List[ProofTree]): LazyList[(Subst, List[(String, Expr)], List[(String, Expr)], List[ProofTree])] = ps match {
-          case Nil => LazyList((currentS, currentL, currentCtx, solved))
-          case p :: tail =>
-            val targetP = applySubst(p, currentS)
-            // 線形前提の場合、リソースを使い切る必要がある
-            val subTree = prover.search(exprs :+ targetP, currentCtx, state.withLinear(currentL), currentS, depth + 1, limit, visited, guarded)
-            allSuccesses(subTree).flatMap { res =>
-              solvePremises(tail, res.subst, res.linearContext, res.context, solved :+ res.result.toOption.get.tree)
-            }
+
+    // --- 1. 前向き推論 (ドミノ倒し) を最優先 ---
+    // プログラム実行のように、現在のリソースを使って状態を遷移させるルールを先に適用する
+    val fwdResults = prover.asInstanceOf[Prover].config.rules.flatMap { rule =>
+      val lhsItems = flatten(rule.lhs).filterNot(_ == Expr.Sym("emp"))
+      if (lhsItems.nonEmpty) {
+        def consumeAll(remainingLhs: List[Expr], currentCtx: List[(String, Expr)], currentS: Subst): Option[(Subst, List[(String, Expr)])] = remainingLhs match {
+          case Nil => Some((currentS, currentCtx))
+          case l :: lTail =>
+            currentCtx.indices.view.flatMap { ci =>
+              unify(applySubst(l, currentS), currentCtx(ci)._2, currentS).flatMap { s =>
+                consumeAll(lTail, currentCtx.patch(ci, Nil, 1), s)
+              }
+            }.headOption
         }
 
-        solvePremises(premises, s, remainingLinear, context, Nil).map { case (finalS, finalL, finalCtx, proofs) =>
-          val pTree = ProofTree.Node(applySubst(goal, finalS), s"apply-linear[$name]", proofs)
-          Tree.V(SearchNode(exprs, s"apply-linear[$name]", depth, Right(ProofResult(pTree)), finalS, finalCtx, finalL), Vector.empty)
+        consumeAll(lhsItems, linearContext, subst).map { case (finalS, residue) =>
+          val rhsResult = prover.normalize(applySubst(rule.rhs, finalS))
+          // RHS からも emp を除外して追加 (増殖防止)
+          val filteredRhs = flatten(rhsResult).filterNot(_ == Expr.Sym("emp"))
+          val newL = filteredRhs.zipWithIndex.map { case (item, i) => (s"step[${rule.name}].$i", item) } ++ residue
+          
+          val subTree = prover.search(exprs, context, state.withLinear(newL), finalS, depth + 1, limit, visited, guarded)
+          allSuccesses(subTree).map { res =>
+            val pTree = ProofTree.Node(applySubst(goal, res.subst), s"linear-step[${rule.name}]", List(res.result.toOption.get.tree))
+            Tree.V(SearchNode(exprs, s"linear-step[${rule.name}]", depth, Right(ProofResult(pTree)), res.subst, res.context, res.linearContext), Vector(subTree))
+          }
+        }.getOrElse(Nil)
+      } else Nil
+    }.toVector
+
+    // --- 2. 後ろ向き推論 (バックチェイン) ---
+    val allHyps = linearContext.map(h => (h, true)) ++ context.map(h => (h, false))
+    val backchainResults = allHyps.flatMap { case ((name, hyp), isLinear) =>
+      val (premises, conclusion) = decompose(hyp, () => prover.freshMeta(depth))
+      unify(conclusion, goal, subst).flatMap { s =>
+        val initialResidue = if (isLinear) linearContext.filterNot(_._1 == name) else linearContext
+        def solvePremises(ps: List[Expr], currentS: Subst, currentL: List[(String, Expr)], solved: List[ProofTree]): LazyList[(Subst, List[(String, Expr)], List[ProofTree])] = ps match {
+          case Nil => LazyList((currentS, currentL, solved))
+          case p :: tail =>
+            val targetP = applySubst(p, currentS)
+            val subTree = prover.search(exprs :+ targetP, context, state.withLinear(currentL), currentS, depth + 1, limit, visited, guarded)
+            allSuccesses(subTree).flatMap { res =>
+              solvePremises(tail, res.subst, res.linearContext, solved :+ res.result.toOption.get.tree)
+            }
+        }
+        solvePremises(premises, s, initialResidue, Nil).map { case (finalS, finalL, proofs) =>
+          val ruleMark = if (isLinear) "linear" else "persistent"
+          val pTree = ProofTree.Node(applySubst(goal, finalS), s"apply-$ruleMark[$name]", proofs)
+          Tree.V(SearchNode(exprs, s"apply-$ruleMark[$name]", depth, Right(ProofResult(pTree)), finalS, context, finalL), Vector.empty)
         }
       }
     }.toVector
 
-    goal match {
-      case Expr.App(Expr.Sym(LImplies), List(Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)), target)) =>
-        // (A * B) ⊸ C  =>  A ⊸ B ⊸ C
-        val subGoal = Expr.App(Expr.Sym(LImplies), List(a, Expr.App(Expr.Sym(LImplies), List(b, target))))
-        val subTree = prover.search(exprs :+ subGoal, context, state, subst, depth + 1, limit, visited, guarded)
-        allSuccesses(subTree).map { s =>
-          Tree.V(SearchNode(exprs :+ subGoal, "tensor-limplies-destruct", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "tensor-limplies-destruct", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
-        }.toVector ++ linearBackchain
+    // --- 3. ゴールの構造分解 ---
+    val logicResults: Vector[Tree[SearchNode]] = goal match {
+      case Expr.Sym("emp") =>
+        if (isEffectivelyEmpty(linearContext)) {
+          Vector(Tree.V(SearchNode(exprs :+ goal, "emp-intro", depth, Right(ProofResult(ProofTree.Leaf(goal, "emp-intro"))), subst, context, Nil), Vector.empty))
+        } else Vector.empty
 
       case Expr.App(Expr.Sym(LImplies), List(a, b)) =>
-        val subTree = prover.search(exprs :+ b, context, state.withLinear((s"lh$depth", a) :: linearContext), subst, depth + 1, limit, visited, guarded)
+        val newL = withFlattened(s"lh$depth", a, linearContext)
+        val subTree = prover.search(exprs :+ b, context, state.withLinear(newL), subst, depth + 1, limit, visited, guarded)
         allSuccesses(subTree).filter(s => isEffectivelyEmpty(s.linearContext)).map { s =>
           Tree.V(SearchNode(exprs :+ b, "linear-implies-intro", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "linear-implies-intro", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
-        }.toVector ++ linearBackchain
-      
-      case Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)) =>
-        // リソース分割の試行 (より強力なパーティショニング)
-        def partition(ctx: List[(String, Expr)]): LazyList[(List[(String, Expr)], List[(String, Expr)])] = {
-          if (ctx.isEmpty) LazyList((Nil, Nil))
-          else {
-            val (name, expr) :: tail = ctx
-            partition(tail).flatMap { case (l, r) =>
-              LazyList(((name, expr) :: l, r), (l, (name, expr) :: r))
-            }
-          }
-        }
+        }.toVector
 
-        val results = partition(linearContext).flatMap { case (leftPart, rightPart) =>
-          prover.checkDeadline()
-          val subTreeA = prover.search(exprs :+ a, context, state.withLinear(leftPart), subst, depth + 1, limit, visited, guarded)
-          allSuccesses(subTreeA).filter(s => isEffectivelyEmpty(s.linearContext)).flatMap { sA =>
-            val subTreeB = prover.search(exprs :+ b, sA.context, state.withLinear(rightPart), sA.subst, depth + 1, limit, visited, guarded)
-            allSuccesses(subTreeB).filter(s => isEffectivelyEmpty(s.linearContext)).map { sB =>
-              Tree.V(SearchNode(exprs :+ goal, "tensor-intro", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, sB.subst), "tensor-intro", List(sA.result.toOption.get.tree, sB.result.toOption.get.tree)))), sB.subst, sB.context, sB.linearContext), Vector(subTreeA, subTreeB))
-            }
+      case Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)) =>
+        val subTreeA = prover.search(exprs :+ a, context, state, subst, depth + 1, limit, visited, guarded)
+        allSuccesses(subTreeA).flatMap { sA =>
+          val subTreeB = prover.search(exprs :+ b, sA.context, state.withLinear(sA.linearContext), sA.subst, depth + 1, limit, visited, guarded)
+          allSuccesses(subTreeB).map { sB =>
+            Tree.V(SearchNode(exprs :+ goal, "tensor-intro-seq", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, sB.subst), "tensor-intro-seq", List(sA.result.toOption.get.tree, sB.result.toOption.get.tree)))), sB.subst, sB.context, sB.linearContext), Vector(subTreeA, subTreeB))
           }
-        }
-        results.toVector ++ linearBackchain
+        }.toVector
 
       case Expr.Meta(_) =>
-        // Frame Inference: 残りのリソースをすべてメタ変数に割り当てる
-        val frameResult = if (linearContext.nonEmpty) {
-          // At(i) はプログラム実行中であることを示す特別なトークン、
-          // Own(r) はメモリリソースなので、これらが残っている状態でフレーム推論を許すと、
-          // 不正なプログラムが受理される原因になる。
+        if (linearContext.nonEmpty) {
           val hasLeakedResources = linearContext.exists(h => h._2.headSymbol == "At" || h._2.headSymbol == "Own")
-          
           if (hasLeakedResources) Vector.empty
           else {
-            // emp を除外してリソースを収集
             val resources = linearContext.filterNot(_._2 == Expr.Sym("emp")).sortBy(_._1).map(_._2)
             val frame = if (resources.isEmpty) Expr.Sym("emp")
                         else resources.reduceLeft((acc, e) => Expr.App(Expr.Sym(SepAnd), List(acc, e)))
-            
             unify(goal, frame, subst).map { s =>
               Tree.V(SearchNode(exprs :+ goal, "frame-inference", depth, Right(ProofResult(ProofTree.Leaf(applySubst(goal, s), "frame-inference"))), s, context, Nil), Vector.empty)
             }.toVector
           }
         } else {
-          // リソースが空なら emp または ⊤ に割り当てる
           (unify(goal, Expr.Sym("emp"), subst).toVector ++ unify(goal, Expr.Sym(LOne), subst).toVector).map { s =>
             Tree.V(SearchNode(exprs :+ goal, "frame-inference-empty", depth, Right(ProofResult(ProofTree.Leaf(applySubst(goal, s), "frame-inference-empty"))), s, context, Nil), Vector.empty)
           }
         }
-        frameResult ++ linearBackchain
-
-      case _ => linearBackchain
+      case _ => Vector.empty
     }
+
+    logicResults ++ fwdResults ++ backchainResults
   }
 
   private def decompose(e: Expr, freshMeta: () => Expr): (List[Expr], Expr) = e match {
@@ -162,105 +180,17 @@ class LinearLogicPlugin extends LogicPlugin {
     val goal = exprs.last
     val linearContext = state.linearContext
     
-    val bangElim = context.zipWithIndex.flatMap {
-      case ((name, Expr.App(Expr.Sym(Bang), List(a))), i) =>
-        val newCtx = context.patch(i, List((name, a)), 1)
-        val subTree = prover.search(exprs, newCtx, state, subst, depth + 1, limit, visited, guarded)
+    // a. 破壊的分解 (A ⊗ B |- A, B)
+    val tensorDestruct = linearContext.zipWithIndex.flatMap {
+      case ((name, Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b))), i) =>
+        val newL = linearContext.filterNot(_._1 == name) ++ List((s"$name.1", a), (s"$name.2", b))
+        val subTree = prover.search(exprs, context, state.withLinear(newL), subst, depth + 1, limit, visited, guarded)
         allSuccesses(subTree).map { s =>
-          Tree.V(SearchNode(exprs, s"linear-bang-elim[$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"linear-bang-elim[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
+          Tree.V(SearchNode(exprs, s"tensor-destruct[$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"tensor-destruct[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
         }
       case _ => None
     }.toVector
 
-    val tensorDestruct = (context.map((_, false)) ++ linearContext.map((_, true))).zipWithIndex.flatMap {
-      case (((name, Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b))), isLinear), i) =>
-        if (isLinear) {
-          val newL = linearContext.filterNot(_._1 == name) ++ List((s"$name.1", a), (s"$name.2", b))
-          val subTree = prover.search(exprs, context, state.withLinear(newL), subst, depth + 1, limit, visited, guarded)
-          allSuccesses(subTree).map { s =>
-            Tree.V(SearchNode(exprs, s"tensor-destruct[$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"tensor-destruct[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
-          }
-        } else {
-          val newCtx = context.patch(context.indexWhere(_._1 == name), List((s"$name.1", a), (s"$name.2", b)), 1)
-          val subTree = prover.search(exprs, newCtx, state, subst, depth + 1, limit, visited, guarded)
-          allSuccesses(subTree).map { s =>
-            Tree.V(SearchNode(exprs, s"tensor-is-ﾃ夕$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"tensor-is-ﾃ夕$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
-          }
-        }
-      case _ => None
-    }.toVector
-
-    val ptrAssign = linearContext.flatMap {
-      case (name, Expr.App(Expr.Sym(PointsTo), List(ptr, oldVal))) =>
-        goal match {
-          case Expr.App(Expr.Sym("triple"), List(pre, Expr.App(Expr.Sym(":="), List(p, newVal)), post)) if p == ptr =>
-            // 残りのリソースをすべて F (Frame) としてまとめる
-            val otherLinear = linearContext.filterNot(_._1 == name)
-            val frame = if (otherLinear.isEmpty) Expr.Sym("emp") else otherLinear.map(_._2).reduce((a, b) => Expr.App(Expr.Sym(SepAnd), List(a, b)))
-            
-            // 目標: post が (ptr |-> newVal * frame) を含むことを示す
-            val targetPost = Expr.App(Expr.Sym(SepAnd), List(Expr.App(Expr.Sym(PointsTo), List(ptr, newVal)), frame))
-            val subGoal = Expr.App(Expr.Sym(LImplies), List(targetPost, post))
-            
-            val subTree = prover.search(exprs :+ subGoal, context, state.withLinear(Nil), subst, depth + 1, limit, visited, guarded)
-            allSuccesses(subTree).map { s =>
-              Tree.V(SearchNode(exprs :+ goal, s"ptr-assign[$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"ptr-assign[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
-            }
-          case _ => Nil
-        }
-      case _ => Nil
-    }.toVector
-
-    val linearForward = linearContext.flatMap { case (name, hyp) =>
-      prover.forwardApplyRules(hyp, subst, depth).flatMap { case (result, ruleName, s) =>
-        val newLinear = linearContext.filterNot(_._1 == name) :+ (s"$name.fwd", result)
-        val subTree = prover.search(exprs, context, state.withLinear(newLinear), s, depth + 1, limit, visited, guarded)
-        allSuccesses(subTree).map { res =>
-          val pTree = ProofTree.Node(applySubst(goal, res.subst), s"linear-forward[$ruleName,$name]", List(res.result.toOption.get.tree))
-          Tree.V(SearchNode(exprs, s"linear-forward[$ruleName,$name]", depth, Right(ProofResult(pTree)), res.subst, res.context, res.linearContext), Vector(subTree))
-        }
-      }
-    }.toVector
-
-    // --- 強化: 複数リソースを消費する前向き推論 ---
-    // LHS が ⊗(A, B) のようなルールを、コンテキストから A と B を探して適用する
-    val linearForwardMulti = prover.asInstanceOf[Prover].config.rules.flatMap { rule =>
-      // ルールの LHS が現在のコンテキスト全体とマッチするか試みる
-      // (emp は単位元なので、柔軟に扱う)
-      def flattenTensor(e: Expr): List[Expr] = e match {
-        case Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)) => flattenTensor(a) ++ flattenTensor(b)
-        case _ => List(e)
-      }
-      
-      val lhsItems = flattenTensor(rule.lhs).filterNot(_ == Expr.Sym("emp"))
-      val ctxItems = linearContext.map(_._2).filterNot(_ == Expr.Sym("emp"))
-      
-      // 個数が一致し、かつ全要素が1対1でユニファイ可能かチェック
-      if (lhsItems.length == ctxItems.length) {
-        def matchAll(remainingLhs: List[Expr], remainingCtx: List[Expr], currentS: Subst): Option[Subst] = (remainingLhs, remainingCtx) match {
-          case (Nil, Nil) => Some(currentS)
-          case (l :: lTail, _) =>
-            remainingCtx.indices.view.flatMap { ci =>
-              unify(applySubst(l, currentS), remainingCtx(ci), currentS).flatMap { s =>
-                matchAll(lTail, remainingCtx.patch(ci, Nil, 1), s)
-              }
-            }.headOption
-          case _ => None
-        }
-
-        matchAll(lhsItems, ctxItems, subst).map { finalS =>
-          val result = prover.normalize(applySubst(rule.rhs, finalS))
-          // result 自身に wrapAll によって emp が含まれているので、ここでは単に追加するだけ
-          val newLinear = List((s"linear-step", result))
-          val subTree = prover.search(exprs, context, state.withLinear(newLinear), finalS, depth + 1, limit, visited, guarded)
-          allSuccesses(subTree).map { res =>
-            val pTree = ProofTree.Node(applySubst(goal, res.subst), s"linear-step[${rule.name}]", List(res.result.toOption.get.tree))
-            Tree.V(SearchNode(exprs, s"linear-step[${rule.name}]", depth, Right(ProofResult(pTree)), res.subst, res.context, res.linearContext), Vector(subTree))
-          }
-        }.getOrElse(Nil)
-      } else Nil
-    }.toVector
-
-    bangElim ++ tensorDestruct ++ ptrAssign ++ linearForward ++ linearForwardMulti
+    tensorDestruct
   }
 }
