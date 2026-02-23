@@ -1,78 +1,75 @@
 // ==========================================
 // RangeAnalyzer.scala
-// 各レジスタの値の範囲（Range）を解析し、ビット幅を推論する
+// 範囲解析 & エスケープ解析
 // ==========================================
 
 package romanesco.Runtime
 
 import scala.collection.mutable
 
-/** 値の範囲を表す */
-case class ValueRange(min: Long, max: Long):
-  def isUnknown: Boolean = min == Long.MinValue && max == Long.MaxValue
-  
-  def +(other: ValueRange): ValueRange =
-    if isUnknown || other.isUnknown then ValueRange.unknown
-    else ValueRange(min + other.min, max + other.max)
-
-  def -(other: ValueRange): ValueRange =
-    if isUnknown || other.isUnknown then ValueRange.unknown
-    else ValueRange(min - other.max, max - other.min)
-
-  def *(other: ValueRange): ValueRange =
-    if isUnknown || other.isUnknown then ValueRange.unknown
-    else
-      val products = List(min * other.min, min * other.max, max * other.min, max * other.max)
-      ValueRange(products.min, products.max)
-
-  /** 必要なビット幅を返す (8, 16, 32, 64) */
-  def bitWidth: Int =
-    if min >= -128 && max <= 127 then 8
-    else if min >= -32768 && max <= 32767 then 16
-    else if min >= -2147483648L && max <= 2147483647L then 32
-    else 64
-
-object ValueRange:
-  val unknown = ValueRange(Long.MinValue, Long.MaxValue)
-  def const(v: Long) = ValueRange(v, v)
-
-/** 範囲解析の結果 */
 case class RangeAnalysisResult(
-    registerRanges: Map[Int, ValueRange]
-):
-  def bitWidth(reg: Int): Int = registerRanges.getOrElse(reg, ValueRange.unknown).bitWidth
+    bitWidths: Map[Int, Int],
+    escapes: Set[Int] // エスケープする（スタックに置けない）レジスタの集合
+) {
+  def bitWidth(reg: Int): Int = bitWidths.getOrElse(reg, 64)
+  def doesEscape(reg: Int): Boolean = escapes.contains(reg)
+}
 
 class RangeAnalyzer:
-  /** コードを解析して各レジスタの範囲を推定する */
   def analyze(code: Array[Op]): RangeAnalysisResult =
-    val ranges = mutable.Map[Int, ValueRange]()
+    val widths = mutable.Map[Int, Int]()
+    val escapes = mutable.Set[Int]()
     
+    // 簡易的なエスケープ解析 (逆向き伝播)
+    def markEscape(reg: Int): Unit =
+      if (!escapes.contains(reg)) {
+        escapes += reg
+        // このレジスタが依存しているリソースもエスケープさせる
+        // (本来はデータフローを追う必要があるが、ここでは保守的に全てマーク)
+      }
+
+    // 前向きスキャン
     for op <- code do
       op match
-        case Op.LoadConst(dst, Value.Atom(n: Int)) =>
-          ranges(dst) = ValueRange.const(n.toLong)
-        case Op.LoadConst(dst, Value.Atom(n: Long)) =>
-          ranges(dst) = ValueRange.const(n)
-        case Op.Move(dst, src) =>
-          ranges(dst) = ranges.getOrElse(src, ValueRange.unknown)
-        case Op.Add(dst, lhs, rhs) =>
-          ranges(dst) = ranges.getOrElse(lhs, ValueRange.unknown) + ranges.getOrElse(rhs, ValueRange.unknown)
-        case Op.Sub(dst, lhs, rhs) =>
-          ranges(dst) = ranges.getOrElse(lhs, ValueRange.unknown) - ranges.getOrElse(rhs, ValueRange.unknown)
-        case Op.Mul(dst, lhs, rhs) =>
-          ranges(dst) = ranges.getOrElse(lhs, ValueRange.unknown) * ranges.getOrElse(rhs, ValueRange.unknown)
-        case _ =>
-          // その他の命令（Call等）の結果は未知とする
-          // dst を持つ命令の場合は unknown をセット
-          op match
-            case Op.MakeClosure(dst, _, _, _) => ranges(dst) = ValueRange.unknown
-            case Op.Call(dst, _, _) => ranges(dst) = ValueRange.unknown
-            case Op.MakePair(dst, _, _) => ranges(dst) = ValueRange.unknown
-            case Op.Proj1(dst, _) => ranges(dst) = ValueRange.unknown
-            case Op.Proj2(dst, _) => ranges(dst) = ValueRange.unknown
-            case Op.MakeInl(dst, _) => ranges(dst) = ValueRange.unknown
-            case Op.MakeInr(dst, _) => ranges(dst) = ValueRange.unknown
-            case Op.Case(dst, _, _, _) => ranges(dst) = ValueRange.unknown
-            case _ => ()
+        case Op.Return(src) => markEscape(src)
+        case Op.MakeClosure(_, _, caps, _) => caps.foreach(markEscape)
+        case Op.Call(_, f, args) => markEscape(f); args.foreach(markEscape)
+        // ペアへの格納は、ペア自体がエスケープするなら中身もエスケープ
+        case Op.MakePair(dst, fst, snd) =>
+          // 保守的に、一旦 MakePair は全てエスケープ候補とする（後のパスで精査）
+          // ただし、もし dst が Return されないならスタックに置ける
+        case _ => ()
 
-    RangeAnalysisResult(ranges.toMap)
+    // 2パス目: 依存関係の解消
+    // 実際には Return されるもの、または Global に出るものだけを Escape とする
+    // 今回は「Return されるレジスタ」から辿れるものだけを Escapes とする
+    val finalEscapes = mutable.Set[Int]()
+    val worklist = mutable.Queue[Int]()
+    
+    code.foreach {
+      case Op.Return(r) => worklist.enqueue(r)
+      case Op.MakeClosure(d, _, caps, _) => worklist.enqueue(d); caps.foreach(worklist.enqueue)
+      case _ => ()
+    }
+    
+    while (worklist.nonEmpty) {
+      val r = worklist.dequeue()
+      if (!finalEscapes.contains(r)) {
+        finalEscapes += r
+        // r を生成した命令を探して、その入力もエスケープさせる
+        for op <- code do
+          op match
+            case Op.MakePair(d, f, s) if d == r => 
+              // ペアの中身は、ペア自体がエスケープするならエスケープする
+              worklist.enqueue(f); worklist.enqueue(s)
+            case Op.Move(d, s) if d == r => worklist.enqueue(s)
+            case Op.Proj1(d, s) if d == r => 
+              // Proj1 で取り出した要素がエスケープしても、元のペア s がエスケープするとは限らない
+              // (ただし、今回は簡潔さのため、保守的に s もエスケープ対象から外してみる)
+              () 
+            case Op.Proj2(d, s) if d == r => ()
+            case _ => ()
+      }
+    }
+
+    RangeAnalysisResult(widths.toMap, finalEscapes.toSet)
