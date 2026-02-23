@@ -100,4 +100,3 @@ import scala.sys.process._
     Op.Return(2)
   )
   compileAndRun("Simple Closure", ops2)
-

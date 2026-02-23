@@ -132,7 +132,9 @@ class VM(
            pc += 1
 
         case Op.Add(dst, lhs, rhs) =>
-          val res = (consumeReg(lhs), consumeReg(rhs)) match
+          val (lv, rv) = (getReg(lhs), getReg(rhs))
+          consumeReg(lhs); consumeReg(rhs)
+          val res = (lv, rv) match
             case (Value.Atom(a: Int), Value.Atom(b: Int)) => a.toLong + b.toLong
             case (Value.Atom(a: Long), Value.Atom(b: Long)) => a + b
             case (Value.Atom(a: Int), Value.Atom(b: Long)) => a.toLong + b
@@ -142,7 +144,9 @@ class VM(
           pc += 1
 
         case Op.Sub(dst, lhs, rhs) =>
-          val res = (consumeReg(lhs), consumeReg(rhs)) match
+          val (lv, rv) = (getReg(lhs), getReg(rhs))
+          consumeReg(lhs); consumeReg(rhs)
+          val res = (lv, rv) match
             case (Value.Atom(a: Int), Value.Atom(b: Int)) => a.toLong - b.toLong
             case (Value.Atom(a: Long), Value.Atom(b: Long)) => a - b
             case (Value.Atom(a: Int), Value.Atom(b: Long)) => a.toLong - b
@@ -152,7 +156,9 @@ class VM(
           pc += 1
 
         case Op.Mul(dst, lhs, rhs) =>
-          val res = (consumeReg(lhs), consumeReg(rhs)) match
+          val (lv, rv) = (getReg(lhs), getReg(rhs))
+          consumeReg(lhs); consumeReg(rhs)
+          val res = (lv, rv) match
             case (Value.Atom(a: Int), Value.Atom(b: Int)) => a.toLong * b.toLong
             case (Value.Atom(a: Long), Value.Atom(b: Long)) => a * b
             case (Value.Atom(a: Int), Value.Atom(b: Long)) => a.toLong * b

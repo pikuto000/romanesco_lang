@@ -25,36 +25,9 @@ class ProfilingVM(
     for _ <- 0 until 32 do r += Value.Unit
     r
 
-  /** 実行ごとに型情報をプロファイリングデータに記録する */
+  /** 実行ごとにプロファイリングデータに記録する（現在は実行回数のみ） */
   private def recordProfile(pc: Int, op: Op, regs: ArrayBuffer[Value]): Unit =
     profileData.record(pc)
-    val prof = profileData.get(pc)
-    op match
-      case Op.Add(_, l, r) =>
-        prof.recordType(l, tagOf(regs(l)))
-        prof.recordType(r, tagOf(regs(r)))
-      case Op.Sub(_, l, r) =>
-        prof.recordType(l, tagOf(regs(l)))
-        prof.recordType(r, tagOf(regs(r)))
-      case Op.Mul(_, l, r) =>
-        prof.recordType(l, tagOf(regs(l)))
-        prof.recordType(r, tagOf(regs(r)))
-      case Op.Call(_, f, args) =>
-        prof.recordType(f, tagOf(regs(f)))
-        args.foreach(a => prof.recordType(a, tagOf(regs(a))))
-      case Op.Proj1(_, s) =>
-        prof.recordType(s, tagOf(regs(s)))
-      case Op.Proj2(_, s) =>
-        prof.recordType(s, tagOf(regs(s)))
-      case _ => ()
-
-  private def tagOf(v: Value): Long = v match
-    case Value.Atom(_: Int) | Value.Atom(_: Long) => 6 // Int
-    case Value.PairVal(_, _) => 2 // Pair
-    case Value.Closure(_, _, _) => 1 // Closure
-    case Value.Unit => 5 // Unit
-    case Value.InlVal(_) | Value.InrVal(_) => 3 // Sum
-    case Value.Atom(_) => 0 // Other
 
   private def execProfiling(code: Array[Op], initialRegsForExec: ArrayBuffer[Value], depth: Int, startPc: Int = 0): Value =
     if depth > maxDepth then throw VMError("スタックオーバーフロー")
@@ -68,8 +41,7 @@ class ProfilingVM(
 
     while pc < code.length do
       val op = code(pc)
-      // リスタート直後はプロファイルをとらない（既にJITが走った証拠）
-      if (pc > startPc) recordProfile(pc, op, initialRegsForExec)
+      recordProfile(pc, op, initialRegsForExec)
       
       op match
         case Op.Move(dst, src) =>
@@ -79,19 +51,17 @@ class ProfilingVM(
           setReg(dst, v)
           pc += 1
         case Op.Add(dst, lhs, rhs) =>
-          val (lv, rv) = (getReg(lhs), getReg(rhs)) // 型不一致でDeoptした可能性があるので、ここでもう一度チェック
+          val (lv, rv) = (getReg(lhs), getReg(rhs))
+          consumeReg(lhs); consumeReg(rhs)
           val res = (lv, rv) match
-            case (Value.Atom(a: Int), Value.Atom(b: Int)) =>
-              consumeReg(lhs); consumeReg(rhs)
-              a.toLong + b.toLong
-            case (Value.Atom(a: Long), Value.Atom(b: Long)) =>
-              consumeReg(lhs); consumeReg(rhs)
-              a + b
+            case (Value.Atom(a: Int), Value.Atom(b: Int)) => a.toLong + b.toLong
+            case (Value.Atom(a: Long), Value.Atom(b: Long)) => a + b
             case _ => 0L
           setReg(dst, Value.Atom(res))
           pc += 1
         case Op.Mul(dst, lhs, rhs) =>
-          val (lv, rv) = (consumeReg(lhs), consumeReg(rhs))
+          val (lv, rv) = (getReg(lhs), getReg(rhs))
+          consumeReg(lhs); consumeReg(rhs)
           val res = (lv, rv) match
             case (Value.Atom(a: Int), Value.Atom(b: Int)) => a.toLong * b.toLong
             case (Value.Atom(a: Long), Value.Atom(b: Long)) => a * b

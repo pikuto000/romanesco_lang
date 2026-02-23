@@ -82,7 +82,7 @@ class LLVMCodeGen:
           case Op.Move(dst, src) =>
             emit(s"store %Value ${consumeReg(src)}, ptr ${getRegPtr(dst)}")
           case Op.Add(dst, l, r) =>
-            compileSpeculativeBinOp(
+            compileBinOp(
               dst,
               l,
               r,
@@ -93,7 +93,7 @@ class LLVMCodeGen:
               consumeReg
             )
           case Op.Sub(dst, l, r) =>
-            compileSpeculativeBinOp(
+            compileBinOp(
               dst,
               l,
               r,
@@ -104,7 +104,7 @@ class LLVMCodeGen:
               consumeReg
             )
           case Op.Mul(dst, l, r) =>
-            compileSpeculativeBinOp(
+            compileBinOp(
               dst,
               l,
               r,
@@ -127,42 +127,20 @@ class LLVMCodeGen:
               s"call void @rt_make_closure(ptr ${getRegPtr(dst)}, ptr $closureName, ptr $envR, i32 $arity)"
             )
           case Op.Call(dst, fIdx, args) =>
-            // 投機的インライニング: Call 先が一定ならインライン展開
-            currentProfile.flatMap(_.get(pc).dominantTag(fIdx)) match
-              case Some(1L) => // Closure Tag
-                // プロファイルから具体的な関数ボディ（body: Array[Op]）を取得できれば理想
-                // 現在の Value.Closure は body を持っているが ProfileData には Value そのものは入っていない
-                // 拡張課題: ProfileData に代表的な Value (Closure) を保持させる
-                emit(s"; Call to closure at PC $pc")
-                val fVal = freshReg();
-                emit(s"$fVal = load %Value, ptr ${getRegPtr(fIdx)}")
-                val aArr = freshReg();
-                lines += s"  $aArr = alloca %Value, i32 ${args.length}"
-                for (aIdx, i) <- args.zipWithIndex do
-                  val v = consumeReg(aIdx)
-                  val s = freshReg();
-                  emit(s"$s = getelementptr %Value, ptr $aArr, i32 $i")
-                  emit(s"store %Value $v, ptr $s")
-                val res = freshReg();
-                emit(
-                  s"$res = call %Value @rt_call(%Value $fVal, ptr $aArr, i32 ${args.length})"
-                )
-                emit(s"store %Value $res, ptr ${getRegPtr(dst)}")
-              case _ =>
-                val fVal = freshReg();
-                emit(s"$fVal = load %Value, ptr ${getRegPtr(fIdx)}")
-                val aArr = freshReg();
-                lines += s"  $aArr = alloca %Value, i32 ${args.length}"
-                for (aIdx, i) <- args.zipWithIndex do
-                  val v = consumeReg(aIdx)
-                  val s = freshReg();
-                  emit(s"$s = getelementptr %Value, ptr $aArr, i32 $i")
-                  emit(s"store %Value $v, ptr $s")
-                val res = freshReg();
-                emit(
-                  s"$res = call %Value @rt_call(%Value $fVal, ptr $aArr, i32 ${args.length})"
-                )
-                emit(s"store %Value $res, ptr ${getRegPtr(dst)}")
+            val fVal = freshReg();
+            emit(s"$fVal = load %Value, ptr ${getRegPtr(fIdx)}")
+            val aArr = freshReg();
+            lines += s"  $aArr = alloca %Value, i32 ${args.length}"
+            for (aIdx, i) <- args.zipWithIndex do
+              val v = consumeReg(aIdx)
+              val s = freshReg();
+              emit(s"$s = getelementptr %Value, ptr $aArr, i32 $i")
+              emit(s"store %Value $v, ptr $s")
+            val res = freshReg();
+            emit(
+              s"$res = call %Value @rt_call(%Value $fVal, ptr $aArr, i32 ${args.length})"
+            )
+            emit(s"store %Value $res, ptr ${getRegPtr(dst)}")
           case Op.Return(src)      => emit(s"ret %Value ${consumeReg(src)}")
           case Op.Borrow(dst, src) =>
             val v = freshReg()
@@ -261,7 +239,7 @@ $retDefault
     else
       s"define %Value @$cleanName(ptr %env, ptr %args, i32 %num_args) {\nentry:\n$bodyStr\n$retDefault\n}"
 
-  private def compileSpeculativeBinOp(
+  private def compileBinOp(
       dst: Int,
       l: Int,
       r: Int,
@@ -272,34 +250,14 @@ $retDefault
       consumeReg: Int => String
   ): Unit =
     def emit(line: String): Unit = lines += s"  $line"
-    currentProfile.flatMap(_.get(pc).dominantTag(l)) match
-      case Some(6L) if currentProfile.get.get(pc).dominantTag(r).contains(6L) =>
-        emit(s"; Speculative optimization for $op at PC $pc")
-        val lv = freshReg(); emit(s"$lv = load %Value, ptr ${getRegPtr(l)}")
-        val rv = freshReg(); emit(s"$rv = load %Value, ptr ${getRegPtr(r)}")
-        emit(
-          s"call void @rt_guard_int(%Value $lv, i32 $pc, ptr %regs_base, i32 32)"
-        )
-        emit(
-          s"call void @rt_guard_int(%Value $rv, i32 $pc, ptr %regs_base, i32 32)"
-        )
-        val li = freshReg(); emit(s"$li = extractvalue %Value $lv, 1")
-        val ri = freshReg(); emit(s"$ri = extractvalue %Value $rv, 1")
-        val lin = freshReg(); emit(s"$lin = ptrtoint ptr $li to i64")
-        val rin = freshReg(); emit(s"$rin = ptrtoint ptr $ri to i64")
-        val res = freshReg(); emit(s"$res = $op i64 $lin, $rin")
-        emit(s"call void @rt_make_int(ptr ${getRegPtr(dst)}, i64 $res)")
-        emit(s"call void @rt_make_unit(ptr ${getRegPtr(l)})")
-        emit(s"call void @rt_make_unit(ptr ${getRegPtr(r)})")
-      case _ =>
-        val lv = freshReg();
-        emit(s"$lv = call i64 @rt_get_int(ptr ${getRegPtr(l)})")
-        val rv = freshReg();
-        emit(s"$rv = call i64 @rt_get_int(ptr ${getRegPtr(r)})")
-        val res = freshReg(); emit(s"$res = $op i64 $lv, $rv")
-        emit(s"call void @rt_make_unit(ptr ${getRegPtr(l)})")
-        emit(s"call void @rt_make_unit(ptr ${getRegPtr(r)})")
-        emit(s"call void @rt_make_int(ptr ${getRegPtr(dst)}, i64 $res)")
+    val lv = freshReg();
+    emit(s"$lv = call i64 @rt_get_int(ptr ${getRegPtr(l)})")
+    val rv = freshReg();
+    emit(s"$rv = call i64 @rt_get_int(ptr ${getRegPtr(r)})")
+    val res = freshReg(); emit(s"$res = $op i64 $lv, $rv")
+    emit(s"call void @rt_make_unit(ptr ${getRegPtr(l)})")
+    emit(s"call void @rt_make_unit(ptr ${getRegPtr(r)})")
+    emit(s"call void @rt_make_int(ptr ${getRegPtr(dst)}, i64 $res)")
 
   private def buildModule(mainFunc: String, embedRuntime: Boolean): String =
     val sb = new StringBuilder()
