@@ -50,32 +50,40 @@ class LinearLogicPlugin extends LogicPlugin {
     val linearContext = state.linearContext
 
     // --- 1. 前向き推論 (ドミノ倒し) を最優先 ---
-    // プログラム実行のように、現在のリソースを使って状態を遷移させるルールを先に適用する
     val fwdResults = prover.asInstanceOf[Prover].config.rules.flatMap { rule =>
       val lhsItems = flatten(rule.lhs).filterNot(_ == Expr.Sym("emp"))
       if (lhsItems.nonEmpty) {
-        def consumeAll(remainingLhs: List[Expr], currentCtx: List[(String, Expr)], currentS: Subst): Option[(Subst, List[(String, Expr)])] = remainingLhs match {
-          case Nil => Some((currentS, currentCtx))
+        def consumeAll(remainingLhs: List[Expr], currentCtx: List[(String, Expr)], currentS: Subst): LazyList[(Subst, List[(String, Expr)])] = remainingLhs match {
+          case Nil => LazyList((currentS, currentCtx))
           case l :: lTail =>
-            currentCtx.indices.view.flatMap { ci =>
-              unify(applySubst(l, currentS), currentCtx(ci)._2, currentS).flatMap { s =>
+            currentCtx.indices.to(LazyList).flatMap { ci =>
+              val resource = currentCtx(ci)._2
+              val target = Unifier.applySubst(l, currentS)
+              
+              // ホモトピー的ユニファイ: 直接一致するか、またはパスの端点として一致するか
+              val matchSubsts = Unifier.unify(target, resource, currentS) ++ (resource match {
+                case Expr.App(Expr.Sym("path"), List(_, start, end, _)) =>
+                  Unifier.unify(target, start, currentS) ++ Unifier.unify(target, end, currentS)
+                case _ => LazyList.empty
+              })
+
+              matchSubsts.flatMap { s =>
                 consumeAll(lTail, currentCtx.patch(ci, Nil, 1), s)
               }
-            }.headOption
+            }
         }
 
         consumeAll(lhsItems, linearContext, subst).map { case (finalS, residue) =>
-          val rhsResult = prover.normalize(applySubst(rule.rhs, finalS))
-          // RHS からも emp を除外して追加 (増殖防止)
+          val rhsResult = prover.normalize(Unifier.applySubst(rule.rhs, finalS))
           val filteredRhs = flatten(rhsResult).filterNot(_ == Expr.Sym("emp"))
           val newL = filteredRhs.zipWithIndex.map { case (item, i) => (s"step[${rule.name}].$i", item) } ++ residue
           
           val subTree = prover.search(exprs, context, state.withLinear(newL), finalS, depth + 1, limit, visited, guarded)
           allSuccesses(subTree).map { res =>
-            val pTree = ProofTree.Node(applySubst(goal, res.subst), s"linear-step[${rule.name}]", List(res.result.toOption.get.tree))
+            val pTree = ProofTree.Node(Unifier.applySubst(goal, res.subst), s"linear-step[${rule.name}]", List(res.result.toOption.get.tree))
             Tree.V(SearchNode(exprs, s"linear-step[${rule.name}]", depth, Right(ProofResult(pTree)), res.subst, res.context, res.linearContext), Vector(subTree))
           }
-        }.getOrElse(Nil)
+        }.flatten.toVector
       } else Nil
     }.toVector
 
@@ -83,12 +91,12 @@ class LinearLogicPlugin extends LogicPlugin {
     val allHyps = linearContext.map(h => (h, true)) ++ context.map(h => (h, false))
     val backchainResults = allHyps.flatMap { case ((name, hyp), isLinear) =>
       val (premises, conclusion) = decompose(hyp, () => prover.freshMeta(depth))
-      unify(conclusion, goal, subst).flatMap { s =>
+      Unifier.unify(conclusion, goal, subst).flatMap { s =>
         val initialResidue = if (isLinear) linearContext.filterNot(_._1 == name) else linearContext
         def solvePremises(ps: List[Expr], currentS: Subst, currentL: List[(String, Expr)], solved: List[ProofTree]): LazyList[(Subst, List[(String, Expr)], List[ProofTree])] = ps match {
           case Nil => LazyList((currentS, currentL, solved))
           case p :: tail =>
-            val targetP = applySubst(p, currentS)
+            val targetP = Unifier.applySubst(p, currentS)
             val subTree = prover.search(exprs :+ targetP, context, state.withLinear(currentL), currentS, depth + 1, limit, visited, guarded)
             allSuccesses(subTree).flatMap { res =>
               solvePremises(tail, res.subst, res.linearContext, solved :+ res.result.toOption.get.tree)
@@ -96,7 +104,7 @@ class LinearLogicPlugin extends LogicPlugin {
         }
         solvePremises(premises, s, initialResidue, Nil).map { case (finalS, finalL, proofs) =>
           val ruleMark = if (isLinear) "linear" else "persistent"
-          val pTree = ProofTree.Node(applySubst(goal, finalS), s"apply-$ruleMark[$name]", proofs)
+          val pTree = ProofTree.Node(Unifier.applySubst(goal, finalS), s"apply-$ruleMark[$name]", proofs)
           Tree.V(SearchNode(exprs, s"apply-$ruleMark[$name]", depth, Right(ProofResult(pTree)), finalS, context, finalL), Vector.empty)
         }
       }
@@ -113,7 +121,7 @@ class LinearLogicPlugin extends LogicPlugin {
         val newL = withFlattened(s"lh$depth", a, linearContext)
         val subTree = prover.search(exprs :+ b, context, state.withLinear(newL), subst, depth + 1, limit, visited, guarded)
         allSuccesses(subTree).filter(s => isEffectivelyEmpty(s.linearContext)).map { s =>
-          Tree.V(SearchNode(exprs :+ b, "linear-implies-intro", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), "linear-implies-intro", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
+          Tree.V(SearchNode(exprs :+ b, "linear-implies-intro", depth, Right(ProofResult(ProofTree.Node(Unifier.applySubst(goal, s.subst), "linear-implies-intro", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
         }.toVector
 
       case Expr.App(Expr.Sym(Tensor | SepAnd), List(a, b)) =>
@@ -121,7 +129,7 @@ class LinearLogicPlugin extends LogicPlugin {
         allSuccesses(subTreeA).flatMap { sA =>
           val subTreeB = prover.search(exprs :+ b, sA.context, state.withLinear(sA.linearContext), sA.subst, depth + 1, limit, visited, guarded)
           allSuccesses(subTreeB).map { sB =>
-            Tree.V(SearchNode(exprs :+ goal, "tensor-intro-seq", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, sB.subst), "tensor-intro-seq", List(sA.result.toOption.get.tree, sB.result.toOption.get.tree)))), sB.subst, sB.context, sB.linearContext), Vector(subTreeA, subTreeB))
+            Tree.V(SearchNode(exprs :+ goal, "tensor-intro-seq", depth, Right(ProofResult(ProofTree.Node(Unifier.applySubst(goal, sB.subst), "tensor-intro-seq", List(sA.result.toOption.get.tree, sB.result.toOption.get.tree)))), sB.subst, sB.context, sB.linearContext), Vector(subTreeA, subTreeB))
           }
         }.toVector
 
@@ -133,13 +141,13 @@ class LinearLogicPlugin extends LogicPlugin {
             val resources = linearContext.filterNot(_._2 == Expr.Sym("emp")).sortBy(_._1).map(_._2)
             val frame = if (resources.isEmpty) Expr.Sym("emp")
                         else resources.reduceLeft((acc, e) => Expr.App(Expr.Sym(SepAnd), List(acc, e)))
-            unify(goal, frame, subst).map { s =>
-              Tree.V(SearchNode(exprs :+ goal, "frame-inference", depth, Right(ProofResult(ProofTree.Leaf(applySubst(goal, s), "frame-inference"))), s, context, Nil), Vector.empty)
+            Unifier.unify(goal, frame, subst).map { s =>
+              Tree.V(SearchNode(exprs :+ goal, "frame-inference", depth, Right(ProofResult(ProofTree.Leaf(Unifier.applySubst(goal, s), "frame-inference"))), s, context, Nil), Vector.empty)
             }.toVector
           }
         } else {
-          (unify(goal, Expr.Sym("emp"), subst).toVector ++ unify(goal, Expr.Sym(LOne), subst).toVector).map { s =>
-            Tree.V(SearchNode(exprs :+ goal, "frame-inference-empty", depth, Right(ProofResult(ProofTree.Leaf(applySubst(goal, s), "frame-inference-empty"))), s, context, Nil), Vector.empty)
+          (Unifier.unify(goal, Expr.Sym("emp"), subst).toVector ++ Unifier.unify(goal, Expr.Sym(LOne), subst).toVector).map { s =>
+            Tree.V(SearchNode(exprs :+ goal, "frame-inference-empty", depth, Right(ProofResult(ProofTree.Leaf(Unifier.applySubst(goal, s), "frame-inference-empty"))), s, context, Nil), Vector.empty)
           }
         }
       case _ => Vector.empty
@@ -187,14 +195,14 @@ class LinearLogicPlugin extends LogicPlugin {
           val newL = linearContext.filterNot(_._1 == name) ++ List((s"$name.1", a), (s"$name.2", b))
           val subTree = prover.search(exprs, context, state.withLinear(newL), subst, depth + 1, limit, visited, guarded)
           allSuccesses(subTree).map { s =>
-            Tree.V(SearchNode(exprs, s"tensor-destruct[$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"tensor-destruct[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
+            Tree.V(SearchNode(exprs, s"tensor-destruct[$name]", depth, Right(ProofResult(ProofTree.Node(Unifier.applySubst(goal, s.subst), s"tensor-destruct[$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
           }
         } else {
           // 通常コンテキストの場合、元のリソースを残したまま分解 (非破壊)
           val newCtx = (s"$name.1", a) :: (s"$name.2", b) :: context.filterNot(_._1 == name)
           val subTree = prover.search(exprs, newCtx, state, subst, depth + 1, limit, visited, guarded)
           allSuccesses(subTree).map { s =>
-            Tree.V(SearchNode(exprs, s"tensor-is-ﾃ夕$name]", depth, Right(ProofResult(ProofTree.Node(applySubst(goal, s.subst), s"tensor-is-ﾃ夕$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
+            Tree.V(SearchNode(exprs, s"tensor-is-ﾃ夕$name]", depth, Right(ProofResult(ProofTree.Node(Unifier.applySubst(goal, s.subst), s"tensor-is-ﾃ夕$name]", List(s.result.toOption.get.tree)))), s.subst, s.context, s.linearContext), Vector(subTree))
           }
         }
       case _ => None

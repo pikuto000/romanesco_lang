@@ -52,19 +52,31 @@ class OmniResourceLogic extends ResourceLogic:
         case _ => true
 
       def wrapAll(regs: Map[Int, Int], base: Expr): Expr =
-        val ids = regs.values.toList.sorted // distinct を削除
-        val res = ids.foldLeft(base)((acc, id) => Expr.App(Expr.Sym("⊗"), List(acc, Expr.App(Expr.Sym("Own"), List(Expr.Sym(s"r$id"))))))
+        val ids = regs.values.toList.sorted
+        // 各レジスタの状態（Own または Shared）を適切にラップ
+        // ここでは、プログラム解析の結果に基づき、借用されているレジスタは Shared とみなす
+        val res = regs.foldLeft(base) { case (acc, (reg, rid)) =>
+          // 解析器が借用と判定している場合は Shared(r) パスとして扱う（簡易実装）
+          val isBorrowed = op match {
+            case Op.Borrow(dst, _) if dst == reg => true
+            case _ => false
+          }
+          val resExpr = if (isBorrowed) 
+            Expr.App(Expr.Sym("path"), List(Expr.Sym("Resource"), Expr.App(Expr.Sym("Own"), List(Expr.Sym(s"r$rid"))), Expr.App(Expr.Sym("Shared"), List(Expr.Sym(s"r$rid"))), Expr.Var(s"i$reg")))
+          else 
+            Expr.App(Expr.Sym("Own"), List(Expr.Sym(s"r$rid")))
+          
+          Expr.App(Expr.Sym("⊗"), List(acc, resExpr))
+        }
         Expr.App(Expr.Sym("⊗"), List(res, Expr.Sym("emp")))
 
       val lhs = wrapAll(regsBefore, cur)
       
-      // 不正な命令の場合、RHS を証明不能なシンボルにする
       val rhs = if (!isOpValid) Expr.Sym("INVALID_STATE_ACCESS") 
         else op match
           case Op.Return(_) =>
             val leaks = analysis.garbageResources.toList.sorted
             val base = leaks.foldLeft(nxt)((acc, id) => Expr.App(Expr.Sym("⊗"), List(acc, Expr.App(Expr.Sym("Own"), List(Expr.Sym(s"r$id"))))))
-            // リークがない場合のみ、最終的な emp と一致するようにする
             Expr.App(Expr.Sym("⊗"), List(base, Expr.Sym("emp")))
           case _ => 
             wrapAll(regsAfter, nxt)
