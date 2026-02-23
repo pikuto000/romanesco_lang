@@ -54,7 +54,7 @@ class LLVMCodeGen:
   ): String =
     val oldRegCounter = regCounter
     regCounter = 0
-    val analysis = rangeAnalyzer.analyze(code)
+    val analysis = rangeAnalyzer.analyze(code, currentProfile)
     val maxReg = 31
     val lines = new ArrayBuffer[String]()
     val allocas = new ArrayBuffer[String]()
@@ -90,7 +90,8 @@ class LLVMCodeGen:
               pc,
               lines,
               getRegPtr,
-              consumeReg
+              consumeReg,
+              analysis
             )
           case Op.Sub(dst, l, r) =>
             compileBinOp(
@@ -101,7 +102,8 @@ class LLVMCodeGen:
               pc,
               lines,
               getRegPtr,
-              consumeReg
+              consumeReg,
+              analysis
             )
           case Op.Mul(dst, l, r) =>
             compileBinOp(
@@ -112,7 +114,8 @@ class LLVMCodeGen:
               pc,
               lines,
               getRegPtr,
-              consumeReg
+              consumeReg,
+              analysis
             )
           case Op.MakeClosure(dst, body, captures, arity) =>
             val closureName = freshClosureName()
@@ -247,14 +250,27 @@ $retDefault
       pc: Int,
       lines: ArrayBuffer[String],
       getRegPtr: Int => String,
-      consumeReg: Int => String
+      consumeReg: Int => String,
+      analysis: RangeAnalysisResult
   ): Unit =
     def emit(line: String): Unit = lines += s"  $line"
-    val lv = freshReg();
-    emit(s"$lv = call i64 @rt_get_int(ptr ${getRegPtr(l)})")
-    val rv = freshReg();
-    emit(s"$rv = call i64 @rt_get_int(ptr ${getRegPtr(r)})")
-    val res = freshReg(); emit(s"$res = $op i64 $lv, $rv")
+    val w = analysis.bitWidth(dst)
+    val llvmTy = s"i$w"
+
+    val lv = freshReg(); emit(s"$lv = call i64 @rt_get_int(ptr ${getRegPtr(l)})")
+    val rv = freshReg(); emit(s"$rv = call i64 @rt_get_int(ptr ${getRegPtr(r)})")
+    
+    val res = if (w < 64) {
+      val lt = freshReg(); emit(s"$lt = trunc i64 $lv to $llvmTy")
+      val rt = freshReg(); emit(s"$rt = trunc i64 $rv to $llvmTy")
+      val rb = freshReg(); emit(s"$rb = $op $llvmTy $lt, $rt")
+      val re = freshReg(); emit(s"$re = zext $llvmTy $rb to i64")
+      re
+    } else {
+      val rb = freshReg(); emit(s"$rb = $op i64 $lv, $rv")
+      rb
+    }
+
     emit(s"call void @rt_make_unit(ptr ${getRegPtr(l)})")
     emit(s"call void @rt_make_unit(ptr ${getRegPtr(r)})")
     emit(s"call void @rt_make_int(ptr ${getRegPtr(dst)}, i64 $res)")

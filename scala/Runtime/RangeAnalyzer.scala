@@ -16,58 +16,68 @@ case class RangeAnalysisResult(
 }
 
 class RangeAnalyzer:
-  def analyze(code: Array[Op]): RangeAnalysisResult =
-    val widths = mutable.Map[Int, Int]()
+  def analyze(code: Array[Op], profile: Option[ProfileData] = None): RangeAnalysisResult =
+    val widths = mutable.Map[Int, Int]().withDefaultValue(64)
     val escapes = mutable.Set[Int]()
     
-    // 簡易的なエスケープ解析 (逆向き伝播)
-    def markEscape(reg: Int): Unit =
-      if (!escapes.contains(reg)) {
-        escapes += reg
-        // このレジスタが依存しているリソースもエスケープさせる
-        // (本来はデータフローを追う必要があるが、ここでは保守的に全てマーク)
+    // ヘルパー: 値から必要な最小ビット幅（iN）を正確に判定
+    def requiredBits(n: Long): Int =
+      if (n == 0) 1
+      else if (n == -1) 1
+      else {
+        val magnitude = if (n < 0) -n - 1 else n
+        val bits = 64 - java.lang.Long.numberOfLeadingZeros(magnitude) + 1
+        Math.min(64, bits)
       }
 
-    // 前向きスキャン
-    for op <- code do
+    // 前向きスキャンでビット幅を推論
+    for (op, pc) <- code.zipWithIndex do
       op match
-        case Op.Return(src) => markEscape(src)
-        case Op.MakeClosure(_, _, caps, _) => caps.foreach(markEscape)
-        case Op.Call(_, f, args) => markEscape(f); args.foreach(markEscape)
-        // ペアへの格納は、ペア自体がエスケープするなら中身もエスケープ
-        case Op.MakePair(dst, fst, snd) =>
-          // 保守的に、一旦 MakePair は全てエスケープ候補とする（後のパスで精査）
-          // ただし、もし dst が Return されないならスタックに置ける
+        case Op.LoadConst(dst, Value.Atom(n: Int)) => 
+          widths(dst) = requiredBits(n.toLong)
+        case Op.LoadConst(dst, Value.Atom(n: Long)) => 
+          widths(dst) = requiredBits(n)
+        case Op.Move(dst, src) => 
+          widths(dst) = widths(src)
+        case Op.Add(dst, l, r) =>
+          widths(dst) = Math.min(64, Math.max(widths(l), widths(r)) + 1)
+        case Op.Sub(dst, l, r) =>
+          widths(dst) = Math.max(widths(l), widths(r)) // 減算は一旦最大幅を維持
+        case Op.Mul(dst, l, r) =>
+          widths(dst) = Math.min(64, widths(l) + widths(r))
+        case Op.Proj1(dst, src) => widths(dst) = 64 // 不明
+        case Op.Proj2(dst, src) => widths(dst) = 64 // 不明
         case _ => ()
 
-    // 2パス目: 依存関係の解消
-    // 実際には Return されるもの、または Global に出るものだけを Escape とする
-    // 今回は「Return されるレジスタ」から辿れるものだけを Escapes とする
+      // プロファイル情報があれば、観測された最大値で上書き（投機的ヒント）
+      profile.foreach { p =>
+        val prof = p.get(code, pc)
+        // 各レジスタの支配的な値を確認
+        (0 to 31).foreach { regIdx =>
+          prof.dominantValue(regIdx).foreach {
+            case Value.Atom(n: Int)  => widths(regIdx) = Math.min(widths(regIdx), requiredBits(n.toLong))
+            case Value.Atom(n: Long) => widths(regIdx) = Math.min(widths(regIdx), requiredBits(n))
+            case _ => ()
+          }
+        }
+      }
+
+    // エスケープ解析 (既存のロジックを維持)
     val finalEscapes = mutable.Set[Int]()
     val worklist = mutable.Queue[Int]()
-    
     code.foreach {
       case Op.Return(r) => worklist.enqueue(r)
       case Op.MakeClosure(d, _, caps, _) => worklist.enqueue(d); caps.foreach(worklist.enqueue)
       case _ => ()
     }
-    
     while (worklist.nonEmpty) {
       val r = worklist.dequeue()
       if (!finalEscapes.contains(r)) {
         finalEscapes += r
-        // r を生成した命令を探して、その入力もエスケープさせる
         for op <- code do
           op match
-            case Op.MakePair(d, f, s) if d == r => 
-              // ペアの中身は、ペア自体がエスケープするならエスケープする
-              worklist.enqueue(f); worklist.enqueue(s)
+            case Op.MakePair(d, f, s) if d == r => worklist.enqueue(f); worklist.enqueue(s)
             case Op.Move(d, s) if d == r => worklist.enqueue(s)
-            case Op.Proj1(d, s) if d == r => 
-              // Proj1 で取り出した要素がエスケープしても、元のペア s がエスケープするとは限らない
-              // (ただし、今回は簡潔さのため、保守的に s もエスケープ対象から外してみる)
-              () 
-            case Op.Proj2(d, s) if d == r => ()
             case _ => ()
       }
     }

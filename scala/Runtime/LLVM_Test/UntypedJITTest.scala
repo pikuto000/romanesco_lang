@@ -82,5 +82,56 @@ import romanesco.Utils.Debug
   assert(profile.contains("calls"))
   assert(profile.contains("values"))
 
-  Debug.logger.info("\nAll extended profiling tests passed!")
+  // --- シナリオ 5: ビット幅最適化の検証 ---
+  Debug.logger.info("\n>>> Test 6: Bit-width Optimization & Propagation")
+  // 100 + 100 = 200 (i8 は 127 までなので、本来 i16 以上が必要)
+  // 解析が正しければ、Add(dst, l, r) で幅が広がり、正しく 200 が得られる
+  val opsWidth = Array(
+    Op.LoadConst(0, Value.Atom(100)), // i8 (100)
+    Op.LoadConst(1, Value.Atom(100)), // i8 (100)
+    Op.Add(2, 0, 1),                 // should be inferred as i16 or i64 (100+100=200)
+    Op.Return(2)
+  )
+
+  val resWidth = jit.run(opsWidth, profile = None)
+  Debug.logger.info(s"  Result (100+100): $resWidth")
+  assert(resWidth.toString.toLong == 200)
+
+  // 127 + 1 = 128 (i8 の境界)
+  val opsBoundary = Array(
+    Op.LoadConst(0, Value.Atom(127)),
+    Op.LoadConst(1, Value.Atom(1)),
+    Op.Add(2, 0, 1),
+    Op.Return(2)
+  )
+  val resBoundary = jit.run(opsBoundary, profile = None)
+  Debug.logger.info(s"  Result (127+1): $resBoundary")
+  assert(resBoundary.toString.toLong == 128)
+
+  // --- シナリオ 6: 任意ビット幅 (iN) の検証 ---
+  Debug.logger.info("\n>>> Test 7: Arbitrary Bit-width (iN) Precision")
+  // 3 + 3 = 6
+  // 3 は i3 (011)、その加算結果は i4 (0110) と推論されるはず
+  val opsExact = Array(
+    Op.LoadConst(0, Value.Atom(3)),
+    Op.LoadConst(1, Value.Atom(3)),
+    Op.Add(2, 0, 1),
+    Op.Return(2)
+  )
+  val resExact = jit.run(opsExact, profile = None)
+  Debug.logger.info(s"  Result (3+3): $resExact")
+  assert(resExact.toString.toLong == 6)
+
+  // 15 + 1 = 16 (i5 の境界)
+  val opsExactBound = Array(
+    Op.LoadConst(0, Value.Atom(15)),
+    Op.LoadConst(1, Value.Atom(1)),
+    Op.Add(2, 0, 1),
+    Op.Return(2)
+  )
+  val resExactBound = jit.run(opsExactBound, profile = None)
+  Debug.logger.info(s"  Result (15+1): $resExactBound")
+  assert(resExactBound.toString.toLong == 16)
+
+  Debug.logger.info("\nAll arbitrary bit-width (iN) tests passed!")
 
