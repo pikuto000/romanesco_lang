@@ -17,6 +17,11 @@ class LLVMCodeGen:
   private var closureCounter = 0
   private val functions = new ArrayBuffer[String]()
   private val rangeAnalyzer = new RangeAnalyzer()
+  private var currentProfile: Option[ProfileData] = None
+
+  private def buildTargetHeader(): String =
+    val isWin = System.getProperty("os.name").toLowerCase.contains("win")
+    if (isWin) "target triple = \"x86_64-pc-windows-msvc\"\n" else ""
 
   private def freshReg(): Reg =
     val r = Reg(regCounter)
@@ -28,10 +33,11 @@ class LLVMCodeGen:
     closureCounter += 1
     n
 
-  def generate(code: Array[Op], entryName: String = "main", embedRuntime: Boolean = true): String =
+  def generate(code: Array[Op], entryName: String = "main", embedRuntime: Boolean = true, profile: Option[ProfileData] = None): String =
     regCounter = 0
     closureCounter = 0
     functions.clear()
+    currentProfile = profile
     val mainBody = compileFunction(code, entryName, isMain = true)
     functions += mainBody
     buildModule(mainBody, embedRuntime)
@@ -46,6 +52,9 @@ class LLVMCodeGen:
     def emit(line: String): Unit = lines += s"  $line"
     def emitAlloca(line: String): Unit = allocas += s"  $line"
     def getRegPtr(idx: Int): String = { val r = freshReg(); emit(s"$r = getelementptr %Value, ptr %regs_base, i32 $idx"); r.toString }
+
+    val initialIsWin = System.getProperty("os.name").toLowerCase.contains("win")
+    val initialDllexp = if (initialIsWin && isMain) "dllexport " else ""
 
     emit(s"%regs_base = alloca %Value, i32 ${maxReg + 1}")
     if (isMain) {
@@ -62,11 +71,30 @@ class LLVMCodeGen:
       v.toString
     }
 
-    for op <- code do
+    for (op, pc) <- code.zipWithIndex do
       op match
         case Op.LoadConst(dst, Value.Atom(n: Int)) => emit(s"call void @rt_make_int(ptr ${getRegPtr(dst)}, i64 $n)")
         case Op.Move(dst, src) => emit(s"store %Value ${consumeReg(src)}, ptr ${getRegPtr(dst)}")
-        case Op.Add(dst, l, r) => compileBinOp(dst, l, r, "add", analysis, lines, getRegPtr, consumeReg)
+        case Op.Add(dst, l, r) => 
+          // 投機的最適化: 型が Int (6) で安定していればガードを挿入
+          currentProfile.flatMap(_.get(pc).dominantTag(l)) match
+            case Some(6L) if currentProfile.get.get(pc).dominantTag(r).contains(6L) =>
+              emit(s"; Speculative optimization for Add at PC $pc")
+              val lv = freshReg(); emit(s"$lv = load %Value, ptr ${getRegPtr(l)}")
+              val rv = freshReg(); emit(s"$rv = load %Value, ptr ${getRegPtr(r)}")
+              emit(s"call void @rt_guard_int(%Value $lv, i32 $pc, ptr %regs_base, i32 ${maxReg + 1})")
+              emit(s"call void @rt_guard_int(%Value $rv, i32 $pc, ptr %regs_base, i32 ${maxReg + 1})")
+              // ガードを通過 = Int 確定なので、直接 i64 加算を行う
+              val li = freshReg(); emit(s"$li = extractvalue %Value $lv, 1")
+              val ri = freshReg(); emit(s"$ri = extractvalue %Value $rv, 1")
+              val lin = freshReg(); emit(s"$lin = ptrtoint ptr $li to i64")
+              val rin = freshReg(); emit(s"$rin = ptrtoint ptr $ri to i64")
+              val res = freshReg(); emit(s"$res = add i64 $lin, $rin")
+              emit(s"call void @rt_make_int(ptr ${getRegPtr(dst)}, i64 $res)")
+              emit(s"call void @rt_make_unit(ptr ${getRegPtr(l)})")
+              emit(s"call void @rt_make_unit(ptr ${getRegPtr(r)})")
+            case _ =>
+              compileBinOp(dst, l, r, "add", analysis, lines, getRegPtr, consumeReg)
         case Op.Sub(dst, l, r) => compileBinOp(dst, l, r, "sub", analysis, lines, getRegPtr, consumeReg)
         case Op.Mul(dst, l, r) => compileBinOp(dst, l, r, "mul", analysis, lines, getRegPtr, consumeReg)
         case Op.MakeClosure(dst, body, captures, arity) =>
@@ -87,13 +115,37 @@ class LLVMCodeGen:
           val res = freshReg(); emit(s"$res = call %Value @rt_call(%Value $fVal, ptr $aArr, i32 ${args.length})")
           emit(s"store %Value $res, ptr ${getRegPtr(dst)}")
         case Op.Return(src) => emit(s"ret %Value ${consumeReg(src)}")
+        case Op.Borrow(dst, src) =>
+          val v = freshReg()
+          emit(s"$v = load %Value, ptr ${getRegPtr(src)}")
+          emit(s"store %Value $v, ptr ${getRegPtr(dst)}")
+        case Op.Free(reg) =>
+          emit(s"call void @rt_make_unit(ptr ${getRegPtr(reg)})")
+        case Op.MakePair(dst, f, s) =>
+          val fVal = consumeReg(f)
+          val sVal = consumeReg(s)
+          emit(s"call void @rt_make_pair(ptr ${getRegPtr(dst)}, %Value $fVal, %Value $sVal)")
+        case Op.Proj1(dst, src) =>
+          val sPtr = getRegPtr(src)
+          val sVal = freshReg(); emit(s"$sVal = load %Value, ptr $sPtr")
+          val res = freshReg(); emit(s"$res = call %Value @rt_proj1(ptr $sPtr, %Value $sVal)")
+          emit(s"store %Value $res, ptr ${getRegPtr(dst)}")
+        case Op.Proj2(dst, src) =>
+          val sPtr = getRegPtr(src)
+          val sVal = freshReg(); emit(s"$sVal = load %Value, ptr $sPtr")
+          val res = freshReg(); emit(s"$res = call %Value @rt_proj2(ptr $sPtr, %Value $sVal)")
+          emit(s"store %Value $res, ptr ${getRegPtr(dst)}")
         case _ => ()
 
     regCounter = oldRegCounter
     val cleanName = if (name.startsWith("@")) name.drop(1) else name
     val retDefault = "  ret %Value { i64 5, ptr null }"
     val bodyStr = (allocas ++ lines).mkString("\n")
-    if (isMain) s"define %Value @$cleanName() {\nentry:\n$bodyStr\n$retDefault\n}"
+    
+    val currentIsWin = System.getProperty("os.name").toLowerCase.contains("win")
+    val currentDllexp = if (currentIsWin && isMain) "dllexport " else ""
+
+    if (isMain) s"define $currentDllexp%Value @$cleanName() {\nentry:\n$bodyStr\n$retDefault\n}"
     else s"define %Value @$cleanName(ptr %env, ptr %args, i32 %num_args) {\nentry:\n$bodyStr\n$retDefault\n}"
 
   private def compileBinOp(dst: Int, lhs: Int, rhs: Int, op: String, analysis: RangeAnalysisResult, lines: ArrayBuffer[String], getRegPtr: Int => String, consumeReg: Int => String): Unit =
@@ -124,6 +176,7 @@ class LLVMCodeGen:
 
   private def buildModule(mainFunc: String, embedRuntime: Boolean): String =
     val sb = new StringBuilder()
+    sb ++= buildTargetHeader()
     sb ++= "; Romanesco Pure Native LLVM IR Module\n%Value = type { i64, ptr }\n%Closure = type { ptr, ptr, i32 }\n"
     if (embedRuntime) sb ++= runtimeImplementation else sb ++= runtimeDeclarations
     for fn <- functions do sb ++= "\n" + fn + "\n"
@@ -137,18 +190,65 @@ declare void @rt_print_int(i64)
 declare ptr @rt_alloc_env(i32)
 declare void @rt_env_store(ptr, i32, %Value)
 declare void @rt_make_closure(ptr, ptr, ptr, i32)
+declare void @rt_make_pair(ptr, %Value, %Value)
+declare %Value @rt_proj1(ptr, %Value)
+declare %Value @rt_proj2(ptr, %Value)
 declare %Value @rt_call(%Value, ptr, i32)
 declare void @rt_setup_regs(ptr, i32, ptr, ptr, i32)
+declare void @rt_guard_int(%Value, i32, ptr, i32)
+declare void @rt_dump_regs(ptr, i32)
 """
 
   private val runtimeImplementation = """
 declare ptr @malloc(i64)
 declare void @free(ptr)
 declare i32 @printf(ptr, ...)
+declare void @exit(i32)
 @.str_int_fmt = private unnamed_addr constant [6 x i8] c"%lld\0A\00"
+@.str_deopt_msg = private unnamed_addr constant [35 x i8] c"Deoptimization at PC %d triggered\0A\00"
+@.str_reg_dump = private unnamed_addr constant [24 x i8] c"REG %d TAG %lld VAL %p\0A\00"
+@.str_deopt_start = private unnamed_addr constant [19 x i8] c"DEOPT_STATE_START\0A\00"
+@.str_deopt_end = private unnamed_addr constant [17 x i8] c"DEOPT_STATE_END\0A\00"
+
 define void @rt_print_int(i64 %n) {
   call i32 (ptr, ...) @printf(ptr @.str_int_fmt, i64 %n)
   ret void
+}
+define void @rt_dump_regs(ptr %regs, i32 %count) {
+  call i32 (ptr, ...) @printf(ptr @.str_deopt_start)
+  %i_ptr = alloca i32
+  store i32 0, ptr %i_ptr
+  br label %loop
+loop:
+  %i = load i32, ptr %i_ptr
+  %cond = icmp ult i32 %i, %count
+  br i1 %cond, label %body, label %done
+body:
+  %ptr = getelementptr %Value, ptr %regs, i32 %i
+  %tag_ptr = getelementptr %Value, ptr %ptr, i32 0, i32 0
+  %tag = load i64, ptr %tag_ptr
+  %val_ptr = getelementptr %Value, ptr %ptr, i32 0, i32 1
+  %val = load ptr, ptr %val_ptr
+  call i32 (ptr, ...) @printf(ptr @.str_reg_dump, i32 %i, i64 %tag, ptr %val)
+  %next = add i32 %i, 1
+  store i32 %next, ptr %i_ptr
+  br label %loop
+done:
+  call i32 (ptr, ...) @printf(ptr @.str_deopt_end)
+  ret void
+}
+define void @rt_guard_int(%Value %v, i32 %pc, ptr %regs, i32 %count) {
+  %tag = extractvalue %Value %v, 0
+  %is_int = icmp eq i64 %tag, 6
+  br i1 %is_int, label %ok, label %deopt
+ok:
+  ret void
+deopt:
+  call void @rt_dump_regs(ptr %regs, i32 %count)
+  call i32 (ptr, ...) @printf(ptr @.str_deopt_msg, i32 %pc)
+  %exit_code = add i32 123, %pc
+  call void @exit(i32 %exit_code)
+  unreachable
 }
 define void @rt_make_int(ptr %out, i64 %n) {
   %p1 = getelementptr %Value, ptr %out, i32 0, i32 0
@@ -159,10 +259,29 @@ define void @rt_make_int(ptr %out, i64 %n) {
   ret void
 }
 define i64 @rt_get_int(ptr %v) {
+  %p1 = getelementptr %Value, ptr %v, i32 0, i32 0
+  %tag = load i64, ptr %p1
+  %is_int = icmp eq i64 %tag, 6
+  br i1 %is_int, label %int_val, label %other_val
+int_val:
   %p2 = getelementptr %Value, ptr %v, i32 0, i32 1
   %ptr = load ptr, ptr %p2
   %n = ptrtoint ptr %ptr to i64
   ret i64 %n
+other_val:
+  %is_pair = icmp eq i64 %tag, 2
+  br i1 %is_pair, label %pair_val, label %fail
+pair_val:
+  ; ペアの場合は便宜上1番目の要素の整数値を返す(デバッグ用)
+  %p3 = getelementptr %Value, ptr %v, i32 0, i32 1
+  %ptr2 = load ptr, ptr %p3
+  %v1 = load %Value, ptr %ptr2
+  %v1_ptr = alloca %Value
+  store %Value %v1, ptr %v1_ptr
+  %n2 = call i64 @rt_get_int(ptr %v1_ptr)
+  ret i64 %n2
+fail:
+  ret i64 0
 }
 define void @rt_make_unit(ptr %out) {
   %p1 = getelementptr %Value, ptr %out, i32 0, i32 0
@@ -170,6 +289,35 @@ define void @rt_make_unit(ptr %out) {
   %p2 = getelementptr %Value, ptr %out, i32 0, i32 1
   store ptr null, ptr %p2
   ret void
+}
+define void @rt_make_pair(ptr %out, %Value %v1, %Value %v2) {
+  %mem = call ptr @malloc(i64 32)
+  store %Value %v1, ptr %mem
+  %v2_ptr = getelementptr %Value, ptr %mem, i32 1
+  store %Value %v2, ptr %v2_ptr
+  %p1 = getelementptr %Value, ptr %out, i32 0, i32 0
+  store i64 2, ptr %p1
+  %p2 = getelementptr %Value, ptr %out, i32 0, i32 1
+  store ptr %mem, ptr %p2
+  ret void
+}
+define %Value @rt_proj1(ptr %src_ptr, %Value %pair) {
+  %mem = extractvalue %Value %pair, 1
+  %v1 = load %Value, ptr %mem
+  %v2_ptr = getelementptr %Value, ptr %mem, i32 1
+  %v2 = load %Value, ptr %v2_ptr
+  ; Proj1 はペアを消費し、v2 を src に戻す (VMの仕様に合わせる)
+  store %Value %v2, ptr %src_ptr
+  ret %Value %v1
+}
+define %Value @rt_proj2(ptr %src_ptr, %Value %pair) {
+  %mem = extractvalue %Value %pair, 1
+  %v1 = load %Value, ptr %mem
+  %v2_ptr = getelementptr %Value, ptr %mem, i32 1
+  %v2 = load %Value, ptr %v2_ptr
+  ; Proj2 はペアを消費し、v1 を src に戻す
+  store %Value %v1, ptr %src_ptr
+  ret %Value %v2
 }
 define ptr @rt_alloc_env(i32 %size) {
   %mem = call ptr @malloc(i64 1024)

@@ -39,7 +39,20 @@ Romanesco 証明エンジン 開発ロードマップ
 
 3. 短期・中期的な拡張項目 (Priority: Medium) ⏳
 - [ ] **探索木の視覚化 (D3.js / Web UI) の統合**: `romanesco.Types.Tree` をブラウザでインタラクティブに描画
-- [ ] **ランタイム・コンパイラの高度化**: JIT (LLVM ORC) 対応
+- [x] **ランタイム・コンパイラの高度化 (JIT/Native Integration)**:
+    - [x] **LLVM ORC (lli) ベースの JIT 実行エンジン基盤の実装**
+    - [x] **JIT における構造体 (Pair)・所有権 (Borrow/Free) 操作の完全サポート**
+    - [x] **Registory への JIT 統合と動的実行環境の構築**
+    - [x] **投機的 JIT (Speculative JIT) の実装**:
+        - [x] プロファイリング VM による実行時型情報の収集 (`ProfileData`, `ProfilingVM`)
+        - [x] ガード命令と Deoptimization (Deopt) メカニズムの導入 (`rt_guard_int`)
+        - [x] 型特化型 LLVM IR 生成による高速パスの構築 (`LLVMCodeGen` 拡張)
+        - [x] 動的な実行切り替えエンジンの実装 (`SpeculativeExecutor`)
+- [ ] **シームレスな実行引き継ぎ (Seamless Execution Handover) の実装**:
+    - [x] **基本的な Deoptimization (Deopt)**: PC 情報を利用した JIT から VM への復帰
+    - [x] **精密な状態復元**: ガード失敗時に JIT 側の全レジスタ状態を VM へ復元する機構 (`rt_dump_regs`)
+    - [ ] **スタックマップ (Stack Maps) の導入**: JIT コード内の各地点でのレジスタ対応関係のメタデータ管理
+    - [ ] **On-Stack Replacement (OSR)**: 実行中のループ内等でインタープリタから JIT へ動的に飛び乗る機能
 
 4. 目標 (Vision) 🎯
 - [ ] あらゆる論理体系がシームレスに協力し、プログラムの性質を「完全に自動で」証明し、その証明に基づいた「数学的に正しい」超高速なネイティブコードを生成する究極の言語基盤。

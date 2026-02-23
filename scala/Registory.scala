@@ -24,6 +24,12 @@ final class Registory {
   private var interpreterHistory: Vector[romanesco.Runtime.VM] =
     Vector()
 
+  private var jitHistory: Vector[romanesco.Runtime.LLVMJIT] =
+    Vector()
+
+  private var speculativeHistory: Vector[romanesco.Runtime.SpeculativeExecutor] =
+    Vector()
+
   /* ========= current ========= */
 
   def currentTokenizer: Tokenizer =
@@ -37,6 +43,12 @@ final class Registory {
 
   def currentVM: romanesco.Runtime.VM =
     interpreterHistory.last
+
+  def currentJIT: romanesco.Runtime.LLVMJIT =
+    jitHistory.last
+
+  def currentSpeculative: romanesco.Runtime.SpeculativeExecutor =
+    speculativeHistory.last
 
   /* ========= random access ========= */
 
@@ -76,6 +88,24 @@ final class Registory {
     interpreterHistory(address)
   }
 
+  def anyJIT(fromLast: Int = 0): romanesco.Runtime.LLVMJIT = {
+    val address = jitHistory.size - 1 - fromLast
+    if (address < 0 || address >= jitHistory.size)
+      throw new RuntimeException(
+        s"JIT history address $address is out of range"
+      )
+    jitHistory(address)
+  }
+
+  def anySpeculative(fromLast: Int = 0): romanesco.Runtime.SpeculativeExecutor = {
+    val address = speculativeHistory.size - 1 - fromLast
+    if (address < 0 || address >= speculativeHistory.size)
+      throw new RuntimeException(
+        s"SpeculativeExecutor history address $address is out of range"
+      )
+    speculativeHistory(address)
+  }
+
   /* ========= push ========= */
 
   def pushTokenizer(rules: immutable.Map[String, Regex]): Unit = {
@@ -96,6 +126,14 @@ final class Registory {
 
   def pushVM(vm: romanesco.Runtime.VM): Unit = {
     interpreterHistory = interpreterHistory :+ vm
+  }
+
+  def pushJIT(jit: romanesco.Runtime.LLVMJIT): Unit = {
+    jitHistory = jitHistory :+ jit
+  }
+
+  def pushSpeculative(se: romanesco.Runtime.SpeculativeExecutor): Unit = {
+    speculativeHistory = speculativeHistory :+ se
   }
 
   /* ========= dump ========= */
