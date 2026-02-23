@@ -76,8 +76,8 @@ import scala.sys.process._
       case e: Exception => println(s"  ! Error: ${e.getMessage}")
     }
 
-  // テストケース: 500 * 2 + 7 = 1007
-  val ops = Array(
+  // テスト 1: 算術演算 (500 * 2 + 7 = 1007)
+  val ops1 = Array(
     Op.LoadConst(0, Value.Atom(500)),
     Op.LoadConst(1, Value.Atom(2)),
     Op.Mul(2, 0, 1),
@@ -85,5 +85,19 @@ import scala.sys.process._
     Op.Add(4, 2, 3),
     Op.Return(4)
   )
+  compileAndRun("Self-contained Arithmetic", ops1)
 
-  compileAndRun("Self-contained Arithmetic", ops)
+  // テスト 2: シンプルなクロージャ (λx. x + 1)(10) = 11
+  val body2 = Array(
+    Op.LoadConst(1, Value.Atom(1)),
+    Op.Add(2, 0, 1), // regs[0] は引数 x (rt_setup_regsにより配置)
+    Op.Return(2)
+  )
+  val ops2 = Array(
+    Op.MakeClosure(0, body2, Array.empty, 1),
+    Op.LoadConst(1, Value.Atom(10)),
+    Op.Call(2, 0, Array(1)),
+    Op.Return(2)
+  )
+  compileAndRun("Simple Closure", ops2)
+
