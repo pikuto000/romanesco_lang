@@ -41,17 +41,18 @@ Romanesco 証明エンジン 開発ロードマップ
 - [ ] **探索木の視覚化 (D3.js / Web UI) の統合**: `romanesco.Types.Tree` をブラウザでインタラクティブに描画
 - [x] **ランタイム・コンパイラの高度化 (JIT/Native Integration)**:
     - [x] **LLVM ORC (lli) ベースの JIT 実行エンジン基盤の実装**
-    - [x] **JIT における構造体 (Pair)・所有権 (Borrow/Free) 操作の完全サポート**
+    - [x] **JIT における構造体 (Pair)・和型 (Sum)・所有権 (Borrow/Free) 操作の完全サポート**
+    - [x] **JIT における自動メモリ管理**: `rt_cleanup_value` による malloc ポインタの自動開放
     - [x] **Registory への JIT 統合と動的実行環境の構築**
-    - [x] **投機的 JIT (Speculative JIT) の実装**:
-        - [x] プロファイリング VM による実行時型情報の収集 (`ProfileData`, `ProfilingVM`)
-        - [x] ガード命令と Deoptimization (Deopt) メカニズムの導入 (`rt_guard_int`)
-        - [x] 型特化型 LLVM IR 生成による高速パスの構築 (`LLVMCodeGen` 拡張)
-        - [x] 動的な実行切り替えエンジンの実装 (`SpeculativeExecutor`)
+- [x] **投機的 JIT (Speculative JIT) の実装**:
+    - [x] プロファイリング VM による実行時型情報の収集 (`ProfileData`, `ProfilingVM`)
+    - [x] ガード命令と Deoptimization (Deopt) メカニズムの導入 (`rt_guard_int`)
+    - [x] 全算術演算の型特化型 LLVM IR 生成による高速パスの構築
+    - [x] 動的な実行切り替えエンジンの実装 (`SpeculativeExecutor`)
 - [x] **シームレスな実行引き継ぎ (Seamless Execution Handover) の実装**:
     - [x] **基本的な Deoptimization (Deopt)**: PC 情報を利用した JIT から VM への復帰
-    - [x] **精密な状態復元**: ガード失敗時に JIT 側の全レジスタ状態を VM へ復元する機構 (`rt_dump_regs` + Panama 同期)
-    - [x] **スタックマップ (Stack Maps) の導入**: LLVM `alloca` と `phi` 結合によるレジスタ対応の自動化
+    - [x] **精密な状態復元**: `rt_dump_regs` + Panama 同期による全レジスタの VM への復元
+    - [x] **スタックマップ (Stack Maps) の導入**: `phi` 命令によるレジスタバッファの動的切り替え
     - [x] **On-Stack Replacement (OSR)**: `external_regs` 引数による VM から JIT への動的引き継ぎ基盤
 
 4. 目標 (Vision) 🎯

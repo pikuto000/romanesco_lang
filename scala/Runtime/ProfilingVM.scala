@@ -98,6 +98,39 @@ class ProfilingVM(
             case _ => 0L
           setReg(dst, Value.Atom(res))
           pc += 1
+        case Op.MakePair(dst, f, s) =>
+          setReg(dst, Value.PairVal(consumeReg(f), consumeReg(s)))
+          pc += 1
+        case Op.Proj1(dst, src) =>
+          consumeReg(src) match
+            case Value.PairVal(f, s) =>
+              setReg(dst, f)
+              setReg(src, s)
+            case v => throw VMError(s"Proj1: not a pair: $v")
+          pc += 1
+        case Op.Proj2(dst, src) =>
+          consumeReg(src) match
+            case Value.PairVal(f, s) =>
+              setReg(dst, s)
+              setReg(src, f)
+            case v => throw VMError(s"Proj2: not a pair: $v")
+          pc += 1
+        case Op.MakeInl(dst, src) =>
+          setReg(dst, Value.InlVal(consumeReg(src)))
+          pc += 1
+        case Op.MakeInr(dst, src) =>
+          setReg(dst, Value.InrVal(consumeReg(src)))
+          pc += 1
+        case Op.Case(dst, scrut, inl, inr) =>
+          val scrutVal = consumeReg(scrut)
+          val (branch, innerV) = scrutVal match
+            case Value.InlVal(v) => (inl, v)
+            case Value.InrVal(v) => (inr, v)
+            case _ => throw VMError(s"Case: invalid scrutinee $scrutVal")
+          
+          setReg(dst, innerV)
+          execProfiling(branch, initialRegsForExec, depth + 1)
+          pc += 1
         case Op.Return(src) =>
           return consumeReg(src)
         case _ => 
