@@ -202,8 +202,17 @@ class LLVMCodeGen:
           case _ => ()
 
     if (isMain) {
+      val isNull = freshReg()
+      emit(s"$isNull = icmp eq ptr %external_regs, null")
+      val labelId = freshReg().id
+      val initLab = s"init_regs_$labelId"
+      val skipLab = s"skip_init_$labelId"
+      emit(s"br i1 $isNull, label %$initLab, label %$skipLab")
+      emit(s"$initLab:")
       for i <- 0 to maxReg do
         emit(s"call void @rt_init_unit(ptr ${getRegPtr(i)})")
+      emit(s"br label %$skipLab")
+      emit(s"$skipLab:")
     } else {
       emit(s"%regs_base = alloca %Value, i32 ${maxReg + 1}")
       emit(
@@ -255,6 +264,8 @@ $retDefault
   ): Unit =
     def emit(line: String): Unit = lines += s"  $line"
     val w = analysis.bitWidth(dst)
+    // デバッグ用
+    if (w < 64) println(s"[CodeGen DEBUG] PC $pc: Inferred bit-width for reg $dst is i$w")
     val llvmTy = s"i$w"
 
     val lv = freshReg(); emit(s"$lv = call i64 @rt_get_int(ptr ${getRegPtr(l)})")

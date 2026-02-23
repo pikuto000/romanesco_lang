@@ -17,9 +17,10 @@ case class RangeAnalysisResult(
 
 class RangeAnalyzer:
   def analyze(code: Array[Op], profile: Option[ProfileData] = None): RangeAnalysisResult =
-    val widths = mutable.Map[Int, Int]().withDefaultValue(64)
-    val escapes = mutable.Set[Int]()
-    
+    val widths = mutable.Map[Int, Int]()
+    // 初期状態: 全て 64bit
+    for i <- 0 to 31 do widths(i) = 64
+
     // ヘルパー: 値から必要な最小ビット幅（iN）を正確に判定
     def requiredBits(n: Long): Int =
       if (n == 0) 1
@@ -30,7 +31,21 @@ class RangeAnalyzer:
         Math.min(64, bits)
       }
 
-    // 前向きスキャンでビット幅を推論
+    // プロファイル情報から、各レジスタで観測された最大ビット幅を事前に抽出
+    profile.foreach { p =>
+      for {
+        ((_, _), prof) <- p.getAll
+        regIdx <- 0 to 31
+        value <- prof.dominantValue(regIdx)
+      } {
+        value match
+          case Value.Atom(n: Int)  => widths(regIdx) = Math.max(widths(regIdx), requiredBits(n.toLong))
+          case Value.Atom(n: Long) => widths(regIdx) = Math.max(widths(regIdx), requiredBits(n))
+          case _ => ()
+      }
+    }
+
+    // 前向きスキャンで依存関係に基づきビット幅を更新
     for (op, pc) <- code.zipWithIndex do
       op match
         case Op.LoadConst(dst, Value.Atom(n: Int)) => 
@@ -42,25 +57,10 @@ class RangeAnalyzer:
         case Op.Add(dst, l, r) =>
           widths(dst) = Math.min(64, Math.max(widths(l), widths(r)) + 1)
         case Op.Sub(dst, l, r) =>
-          widths(dst) = Math.max(widths(l), widths(r)) // 減算は一旦最大幅を維持
+          widths(dst) = Math.max(widths(l), widths(r))
         case Op.Mul(dst, l, r) =>
           widths(dst) = Math.min(64, widths(l) + widths(r))
-        case Op.Proj1(dst, src) => widths(dst) = 64 // 不明
-        case Op.Proj2(dst, src) => widths(dst) = 64 // 不明
         case _ => ()
-
-      // プロファイル情報があれば、観測された最大値で上書き（投機的ヒント）
-      profile.foreach { p =>
-        val prof = p.get(code, pc)
-        // 各レジスタの支配的な値を確認
-        (0 to 31).foreach { regIdx =>
-          prof.dominantValue(regIdx).foreach {
-            case Value.Atom(n: Int)  => widths(regIdx) = Math.min(widths(regIdx), requiredBits(n.toLong))
-            case Value.Atom(n: Long) => widths(regIdx) = Math.min(widths(regIdx), requiredBits(n))
-            case _ => ()
-          }
-        }
-      }
 
     // エスケープ解析 (既存のロジックを維持)
     val finalEscapes = mutable.Set[Int]()

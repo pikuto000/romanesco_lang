@@ -55,6 +55,11 @@ class ProfileData:
   // (codeBlockId, pc) -> profile
   private val profiles = mutable.Map[(Int, Int), OpProfile]()
 
+  def getAll: Map[(Int, Int), OpProfile] = profiles.toMap
+
+  def loadFrom(other: ProfileData): Unit =
+    profiles ++= other.getAll
+
   private def getCodeId(code: Array[Op]): Int = System.identityHashCode(code)
 
   def get(code: Array[Op], pc: Int): OpProfile =
