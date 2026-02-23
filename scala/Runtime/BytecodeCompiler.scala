@@ -15,6 +15,8 @@ class BytecodeCompiler:
   private var regCounter = 0
   private val env = mutable.Map[String, (Int, Int)]() 
   private val optimizer = new ResourceOptimizer(new OmniResourceLogic())
+  private val registerAllocator = new RegisterAllocator()
+  private val bytecodeOptimizer = new BytecodeOptimizer()
 
   private def freshReg(): Int =
     val r = regCounter
@@ -37,11 +39,15 @@ class BytecodeCompiler:
     val finalReg = compileRecursive(tree, ops)
     ops += Op.Return(finalReg)
     
-    // 生成された「生の」バイトコードに対して、
-    // ResourceOptimizer を適用し、必要な Free 命令を自動挿入する。
-    // これこそが「メモリ管理の完全自動化」である。
-    val optimizedOps = optimizer.optimize(ops.toArray)
-    optimizedOps
+    // 1. バイトコードレベルの命令削減（定数畳み込み、DCE等）
+    val optimizedInstructions = bytecodeOptimizer.optimize(ops.toArray)
+    
+    // 2. ResourceOptimizer を適用し、必要な Free 命令を自動挿入する。
+    val withFreeOps = optimizer.optimize(optimizedInstructions)
+    
+    // 3. 最後にレジスタの再割り当てを行い、使用レジスタ数を最小化する。
+    val finalOps = registerAllocator.allocate(withFreeOps)
+    finalOps
 
   private def compileRecursive(
       tree: Tree[(String, Vector[String])],

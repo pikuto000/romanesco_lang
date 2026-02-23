@@ -6,6 +6,7 @@
 package romanesco.Runtime
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import romanesco.Utils.Debug
 
 class CodeGenError(msg: String) extends RuntimeException(msg)
 
@@ -265,12 +266,17 @@ $retDefault
     def emit(line: String): Unit = lines += s"  $line"
     val w = analysis.bitWidth(dst)
     // デバッグ用
-    if (w < 64) println(s"[CodeGen DEBUG] PC $pc: Inferred bit-width for reg $dst is i$w")
+    if (w < 64)
+      Debug.logger.log(
+        s"[CodeGen DEBUG] PC $pc: Inferred bit-width for reg $dst is i$w"
+      )
     val llvmTy = s"i$w"
 
-    val lv = freshReg(); emit(s"$lv = call i64 @rt_get_int(ptr ${getRegPtr(l)})")
-    val rv = freshReg(); emit(s"$rv = call i64 @rt_get_int(ptr ${getRegPtr(r)})")
-    
+    val lv = freshReg();
+    emit(s"$lv = call i64 @rt_get_int(ptr ${getRegPtr(l)})")
+    val rv = freshReg();
+    emit(s"$rv = call i64 @rt_get_int(ptr ${getRegPtr(r)})")
+
     val res = if (w < 64) {
       val lt = freshReg(); emit(s"$lt = trunc i64 $lv to $llvmTy")
       val rt = freshReg(); emit(s"$rt = trunc i64 $rv to $llvmTy")
