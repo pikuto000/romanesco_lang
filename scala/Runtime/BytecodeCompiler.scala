@@ -1,34 +1,47 @@
 // ==========================================
 // BytecodeCompiler.scala
-// ParseTree -> レジスタマシンバイトコード (Op)
+// 所有権推論・自動メモリ管理（Optimizer統合型）コンパイラ
 // ==========================================
 
 package romanesco.Runtime
 
 import romanesco.Types._
 import romanesco.Parser.rParser
-
 import scala.collection.mutable
 
 class CompileError(msg: String) extends RuntimeException(msg)
 
 class BytecodeCompiler:
   private var regCounter = 0
-  private val env = mutable.Map[String, Int]() // 変数名 -> レジスタ番号
+  private val env = mutable.Map[String, (Int, Int)]() 
+  private val optimizer = new ResourceOptimizer(new OmniResourceLogic())
 
   private def freshReg(): Int =
     val r = regCounter
     regCounter += 1
     r
 
-  /** ParseTree をコンパイルして Op 配列を返す */
+  private def countUses(tree: Tree[(String, Vector[String])], counts: mutable.Map[String, Int]): Unit = tree match
+    case Tree.V(("Var", args), _) =>
+      val name = args.head
+      counts(name) = counts.getOrElse(name, 0) + 1
+    case Tree.V(_, branches) =>
+      branches.foreach(countUses(_, counts))
+    case _ => ()
+
+  /** ParseTree をコンパイルし、さらに最適化（自動Free挿入）を適用して返す */
   def compile(tree: Tree[(String, Vector[String])]): Array[Op] =
     regCounter = 0
     env.clear()
     val ops = mutable.ArrayBuffer[Op]()
     val finalReg = compileRecursive(tree, ops)
     ops += Op.Return(finalReg)
-    ops.toArray
+    
+    // 生成された「生の」バイトコードに対して、
+    // ResourceOptimizer を適用し、必要な Free 命令を自動挿入する。
+    // これこそが「メモリ管理の完全自動化」である。
+    val optimizedOps = optimizer.optimize(ops.toArray)
+    optimizedOps
 
   private def compileRecursive(
       tree: Tree[(String, Vector[String])],
@@ -42,7 +55,6 @@ class BytecodeCompiler:
     case Tree.V((op, args), branches) =>
       op match
         case "ParseRoot" =>
-          // 複数の式がある場合は最後を結果とする
           var lastReg = -1
           for branch <- branches do
             lastReg = compileRecursive(branch, ops)
@@ -60,14 +72,25 @@ class BytecodeCompiler:
 
         case "Var" =>
           val name = args.head
-          env.getOrElse(name, throw CompileError(s"未定義の変数: $name"))
+          val (reg, uses) = env.getOrElse(name, throw CompileError(s"未定義の変数: $name"))
+          
+          if (uses > 1) {
+            val dst = freshReg()
+            ops += Op.Borrow(dst, reg)
+            env(name) = (reg, uses - 1)
+            dst
+          } else {
+            val dst = freshReg()
+            ops += Op.Move(dst, reg)
+            env(name) = (reg, 0)
+            dst
+          }
 
         case "Add" => compileBinOp(ops, branches, Op.Add.apply)
         case "Sub" => compileBinOp(ops, branches, Op.Sub.apply)
         case "Mul" => compileBinOp(ops, branches, Op.Mul.apply)
 
         case "Pair" =>
-          if branches.size != 2 then throw CompileError("Pairは2つの引数が必要です")
           val r1 = compileRecursive(branches(0), ops)
           val r2 = compileRecursive(branches(1), ops)
           val dst = freshReg()
@@ -87,45 +110,50 @@ class BytecodeCompiler:
           dst
 
         case "Let" =>
-          // (Let varName valueExpr bodyExpr)
           val varName = args.head
+          val bodyUses = mutable.Map[String, Int]()
+          countUses(branches(1), bodyUses)
+          
           val valReg = compileRecursive(branches(0), ops)
+          
           val oldMapping = env.get(varName)
-          env(varName) = valReg
+          env(varName) = (valReg, bodyUses.getOrElse(varName, 0))
+          
           val resultReg = compileRecursive(branches(1), ops)
-          // 本来はスコープを抜けるときに env を戻すべきだが簡易化
+          
+          oldMapping match
+            case Some(m) => env(varName) = m
+            case None => env.remove(varName)
+            
           resultReg
 
         case "Lambda" =>
-          // (Lambda argName bodyExpr)
           val argName = args.head
           val savedCounter = regCounter
           val savedEnv = env.toMap
           
-          // 引数レジスタを予約（環境の直後に配置される想定）
-          // FIXME: クロージャの環境キャプチャと引数配置の規約を合わせる
+          val bodyUses = mutable.Map[String, Int]()
+          countUses(branches(0), bodyUses)
+          
           val argReg = freshReg()
-          env(argName) = argReg
+          env(argName) = (argReg, bodyUses.getOrElse(argName, 0))
           
           val bodyOps = mutable.ArrayBuffer[Op]()
           val bodyRes = compileRecursive(branches(0), bodyOps)
           bodyOps += Op.Return(bodyRes)
           
+          // 関数内部も個別に最適化する
+          val optimizedBody = optimizer.optimize(bodyOps.toArray)
+          
           regCounter = savedCounter
-          // env を戻す（キャプチャ対象の特定に必要）
-          val captures = savedEnv.values.toArray
+          env.clear()
+          env ++= savedEnv
           
           val dst = freshReg()
-          ops += Op.MakeClosure(dst, bodyOps.toArray, captures, 1)
+          ops += Op.MakeClosure(dst, optimizedBody, savedEnv.values.map(_._1).toArray, 1)
           dst
 
-        case "EOF" =>
-          val r = freshReg()
-          ops += Op.LoadConst(r, Value.Unit)
-          r
-
         case _ =>
-          // 未知の演算子はとりあえず Unit
           val r = freshReg()
           ops += Op.LoadConst(r, Value.Unit)
           r
@@ -135,7 +163,6 @@ class BytecodeCompiler:
       branches: Vector[Tree[(String, Vector[String])]],
       constructor: (Int, Int, Int) => Op
   ): Int =
-    if branches.size != 2 then throw CompileError("2項演算には2つの引数が必要です")
     val r1 = compileRecursive(branches(0), ops)
     val r2 = compileRecursive(branches(1), ops)
     val dst = freshReg()

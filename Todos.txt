@@ -17,13 +17,11 @@ Romanesco 証明エンジン 開発ロードマップ
     - [x] **線形コンテキストの等価書き換え**: 通常コンテキストの `A = B` (HoTT/Path) を用いた `linearContext` の動的変換の実装
     - [x] **順次消費型線形推論 (Sequential Consumption Model)**: 組み合わせ爆発を排除した効率的なリソース管理とフレーム推論の統合
     - [x] **統合型前向き・後ろ向き探索**: プログラム実行（ドミノ倒し）と構造分解の矛盾なき融合
-    - [x] **100% 検証精度の達成**: 
-        - [x] `OmniVerificationTest`: プログラムメモリ安全検証 (5/5 Passed)
-        - [x] `EnhancedFrameTest`: 汎用分離論理・フレーム推論 (8/8 Passed)
-        - [x] `LinearLogicTest`: 線形論理・写像推論 (4/4 Passed)
-- [x] **ホモトピー借用（Homotopic Borrowing / Shared References）**:
-    - [x] **Pathベースのライフタイム管理**: `Own(r)` と `Shared(r)` の間の Path による借用状態の幾何学的表現
-    - [x] **ホモトピー的リソース消費**: パス上の端点を同一リソースとみなす透過的な推論ロジックの統合
+    - [x] **100% 検証精度の達成**: OmniVerificationTest, EnhancedFrameTest, LinearLogicTest の全パス
+- [x] **メモリ安全の完全自動化 (Full Ownership Automation)**:
+    - [x] **自動所有権推論コンパイラ**: 使用回数解析に基づく `Borrow`/`Move` の自動発行
+    - [x] **コンパイル時自動メモリ管理**: `ResourceOptimizer` 統合による `Free` 命令の最適配置
+    - [x] **ホモトピー借用システム**: Pathベースのライフタイム管理と透過的なリソース共有
 - [x] **各論理体系のサポート**:
     - [x] モナド三則 (Left/Right Identity, Associativity) の完全証明
     - [x] 分離論理のフレーム推論とマルチリソース・パーティショニング
@@ -48,8 +46,8 @@ Romanesco 証明エンジン 開発ロードマップ
 - [ ] **プラグイン導入の自動化**:
     - [ ] リフレクションまたはマクロを利用した特定パッケージからのプラグイン自動検出・ロード
     - [ ] `ProverConfig` における外部からのプラグイン動的注入
-- [ ] **LLVMバックエンドへの参照計数導入**:
-    - [ ] ホモトピー借用の証明に基づいた、実行時の自動メモリ管理コード（RC increment/decrement）の生成
+- [ ] **高度なHITsサポートの洗練**:
+    - [ ] 複雑なHIT構造体に対する自動 Drop 規則の生成
 
 3. 短期・中期的な拡張項目 (Priority: Medium) ⏳
 - [ ] **探索木の視覚化 (D3.js / Web UI) の統合**:

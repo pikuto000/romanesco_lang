@@ -38,6 +38,8 @@ class ResourceAnalyzer:
     val regsAt = mutable.Map[Int, Map[Int, Int]]()
     val garbage = mutable.Set[Int]()
 
+    val lostAt = mutable.Map[Int, Set[Int]]()
+
     for (op, idx) <- code.zipWithIndex do
       regsAt(idx) = state.regs
       state = op match
@@ -55,13 +57,14 @@ class ResourceAnalyzer:
           val (s, rid) = state.clearReg(fst).clearReg(snd).alloc(ResourceKind.PairStruct, Set(fId, sId).filter(_>=0), idx)
           s.setReg(dst, rid)
         case Op.Proj1(dst, src) =>
-          val res = for { pId <- state.getReg(src); r <- state.resources.get(pId) if r.initialChildren.size >= 2 } yield (r.initialChildren.min, r.initialChildren.max)
+          // 解析上の簡易化: Proj1/2 はペアを分解し、片方を dst に、もう片方を src に戻す
+          val res = for { pId <- state.getReg(src); r <- state.resources.get(pId) if r.initialChildren.size >= 2 } yield (r.initialChildren.toList.sorted)
           val s2 = state.clearReg(src)
-          res.map(ids => s2.setReg(dst, ids._1).setReg(src, ids._2)).getOrElse(s2)
+          res.map(ids => s2.setReg(dst, ids(0)).setReg(src, ids(1))).getOrElse(s2)
         case Op.Proj2(dst, src) =>
-          val res = for { pId <- state.getReg(src); r <- state.resources.get(pId) if r.initialChildren.size >= 2 } yield (r.initialChildren.min, r.initialChildren.max)
+          val res = for { pId <- state.getReg(src); r <- state.resources.get(pId) if r.initialChildren.size >= 2 } yield (r.initialChildren.toList.sorted)
           val s2 = state.clearReg(src)
-          res.map(ids => s2.setReg(dst, ids._2).setReg(src, ids._1)).getOrElse(s2)
+          res.map(ids => s2.setReg(dst, ids(1)).setReg(src, ids(0))).getOrElse(s2)
         case Op.Add(dst, l, r) =>
           val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
           s.setReg(dst, rid)
@@ -73,8 +76,6 @@ class ResourceAnalyzer:
           s.setReg(dst, rid)
         case Op.Borrow(dst, src) => state.getReg(src).map(state.setReg(dst, _)).getOrElse(state)
         case Op.Return(src) =>
-          // Return 直前の全有効リソースのうち、src に入っているもの以外をリークとして記録
-          // ただし、src と同じ ID が他のレジスタにあっても、それは共有参照なのでリークとはみなさない
           val returnedRid = state.getReg(src)
           val others = state.regs.filter(_._1 != src).values.toSet
           val trueLeaks = returnedRid match {
@@ -82,10 +83,12 @@ class ResourceAnalyzer:
             case None => others
           }
           garbage ++= trueLeaks
+          // リークしたものを「ここで失われた」として記録
+          lostAt(idx) = trueLeaks
           state.copy(regs = Map.empty)
         case _ => state
 
-    AnalysisResult(state, None, garbage.toSet, Map.empty, regsAt.toMap, state.regs)
+    AnalysisResult(state, None, garbage.toSet, lostAt.toMap, regsAt.toMap, state.regs)
 
   private def allReachable(state: ResourceState): Set[Int] =
     state.regs.values.toSet.flatMap(rid => transitiveOwned(state, rid) + rid)
