@@ -9,7 +9,7 @@ import Types._
 import romanesco.Utils.Debug
 import romanesco.Utils.Macro
 
-final class Registory {
+final class Registry {
   private type Token = Tuple4[UInt, UInt, Regex, String]
   private type TokenTree = Tree[Token]
   private var tokenizerHistory: Vector[Tokenizer] =
@@ -27,7 +27,8 @@ final class Registory {
   private var jitHistory: Vector[romanesco.Runtime.LLVMJIT] =
     Vector()
 
-  private var speculativeHistory: Vector[romanesco.Runtime.SpeculativeExecutor] =
+  private var speculativeHistory
+      : Vector[romanesco.Runtime.SpeculativeExecutor] =
     Vector()
 
   /* ========= current ========= */
@@ -97,7 +98,9 @@ final class Registory {
     jitHistory(address)
   }
 
-  def anySpeculative(fromLast: Int = 0): romanesco.Runtime.SpeculativeExecutor = {
+  def anySpeculative(
+      fromLast: Int = 0
+  ): romanesco.Runtime.SpeculativeExecutor = {
     val address = speculativeHistory.size - 1 - fromLast
     if (address < 0 || address >= speculativeHistory.size)
       throw new RuntimeException(

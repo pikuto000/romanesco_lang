@@ -17,7 +17,7 @@ class SpeculativeExecutor(
 
   def execute(code: Array[Op]): Value =
     val entryPC = 0
-    val prof = vm.profileData.get(entryPC)
+    val prof = vm.profileData.get(code, entryPC)
 
     if jitCompiled then
        try {

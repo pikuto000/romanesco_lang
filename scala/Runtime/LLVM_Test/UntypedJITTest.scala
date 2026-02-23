@@ -67,4 +67,30 @@ import romanesco.Runtime._
   println(s"  Final Result: $resFinal")
   assert(resFinal.toString.contains("200"))
 
-  println("\nUntyped JIT tests completed successfully.")
+  // --- シナリオ 4: 拡張プロファイリングの検証 ---
+  println("\n>>> Test 5: Extended Profiling (Branch, Call, Value)")
+  val pvm2 = new ProfilingVM()
+  
+  // 分岐と呼び出しを含むコード
+  // if (x == 1) then f(x) else x + 1
+  val fBody = Array(Op.Add(1, 0, 0), Op.Return(1))
+  val opsExt = Array(
+    Op.LoadConst(0, Value.Atom(1)),   // x = 1
+    Op.MakeInl(1, 0),                 // wrap as Inl
+    Op.MakeClosure(2, fBody, Array(), 1), // f
+    Op.Case(3, 1, 
+      Array(Op.Call(4, 2, Array(0)), Op.Return(4)), // Inl branch: call f(x)
+      Array(Op.Add(4, 0, 0), Op.Return(4))          // Inr branch: x + x
+    ),
+    Op.Return(3)
+  )
+
+  pvm2.runWithProfiling(opsExt)
+  val profile = pvm2.profileData.toString
+  println(s"  Ext Profile Data:\n$profile")
+  
+  assert(profile.contains("branches") && profile.contains("0 -> 1")) // Inl branch taken
+  assert(profile.contains("calls"))              // Call target recorded
+  assert(profile.contains("values"))             // Constant values recorded
+
+  println("\nAll extended profiling tests passed!")

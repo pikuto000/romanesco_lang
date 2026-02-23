@@ -25,9 +25,33 @@ class ProfilingVM(
     for _ <- 0 until 32 do r += Value.Unit
     r
 
-  /** 実行ごとにプロファイリングデータに記録する（現在は実行回数のみ） */
-  private def recordProfile(pc: Int, op: Op, regs: ArrayBuffer[Value]): Unit =
-    profileData.record(pc)
+  /** 実行ごとにプロファイリングデータに記録する */
+  private def recordProfile(code: Array[Op], pc: Int, op: Op, regs: ArrayBuffer[Value]): Unit =
+    profileData.record(code, pc)
+    val prof = profileData.get(code, pc)
+    
+    // 全ての命令で、関与するレジスタ（ソースレジスタ）の値を記録する
+    op match
+      case Op.Move(_, s) => prof.recordValue(s, regs(s))
+      case Op.Add(_, l, r) => prof.recordValue(l, regs(l)); prof.recordValue(r, regs(r))
+      case Op.Sub(_, l, r) => prof.recordValue(l, regs(l)); prof.recordValue(r, regs(r))
+      case Op.Mul(_, l, r) => prof.recordValue(l, regs(l)); prof.recordValue(r, regs(r))
+      case Op.Call(_, fIdx, args) =>
+        prof.recordValue(fIdx, regs(fIdx))
+        args.foreach(a => prof.recordValue(a, regs(a)))
+        regs(fIdx) match
+          case Value.Closure(body, _, _) => prof.recordCallTarget(body)
+          case _ => ()
+      case Op.MakePair(_, f, s) => prof.recordValue(f, regs(f)); prof.recordValue(s, regs(s))
+      case Op.Proj1(_, s) => prof.recordValue(s, regs(s))
+      case Op.Proj2(_, s) => prof.recordValue(s, regs(s))
+      case Op.MakeInl(_, s) => prof.recordValue(s, regs(s))
+      case Op.MakeInr(_, s) => prof.recordValue(s, regs(s))
+      case Op.Case(_, s, _, _) => prof.recordValue(s, regs(s))
+      case Op.Return(s) => prof.recordValue(s, regs(s))
+      case Op.MakeClosure(_, _, caps, _) => caps.foreach(c => prof.recordValue(c, regs(c)))
+      case Op.Free(s) => prof.recordValue(s, regs(s))
+      case _ => ()
 
   private def execProfiling(code: Array[Op], initialRegsForExec: ArrayBuffer[Value], depth: Int, startPc: Int = 0): Value =
     if depth > maxDepth then throw VMError("スタックオーバーフロー")
@@ -41,7 +65,7 @@ class ProfilingVM(
 
     while pc < code.length do
       val op = code(pc)
-      recordProfile(pc, op, initialRegsForExec)
+      recordProfile(code, pc, op, initialRegsForExec)
       
       op match
         case Op.Move(dst, src) =>
@@ -49,6 +73,23 @@ class ProfilingVM(
           pc += 1
         case Op.LoadConst(dst, v) =>
           setReg(dst, v)
+          pc += 1
+        case Op.MakeClosure(dst, body, captures, arity) =>
+          val env = captures.map(idx => consumeReg(idx))
+          setReg(dst, Value.Closure(body, env, arity))
+          pc += 1
+        case Op.Call(dst, funcIdx, argIdxs) =>
+          val func = consumeReg(funcIdx)
+          val args = argIdxs.map(idx => consumeReg(idx))
+          func match
+            case Value.Closure(body, env, arity) =>
+              val newRegs = ArrayBuffer.from(env ++ args)
+              // 32レジスタを確保
+              while newRegs.length < 32 do newRegs += Value.Unit
+              val res = execProfiling(body, newRegs, depth + 1)
+              setReg(dst, res)
+            case _ =>
+              throw VMError(s"関数でない値へのCall: $func")
           pc += 1
         case Op.Add(dst, lhs, rhs) =>
           val (lv, rv) = (getReg(lhs), getReg(rhs))
@@ -67,6 +108,21 @@ class ProfilingVM(
             case (Value.Atom(a: Long), Value.Atom(b: Long)) => a * b
             case _ => 0L
           setReg(dst, Value.Atom(res))
+          pc += 1
+        case Op.Sub(dst, lhs, rhs) =>
+          val (lv, rv) = (getReg(lhs), getReg(rhs))
+          consumeReg(lhs); consumeReg(rhs)
+          val res = (lv, rv) match
+            case (Value.Atom(a: Int), Value.Atom(b: Int)) => a.toLong - b.toLong
+            case (Value.Atom(a: Long), Value.Atom(b: Long)) => a - b
+            case _ => 0L
+          setReg(dst, Value.Atom(res))
+          pc += 1
+        case Op.Borrow(dst, src) =>
+          setReg(dst, getReg(src))
+          pc += 1
+        case Op.Free(reg) =>
+          consumeReg(reg)
           pc += 1
         case Op.MakePair(dst, f, s) =>
           setReg(dst, Value.PairVal(consumeReg(f), consumeReg(s)))
@@ -93,11 +149,12 @@ class ProfilingVM(
           pc += 1
         case Op.Case(dst, scrut, inl, inr) =>
           val scrutVal = consumeReg(scrut)
-          val (branch, innerV) = scrutVal match
-            case Value.InlVal(v) => (inl, v)
-            case Value.InrVal(v) => (inr, v)
+          val (branch, innerV, branchIdx) = scrutVal match
+            case Value.InlVal(v) => (inl, v, 0)
+            case Value.InrVal(v) => (inr, v, 1)
             case _ => throw VMError(s"Case: invalid scrutinee $scrutVal")
           
+          profileData.get(code, pc).recordBranch(branchIdx)
           setReg(dst, innerV)
           execProfiling(branch, initialRegsForExec, depth + 1)
           pc += 1
