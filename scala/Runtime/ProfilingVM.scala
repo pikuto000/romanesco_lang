@@ -12,15 +12,18 @@ class ProfilingVM(
   val maxDepth: Int = 1000,
   initialRegSize: Int = 32
 ) extends VM(maxDepth = maxDepth, initialRegSize = initialRegSize):
+  private var regs: ArrayBuffer[Value] = initialRegs()
+  def currentRegs: ArrayBuffer[Value] = regs
 
   /** プロファイリングを行いながらバイトコードを実行する */
-  def runWithProfiling(code: Array[Op], regs: Option[ArrayBuffer[Value]] = None, startPc: Int = 0): Value =
-    execProfiling(code, regs.getOrElse(initialRegs()), 0, startPc)
+  def runWithProfiling(code: Array[Op], regsInput: Option[ArrayBuffer[Value]] = None, startPc: Int = 0): Value =
+    regsInput.foreach(r => regs = r)
+    execProfiling(code, regs, 0, startPc)
 
   private def initialRegs(): ArrayBuffer[Value] =
-    val regs = new ArrayBuffer[Value](32)
-    for _ <- 0 until 32 do regs += Value.Unit
-    regs
+    val r = new ArrayBuffer[Value](32)
+    for _ <- 0 until 32 do r += Value.Unit
+    r
 
   /** 実行ごとに型情報をプロファイリングデータに記録する */
   private def recordProfile(pc: Int, op: Op, regs: ArrayBuffer[Value]): Unit =
@@ -53,20 +56,20 @@ class ProfilingVM(
     case Value.InlVal(_) | Value.InrVal(_) => 3 // Sum
     case Value.Atom(_) => 0 // Other
 
-  private def execProfiling(code: Array[Op], regs: ArrayBuffer[Value], depth: Int, startPc: Int = 0): Value =
+  private def execProfiling(code: Array[Op], initialRegsForExec: ArrayBuffer[Value], depth: Int, startPc: Int = 0): Value =
     if depth > maxDepth then throw VMError("スタックオーバーフロー")
     
     var pc = startPc
     var retVal: Value = Value.Unit
 
-    def getReg(idx: Int): Value = regs(idx)
-    def setReg(idx: Int, v: Value): Unit = regs(idx) = v
-    def consumeReg(idx: Int): Value = { val v = regs(idx); regs(idx) = Value.Unit; v }
+    def getReg(idx: Int): Value = initialRegsForExec(idx)
+    def setReg(idx: Int, v: Value): Unit = initialRegsForExec(idx) = v
+    def consumeReg(idx: Int): Value = { val v = initialRegsForExec(idx); initialRegsForExec(idx) = Value.Unit; v }
 
     while pc < code.length do
       val op = code(pc)
       // リスタート直後はプロファイルをとらない（既にJITが走った証拠）
-      if (pc > startPc) recordProfile(pc, op, regs)
+      if (pc > startPc) recordProfile(pc, op, initialRegsForExec)
       
       op match
         case Op.Move(dst, src) =>

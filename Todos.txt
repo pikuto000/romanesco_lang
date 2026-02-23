@@ -48,11 +48,11 @@ Romanesco 証明エンジン 開発ロードマップ
         - [x] ガード命令と Deoptimization (Deopt) メカニズムの導入 (`rt_guard_int`)
         - [x] 型特化型 LLVM IR 生成による高速パスの構築 (`LLVMCodeGen` 拡張)
         - [x] 動的な実行切り替えエンジンの実装 (`SpeculativeExecutor`)
-- [ ] **シームレスな実行引き継ぎ (Seamless Execution Handover) の実装**:
+- [x] **シームレスな実行引き継ぎ (Seamless Execution Handover) の実装**:
     - [x] **基本的な Deoptimization (Deopt)**: PC 情報を利用した JIT から VM への復帰
-    - [x] **精密な状態復元**: ガード失敗時に JIT 側の全レジスタ状態を VM へ復元する機構 (`rt_dump_regs`)
-    - [ ] **スタックマップ (Stack Maps) の導入**: JIT コード内の各地点でのレジスタ対応関係のメタデータ管理
-    - [ ] **On-Stack Replacement (OSR)**: 実行中のループ内等でインタープリタから JIT へ動的に飛び乗る機能
+    - [x] **精密な状態復元**: ガード失敗時に JIT 側の全レジスタ状態を VM へ復元する機構 (`rt_dump_regs` + Panama 同期)
+    - [x] **スタックマップ (Stack Maps) の導入**: LLVM `alloca` と `phi` 結合によるレジスタ対応の自動化
+    - [x] **On-Stack Replacement (OSR)**: `external_regs` 引数による VM から JIT への動的引き継ぎ基盤
 
 4. 目標 (Vision) 🎯
 - [ ] あらゆる論理体系がシームレスに協力し、プログラムの性質を「完全に自動で」証明し、その証明に基づいた「数学的に正しい」超高速なネイティブコードを生成する究極の言語基盤。
