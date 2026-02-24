@@ -23,7 +23,7 @@ pub const Repl = struct {
     pub fn init(arena: Allocator) Repl {
         return .{
             .arena = arena,
-            .history = std.ArrayList(ProofState).init(arena),
+            .history = .{},
             .state = null,
             .plugins = &plugin_mod.all_plugins,
         };
@@ -94,7 +94,7 @@ pub const Repl = struct {
         const s = self.state orelse return;
 
         // 履歴に保存
-        try self.history.append(s);
+        try self.history.append(self.arena, s);
 
         const result = if (std.mem.eql(u8, input, "intro"))
             tactics_mod.intro(s, null, self.arena)

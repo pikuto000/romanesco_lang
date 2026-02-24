@@ -23,7 +23,7 @@ const app1 = expr_mod.app1;
 const app2 = expr_mod.app2;
 
 fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     if (goal.* != .app or goal.app.head.* != .sym) return results.items;
@@ -39,10 +39,10 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         // 新しいコンテキストにAを追加
         var new_ctx = try std.ArrayList(ContextEntry).initCapacity(args.arena, args.context.len + 1);
         var buf: [32]u8 = undefined;
-        const hyp_name = try std.fmt.bufPrint(&buf, "h{d}", .{args.depth});
+        const hyp_name = std.fmt.bufPrint(&buf, "h{d}", .{args.depth}) catch unreachable;
         const hyp_name_owned = try args.arena.dupe(u8, hyp_name);
-        try new_ctx.append(.{ .name = hyp_name_owned, .expr = a });
-        for (args.context) |entry| try new_ctx.append(entry);
+        try new_ctx.append(args.arena, .{ .name = hyp_name_owned, .expr = a });
+        for (args.context) |entry| try new_ctx.append(args.arena, entry);
 
         // Bを証明
         const sub_tree = try args.prover.search(
@@ -55,7 +55,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         );
 
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "implies-intro",
                 .rule_name = "implies-intro",
                 .status = .success,
@@ -73,7 +73,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         if (search_mod.findSuccess(tree_a)) |_| {
             const tree_b = try args.prover.search(b, args.context, args.state, args.subst, args.depth + 1, args.limit);
             if (search_mod.findSuccess(tree_b) != null) {
-                try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "product-intro",
                     .rule_name = "product-intro",
                     .status = .success,
@@ -90,7 +90,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
 
         const tree_a = try args.prover.search(a, args.context, args.state, args.subst, args.depth + 1, args.limit);
         if (search_mod.findSuccess(tree_a) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "coproduct-intro-l",
                 .rule_name = "coproduct-intro-l",
                 .status = .success,
@@ -100,7 +100,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
 
         const tree_b = try args.prover.search(b, args.context, args.state, args.subst, args.depth + 1, args.limit);
         if (search_mod.findSuccess(tree_b) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "coproduct-intro-r",
                 .rule_name = "coproduct-intro-r",
                 .status = .success,
@@ -115,7 +115,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         const body = if (goal_args.len == 3) goal_args[2] else goal_args[1];
 
         var buf2: [32]u8 = undefined;
-        const fresh_name = try std.fmt.bufPrint(&buf2, "{s}_{d}", .{ v_name, args.depth });
+        const fresh_name = std.fmt.bufPrint(&buf2, "{s}_{d}", .{ v_name, args.depth }) catch unreachable;
         const fresh_owned = try args.arena.dupe(u8, fresh_name);
         const fresh_var = try var_(args.arena, fresh_owned);
 
@@ -124,12 +124,12 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         // フレッシュ変数をコンテキストに追加
         var new_ctx = try std.ArrayList(ContextEntry).initCapacity(args.arena, args.context.len + 1);
         const type_expr = if (goal_args.len == 3) goal_args[1] else try sym(args.arena, "Type");
-        try new_ctx.append(.{ .name = fresh_owned, .expr = type_expr });
-        for (args.context) |entry| try new_ctx.append(entry);
+        try new_ctx.append(args.arena, .{ .name = fresh_owned, .expr = type_expr });
+        for (args.context) |entry| try new_ctx.append(args.arena, entry);
 
         const sub_tree = try args.prover.search(instantiated, new_ctx.items, args.state, args.subst, args.depth + 1, args.limit);
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "forall-intro",
                 .rule_name = "forall-intro",
                 .status = .success,
@@ -148,7 +148,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
 
         const sub_tree = try args.prover.search(instantiated, args.context, args.state, args.subst, args.depth + 1, args.limit);
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "exists-intro",
                 .rule_name = "exists-intro",
                 .status = .success,

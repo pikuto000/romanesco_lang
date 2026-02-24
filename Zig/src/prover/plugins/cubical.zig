@@ -18,7 +18,7 @@ const HookError = search_mod.HookError;
 const sym = expr_mod.sym;
 
 fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     if (goal.* != .app or goal.app.head.* != .sym) return results.items;
@@ -38,7 +38,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         const comp_goal = try expr_mod.app(args.arena, comp_sym, &[_]*const Expr{ a, p, base_val });
         const sub_tree = args.prover.search(comp_goal, args.context, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "fill-to-comp",
                 .rule_name = "fill-to-comp",
                 .status = .success,

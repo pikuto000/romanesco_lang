@@ -201,12 +201,12 @@ pub const Parser = struct {
                 // 関数適用: f(a, b, ...)
                 if (self.current == .lparen) {
                     self.advance();
-                    var args = std.ArrayList(*const Expr).init(self.arena);
+                    var args: std.ArrayList(*const Expr) = .{};
                     if (self.current != .rparen) {
-                        try args.append(try self.parseExpr());
+                        try args.append(self.arena, try self.parseExpr());
                         while (self.current == .comma) {
                             self.advance();
-                            try args.append(try self.parseExpr());
+                            try args.append(self.arena, try self.parseExpr());
                         }
                     }
                     if (self.current != .rparen) return ParseError.UnexpectedToken;
@@ -230,12 +230,12 @@ pub const Parser = struct {
                 // シンボルが後に引数を取る場合
                 if (self.current == .lparen) {
                     self.advance();
-                    var args = std.ArrayList(*const Expr).init(self.arena);
+                    var args: std.ArrayList(*const Expr) = .{};
                     if (self.current != .rparen) {
-                        try args.append(try self.parseExpr());
+                        try args.append(self.arena, try self.parseExpr());
                         while (self.current == .comma) {
                             self.advance();
-                            try args.append(try self.parseExpr());
+                            try args.append(self.arena, try self.parseExpr());
                         }
                     }
                     if (self.current != .rparen) return ParseError.UnexpectedToken;

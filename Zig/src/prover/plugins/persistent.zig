@@ -20,7 +20,7 @@ const HookError = search_mod.HookError;
 const sym = expr_mod.sym;
 
 fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     for (args.context) |entry| {
@@ -37,7 +37,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             if (unify_result.first()) |s| {
                 const sub_tree = args.prover.search(a, args.context, args.state, s, args.depth + 1, args.limit) catch continue;
                 if (search_mod.findSuccess(sub_tree) != null) {
-                    try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                    try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                         .goal = "backchain",
                         .rule_name = "backchain",
                         .status = .success,
@@ -51,19 +51,19 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         if ((std.mem.eql(u8, hn, syms.And) or std.mem.eql(u8, hn, syms.Product)) and h_args.len == 2) {
             const a = h_args[0];
             const b = h_args[1];
-            var new_ctx = std.ArrayList(ContextEntry).init(args.arena);
+            var new_ctx: std.ArrayList(ContextEntry) = .{};
             var buf1: [32]u8 = undefined;
             var buf2: [32]u8 = undefined;
-            const n1 = try std.fmt.bufPrint(&buf1, "{s}_l", .{entry.name});
-            const n2 = try std.fmt.bufPrint(&buf2, "{s}_r", .{entry.name});
-            try new_ctx.append(.{ .name = try args.arena.dupe(u8, n1), .expr = a });
-            try new_ctx.append(.{ .name = try args.arena.dupe(u8, n2), .expr = b });
+            const n1 = std.fmt.bufPrint(&buf1, "{s}_l", .{entry.name}) catch unreachable;
+            const n2 = std.fmt.bufPrint(&buf2, "{s}_r", .{entry.name}) catch unreachable;
+            try new_ctx.append(args.arena, .{ .name = try args.arena.dupe(u8, n1), .expr = a });
+            try new_ctx.append(args.arena, .{ .name = try args.arena.dupe(u8, n2), .expr = b });
             for (args.context) |e2| {
-                if (!std.mem.eql(u8, e2.name, entry.name)) try new_ctx.append(e2);
+                if (!std.mem.eql(u8, e2.name, entry.name)) try new_ctx.append(args.arena, e2);
             }
             const sub_tree = args.prover.search(goal, new_ctx.items, args.state, args.subst, args.depth + 1, args.limit) catch continue;
             if (search_mod.findSuccess(sub_tree) != null) {
-                try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "and-elim",
                     .rule_name = "and-elim",
                     .status = .success,
@@ -78,27 +78,27 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             const b = h_args[1];
 
             // Aのケース
-            var ctx_a = std.ArrayList(ContextEntry).init(args.arena);
+            var ctx_a: std.ArrayList(ContextEntry) = .{};
             var buf3: [32]u8 = undefined;
-            const n3 = try std.fmt.bufPrint(&buf3, "{s}_case_l", .{entry.name});
-            try ctx_a.append(.{ .name = try args.arena.dupe(u8, n3), .expr = a });
+            const n3 = std.fmt.bufPrint(&buf3, "{s}_case_l", .{entry.name}) catch unreachable;
+            try ctx_a.append(args.arena, .{ .name = try args.arena.dupe(u8, n3), .expr = a });
             for (args.context) |e2| {
-                if (!std.mem.eql(u8, e2.name, entry.name)) try ctx_a.append(e2);
+                if (!std.mem.eql(u8, e2.name, entry.name)) try ctx_a.append(args.arena, e2);
             }
             const tree_a = args.prover.search(goal, ctx_a.items, args.state, args.subst, args.depth + 1, args.limit) catch continue;
 
             if (search_mod.findSuccess(tree_a) != null) {
                 // Bのケース
-                var ctx_b = std.ArrayList(ContextEntry).init(args.arena);
+                var ctx_b: std.ArrayList(ContextEntry) = .{};
                 var buf4: [32]u8 = undefined;
-                const n4 = try std.fmt.bufPrint(&buf4, "{s}_case_r", .{entry.name});
-                try ctx_b.append(.{ .name = try args.arena.dupe(u8, n4), .expr = b });
+                const n4 = std.fmt.bufPrint(&buf4, "{s}_case_r", .{entry.name}) catch unreachable;
+                try ctx_b.append(args.arena, .{ .name = try args.arena.dupe(u8, n4), .expr = b });
                 for (args.context) |e2| {
-                    if (!std.mem.eql(u8, e2.name, entry.name)) try ctx_b.append(e2);
+                    if (!std.mem.eql(u8, e2.name, entry.name)) try ctx_b.append(args.arena, e2);
                 }
                 const tree_b = args.prover.search(goal, ctx_b.items, args.state, args.subst, args.depth + 1, args.limit) catch continue;
                 if (search_mod.findSuccess(tree_b) != null) {
-                    try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                    try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                         .goal = "or-elim",
                         .rule_name = "or-elim",
                         .status = .success,
@@ -117,7 +117,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
 
             const unify_result = unifier_mod.unify(instantiated, goal, args.subst, args.arena) catch continue;
             if (unify_result.first() != null) {
-                try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "forall-elim",
                     .rule_name = "forall-elim",
                     .status = .success,

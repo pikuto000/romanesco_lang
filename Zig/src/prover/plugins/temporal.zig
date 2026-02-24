@@ -20,7 +20,7 @@ const app1 = expr_mod.app1;
 const app2 = expr_mod.app2;
 
 fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     if (goal.* != .app or goal.app.head.* != .sym) return results.items;
@@ -33,7 +33,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         // まずAを証明
         const tree_a = args.prover.search(a, args.context, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(tree_a) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "globally-unfold",
                 .rule_name = "globally-unfold",
                 .status = .success,
@@ -48,7 +48,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         // Aを直接証明試行
         const tree_a = args.prover.search(a, args.context, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(tree_a) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "finally-now",
                 .rule_name = "finally-now",
                 .status = .success,
@@ -62,7 +62,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         const a = goal_args[0];
         const sub_tree = args.prover.search(a, args.context, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "next-step",
                 .rule_name = "next-step",
                 .status = .success,
@@ -77,7 +77,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         // まずBを直接証明
         const tree_b = args.prover.search(b, args.context, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(tree_b) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "until-base",
                 .rule_name = "until-base",
                 .status = .success,

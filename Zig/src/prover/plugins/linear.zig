@@ -22,7 +22,7 @@ const sym = expr_mod.sym;
 const app2 = expr_mod.app2;
 
 fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     if (goal.* != .app or goal.app.head.* != .sym) return results.items;
@@ -33,11 +33,11 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     if (std.mem.eql(u8, hn, syms.LImplies) and goal_args.len == 2) {
         const a = goal_args[0];
         const b = goal_args[1];
-        var new_linear = std.ArrayList(ContextEntry).init(args.arena);
-        for (args.state.linear_context) |e| try new_linear.append(e);
+        var new_linear: std.ArrayList(ContextEntry) = .{};
+        for (args.state.linear_context) |e| try new_linear.append(args.arena, e);
         var buf: [32]u8 = undefined;
-        const n = try std.fmt.bufPrint(&buf, "lh{d}", .{args.depth});
-        try new_linear.append(.{ .name = try args.arena.dupe(u8, n), .expr = a });
+        const n = std.fmt.bufPrint(&buf, "lh{d}", .{args.depth}) catch unreachable;
+        try new_linear.append(args.arena, .{ .name = try args.arena.dupe(u8, n), .expr = a });
 
         const new_state = LogicState{
             .linear_context = new_linear.items,
@@ -47,7 +47,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         };
         const sub_tree = args.prover.search(b, args.context, new_state, args.subst, args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "lollipop-intro",
                 .rule_name = "lollipop-intro",
                 .status = .success,
@@ -68,7 +68,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             const empty_state = LogicState{};
             const tree_b = args.prover.search(b, args.context, empty_state, args.subst, args.depth + 1, args.limit) catch return results.items;
             if (search_mod.findSuccess(tree_b) != null) {
-                try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "tensor-intro",
                     .rule_name = "tensor-intro",
                     .status = .success,
@@ -83,7 +83,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         const a = goal_args[0];
         const sub_tree = args.prover.search(a, args.context, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "bang-intro",
                 .rule_name = "bang-intro",
                 .status = .success,
@@ -96,7 +96,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
 }
 
 fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     // 線形コンテキストからの⊸除去
@@ -112,9 +112,9 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             const unify_result = unifier_mod.unify(b, goal, args.subst, args.arena) catch continue;
             if (unify_result.first()) |s| {
                 // この⊸を消費して、Aを証明
-                var new_linear = std.ArrayList(ContextEntry).init(args.arena);
+                var new_linear: std.ArrayList(ContextEntry) = .{};
                 for (args.state.linear_context, 0..) |e, j| {
-                    if (j != idx) try new_linear.append(e);
+                    if (j != idx) try new_linear.append(args.arena, e);
                 }
                 const new_state = LogicState{
                     .linear_context = new_linear.items,
@@ -122,7 +122,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
                 };
                 const sub_tree = args.prover.search(a, args.context, new_state, s, args.depth + 1, args.limit) catch continue;
                 if (search_mod.findSuccess(sub_tree) != null) {
-                    try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                    try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                         .goal = "lollipop-elim",
                         .rule_name = "lollipop-elim",
                         .status = .success,
@@ -137,23 +137,23 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             const a = entry.expr.app.args[0];
             const b = entry.expr.app.args[1];
 
-            var new_linear = std.ArrayList(ContextEntry).init(args.arena);
+            var new_linear: std.ArrayList(ContextEntry) = .{};
             for (args.state.linear_context, 0..) |e, j| {
-                if (j != idx) try new_linear.append(e);
+                if (j != idx) try new_linear.append(args.arena, e);
             }
             var buf1: [32]u8 = undefined;
             var buf2: [32]u8 = undefined;
-            const n1 = try std.fmt.bufPrint(&buf1, "{s}_l", .{entry.name});
-            const n2 = try std.fmt.bufPrint(&buf2, "{s}_r", .{entry.name});
-            try new_linear.append(.{ .name = try args.arena.dupe(u8, n1), .expr = a });
-            try new_linear.append(.{ .name = try args.arena.dupe(u8, n2), .expr = b });
+            const n1 = std.fmt.bufPrint(&buf1, "{s}_l", .{entry.name}) catch unreachable;
+            const n2 = std.fmt.bufPrint(&buf2, "{s}_r", .{entry.name}) catch unreachable;
+            try new_linear.append(args.arena, .{ .name = try args.arena.dupe(u8, n1), .expr = a });
+            try new_linear.append(args.arena, .{ .name = try args.arena.dupe(u8, n2), .expr = b });
             const new_state = LogicState{
                 .linear_context = new_linear.items,
                 .meta_counter = args.state.meta_counter,
             };
             const sub_tree = args.prover.search(goal, args.context, new_state, args.subst, args.depth + 1, args.limit) catch continue;
             if (search_mod.findSuccess(sub_tree) != null) {
-                try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "tensor-elim",
                     .rule_name = "tensor-elim",
                     .status = .success,

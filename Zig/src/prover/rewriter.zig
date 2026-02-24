@@ -19,11 +19,11 @@ const app1 = expr_mod.app1;
 const app2 = expr_mod.app2;
 
 /// 正規化: 不動点まで反復簡約
-pub fn normalize(e: *const Expr, rules: []const CatRule, arena: Allocator) !*const Expr {
+pub fn normalize(e: *const Expr, rules: []const CatRule, arena: Allocator) error{OutOfMemory}!*const Expr {
     return normalizeN(e, rules, 100, arena);
 }
 
-pub fn normalizeN(e: *const Expr, rules: []const CatRule, max_iter: u32, arena: Allocator) !*const Expr {
+pub fn normalizeN(e: *const Expr, rules: []const CatRule, max_iter: u32, arena: Allocator) error{OutOfMemory}!*const Expr {
     var current = e;
     var iter: u32 = 0;
     while (iter < max_iter) : (iter += 1) {
@@ -36,7 +36,7 @@ pub fn normalizeN(e: *const Expr, rules: []const CatRule, max_iter: u32, arena: 
 }
 
 /// 1ステップの簡約
-fn step(e: *const Expr, rules: []const CatRule, arena: Allocator) !*const Expr {
+fn step(e: *const Expr, rules: []const CatRule, arena: Allocator) error{OutOfMemory}!*const Expr {
     return switch (e.*) {
         .app => |a| {
             const new_head = try step(a.head, rules, arena);
@@ -54,7 +54,7 @@ fn step(e: *const Expr, rules: []const CatRule, arena: Allocator) !*const Expr {
 
 /// AC (Associative-Commutative) 正規化
 /// ⊗,∧,∨,*等の可換・結合的演算子を正規化
-fn acNormalize(e: *const Expr, arena: Allocator) !*const Expr {
+fn acNormalize(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr {
     if (e.* != .app) return e;
     const a = e.app;
     if (a.head.* != .sym) {
@@ -90,7 +90,7 @@ fn acNormalize(e: *const Expr, arena: Allocator) !*const Expr {
     }
 
     // フラット化: 同じ演算子の入れ子を展開
-    var flattened = std.ArrayList(*const Expr).init(arena);
+    var flattened: std.ArrayList(*const Expr) = .{};
     for (a.args) |arg| {
         try collectAC(arg, op, &flattened, arena);
     }
@@ -106,10 +106,10 @@ fn acNormalize(e: *const Expr, arena: Allocator) !*const Expr {
             }
         }
         // ⊤を除去
-        var filtered = std.ArrayList(*const Expr).init(arena);
+        var filtered: std.ArrayList(*const Expr) = .{};
         for (flattened.items) |item| {
             if (!(item.* == .sym and (std.mem.eql(u8, item.sym, syms.True) or std.mem.eql(u8, item.sym, "⊤")))) {
-                try filtered.append(item);
+                try filtered.append(arena, item);
             }
         }
         flattened = filtered;
@@ -119,10 +119,10 @@ fn acNormalize(e: *const Expr, arena: Allocator) !*const Expr {
                 return sym(arena, syms.True);
             }
         }
-        var filtered = std.ArrayList(*const Expr).init(arena);
+        var filtered: std.ArrayList(*const Expr) = .{};
         for (flattened.items) |item| {
             if (!(item.* == .sym and (std.mem.eql(u8, item.sym, syms.False) or std.mem.eql(u8, item.sym, "⊥")))) {
-                try filtered.append(item);
+                try filtered.append(arena, item);
             }
         }
         flattened = filtered;
@@ -147,17 +147,17 @@ fn acNormalize(e: *const Expr, arena: Allocator) !*const Expr {
 }
 
 /// AC演算子のフラット化
-fn collectAC(e: *const Expr, op: []const u8, list: *std.ArrayList(*const Expr), arena: Allocator) !void {
+fn collectAC(e: *const Expr, op: []const u8, list: *std.ArrayList(*const Expr), arena: Allocator) error{OutOfMemory}!void {
     if (e.* == .app and e.app.head.* == .sym and std.mem.eql(u8, e.app.head.sym, op) and e.app.args.len == 2) {
         try collectAC(e.app.args[0], op, list, arena);
         try collectAC(e.app.args[1], op, list, arena);
     } else {
-        try list.append(try acNormalize(e, arena));
+        try list.append(arena, try acNormalize(e, arena));
     }
 }
 
 /// 規則適用 (ユーザ定義 + 組込み)
-fn rewriteRule(e: *const Expr, rules: []const CatRule, arena: Allocator) !*const Expr {
+fn rewriteRule(e: *const Expr, rules: []const CatRule, arena: Allocator) error{OutOfMemory}!*const Expr {
     // 優先度の高い等値チェック
     if (e.* == .app and e.app.args.len == 2) {
         const head = e.app.head;
@@ -192,7 +192,7 @@ fn rewriteRule(e: *const Expr, rules: []const CatRule, arena: Allocator) !*const
 }
 
 /// 組込み簡約規則
-fn builtinRules(e: *const Expr, arena: Allocator) !*const Expr {
+fn builtinRules(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr {
     if (e.* != .app) return e;
     const a = e.app;
     if (a.head.* != .sym) {

@@ -196,8 +196,7 @@ test "parser + prover: parse and prove ⊤" {
     const arena = arena_state.allocator();
 
     const goal = try parser_mod.parse("⊤", arena);
-    try std.testing.expect(goal != null);
-    try expectProved(goal.?, 3, &plugin_mod.all_plugins, .{}, arena);
+    try expectProved(goal, 3, &plugin_mod.all_plugins, .{}, arena);
 }
 
 test "parser + prover: parse and prove a = a" {
@@ -206,8 +205,7 @@ test "parser + prover: parse and prove a = a" {
     const arena = arena_state.allocator();
 
     const goal = try parser_mod.parse("a = a", arena);
-    try std.testing.expect(goal != null);
-    try expectProved(goal.?, 3, &plugin_mod.all_plugins, .{}, arena);
+    try expectProved(goal, 3, &plugin_mod.all_plugins, .{}, arena);
 }
 
 // ==========================================

@@ -39,14 +39,14 @@ pub fn intro(state: ProofState, name: ?[]const u8, arena: Allocator) TacticResul
             const n = std.fmt.bufPrint(&buf, "h{d}", .{goal.context.len}) catch return .{ .err = "intro: name gen failed" };
             break :blk arena.dupe(u8, n) catch return .{ .err = "OOM" };
         };
-        var new_ctx = std.ArrayList(ContextEntry).init(arena);
-        new_ctx.append(.{ .name = hyp_name, .expr = args[0] }) catch return .{ .err = "OOM" };
-        for (goal.context) |e| new_ctx.append(e) catch return .{ .err = "OOM" };
+        var new_ctx: std.ArrayList(ContextEntry) = .{};
+        new_ctx.append(arena, .{ .name = hyp_name, .expr = args[0] }) catch return .{ .err = "OOM" };
+        for (goal.context) |e| new_ctx.append(arena, e) catch return .{ .err = "OOM" };
 
         const new_goal = Goal{ .context = new_ctx.items, .linear_context = goal.linear_context, .target = args[1] };
-        var new_goals = std.ArrayList(Goal).init(arena);
-        new_goals.append(new_goal) catch return .{ .err = "OOM" };
-        for (state.goals[1..]) |g| new_goals.append(g) catch return .{ .err = "OOM" };
+        var new_goals: std.ArrayList(Goal) = .{};
+        new_goals.append(arena, new_goal) catch return .{ .err = "OOM" };
+        for (state.goals[1..]) |g| new_goals.append(arena, g) catch return .{ .err = "OOM" };
         return .{ .ok = .{
             .goals = new_goals.items,
             .completed_proofs = state.completed_proofs,
@@ -62,14 +62,14 @@ pub fn intro(state: ProofState, name: ?[]const u8, arena: Allocator) TacticResul
             const n = std.fmt.bufPrint(&buf, "lin{d}", .{goal.linear_context.len}) catch return .{ .err = "intro: name gen failed" };
             break :blk arena.dupe(u8, n) catch return .{ .err = "OOM" };
         };
-        var new_lin = std.ArrayList(ContextEntry).init(arena);
-        new_lin.append(.{ .name = hyp_name, .expr = args[0] }) catch return .{ .err = "OOM" };
-        for (goal.linear_context) |e| new_lin.append(e) catch return .{ .err = "OOM" };
+        var new_lin: std.ArrayList(ContextEntry) = .{};
+        new_lin.append(arena, .{ .name = hyp_name, .expr = args[0] }) catch return .{ .err = "OOM" };
+        for (goal.linear_context) |e| new_lin.append(arena, e) catch return .{ .err = "OOM" };
 
         const new_goal = Goal{ .context = goal.context, .linear_context = new_lin.items, .target = args[1] };
-        var new_goals = std.ArrayList(Goal).init(arena);
-        new_goals.append(new_goal) catch return .{ .err = "OOM" };
-        for (state.goals[1..]) |g| new_goals.append(g) catch return .{ .err = "OOM" };
+        var new_goals: std.ArrayList(Goal) = .{};
+        new_goals.append(arena, new_goal) catch return .{ .err = "OOM" };
+        for (state.goals[1..]) |g| new_goals.append(arena, g) catch return .{ .err = "OOM" };
         return .{ .ok = .{
             .goals = new_goals.items,
             .completed_proofs = state.completed_proofs,
@@ -90,9 +90,9 @@ pub fn intro(state: ProofState, name: ?[]const u8, arena: Allocator) TacticResul
         const fresh_var = expr_mod.var_(arena, hyp_name) catch return .{ .err = "OOM" };
         const instantiated = unifier_mod.substVar(body, v_name, fresh_var, arena) catch return .{ .err = "OOM" };
         const new_goal = Goal{ .context = goal.context, .linear_context = goal.linear_context, .target = instantiated };
-        var new_goals = std.ArrayList(Goal).init(arena);
-        new_goals.append(new_goal) catch return .{ .err = "OOM" };
-        for (state.goals[1..]) |g| new_goals.append(g) catch return .{ .err = "OOM" };
+        var new_goals: std.ArrayList(Goal) = .{};
+        new_goals.append(arena, new_goal) catch return .{ .err = "OOM" };
+        for (state.goals[1..]) |g| new_goals.append(arena, g) catch return .{ .err = "OOM" };
         return .{ .ok = .{
             .goals = new_goals.items,
             .completed_proofs = state.completed_proofs,
@@ -116,10 +116,10 @@ pub fn split(state: ProofState, arena: Allocator) TacticResult {
     if ((std.mem.eql(u8, hn, syms.And) or std.mem.eql(u8, hn, syms.Product)) and args.len == 2) {
         const g1 = Goal{ .context = goal.context, .linear_context = goal.linear_context, .target = args[0] };
         const g2 = Goal{ .context = goal.context, .linear_context = goal.linear_context, .target = args[1] };
-        var new_goals = std.ArrayList(Goal).init(arena);
-        new_goals.append(g1) catch return .{ .err = "OOM" };
-        new_goals.append(g2) catch return .{ .err = "OOM" };
-        for (state.goals[1..]) |g| new_goals.append(g) catch return .{ .err = "OOM" };
+        var new_goals: std.ArrayList(Goal) = .{};
+        new_goals.append(arena, g1) catch return .{ .err = "OOM" };
+        new_goals.append(arena, g2) catch return .{ .err = "OOM" };
+        for (state.goals[1..]) |g| new_goals.append(arena, g) catch return .{ .err = "OOM" };
         return .{ .ok = .{
             .goals = new_goals.items,
             .completed_proofs = state.completed_proofs,
@@ -145,11 +145,11 @@ pub fn auto(state: ProofState, plugins: []const search_mod.Plugin, arena: Alloca
 
     return switch (result) {
         .success => |s| {
-            var new_proofs = std.ArrayList(ProofTree).init(arena);
-            for (state.completed_proofs) |p| new_proofs.append(p) catch return .{ .err = "OOM" };
-            new_proofs.append(s.tree) catch return .{ .err = "OOM" };
-            var new_goals = std.ArrayList(Goal).init(arena);
-            for (state.goals[1..]) |g| new_goals.append(g) catch return .{ .err = "OOM" };
+            var new_proofs: std.ArrayList(ProofTree) = .{};
+            for (state.completed_proofs) |p| new_proofs.append(arena, p) catch return .{ .err = "OOM" };
+            new_proofs.append(arena, s.tree) catch return .{ .err = "OOM" };
+            var new_goals: std.ArrayList(Goal) = .{};
+            for (state.goals[1..]) |g| new_goals.append(arena, g) catch return .{ .err = "OOM" };
             return .{ .ok = .{
                 .goals = new_goals.items,
                 .completed_proofs = new_proofs.items,
@@ -167,8 +167,8 @@ pub fn assumption(state: ProofState, arena: Allocator) TacticResult {
 
     for (goal.context) |entry| {
         if (entry.expr.eql(goal.target)) {
-            var new_goals = std.ArrayList(Goal).init(arena);
-            for (state.goals[1..]) |g| new_goals.append(g) catch return .{ .err = "OOM" };
+            var new_goals: std.ArrayList(Goal) = .{};
+            for (state.goals[1..]) |g| new_goals.append(arena, g) catch return .{ .err = "OOM" };
             return .{ .ok = .{
                 .goals = new_goals.items,
                 .completed_proofs = state.completed_proofs,
@@ -192,8 +192,8 @@ pub fn reflexivity(state: ProofState, arena: Allocator) TacticResult {
             const l_idx: usize = if (std.mem.eql(u8, hn, syms.Path) and target.app.args.len == 3) 1 else 0;
             const r_idx: usize = if (std.mem.eql(u8, hn, syms.Path) and target.app.args.len == 3) 2 else 1;
             if (target.app.args.len > r_idx and target.app.args[l_idx].eql(target.app.args[r_idx])) {
-                var new_goals = std.ArrayList(Goal).init(arena);
-                for (state.goals[1..]) |g| new_goals.append(g) catch return .{ .err = "OOM" };
+                var new_goals: std.ArrayList(Goal) = .{};
+                for (state.goals[1..]) |g| new_goals.append(arena, g) catch return .{ .err = "OOM" };
                 return .{ .ok = .{
                     .goals = new_goals.items,
                     .completed_proofs = state.completed_proofs,

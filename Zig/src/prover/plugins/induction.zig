@@ -22,7 +22,7 @@ const var_ = expr_mod.var_;
 const app1 = expr_mod.app1;
 
 fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     // 帰納法の深さ制限
@@ -46,23 +46,23 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         for (algebra.constructors) |ctor| {
             // コンストラクタの引数を生成
             const ctor_sym = try sym(args.arena, ctor.symbol);
-            var ctor_args = std.ArrayList(*const Expr).init(args.arena);
-            var new_ctx = std.ArrayList(ContextEntry).init(args.arena);
-            for (args.context) |entry| try new_ctx.append(entry);
+            var ctor_args: std.ArrayList(*const Expr) = .{};
+            var new_ctx: std.ArrayList(ContextEntry) = .{};
+            for (args.context) |entry| try new_ctx.append(args.arena, entry);
 
             for (ctor.arg_types, 0..) |arg_type, i| {
                 var buf: [32]u8 = undefined;
-                const arg_name = try std.fmt.bufPrint(&buf, "{s}{d}", .{ algebra.var_prefix, i });
+                const arg_name = std.fmt.bufPrint(&buf, "{s}{d}", .{ algebra.var_prefix, i }) catch unreachable;
                 const arg_name_owned = try args.arena.dupe(u8, arg_name);
                 const arg_var = try var_(args.arena, arg_name_owned);
-                try ctor_args.append(arg_var);
+                try ctor_args.append(args.arena, arg_var);
 
                 if (arg_type == .recursive) {
                     // 帰納法の仮定を追加
                     const ih = try unifier_mod.substVar(body, v_name, arg_var, args.arena);
                     var buf2: [32]u8 = undefined;
-                    const ih_name = try std.fmt.bufPrint(&buf2, "ih_{s}{d}", .{ algebra.var_prefix, i });
-                    try new_ctx.append(.{ .name = try args.arena.dupe(u8, ih_name), .expr = ih });
+                    const ih_name = std.fmt.bufPrint(&buf2, "ih_{s}{d}", .{ algebra.var_prefix, i }) catch unreachable;
+                    try new_ctx.append(args.arena, .{ .name = try args.arena.dupe(u8, ih_name), .expr = ih });
                 }
             }
 
@@ -93,7 +93,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         }
 
         if (all_cases_ok) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "induction",
                 .rule_name = "induction",
                 .status = .success,

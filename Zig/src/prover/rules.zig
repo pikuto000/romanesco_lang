@@ -44,56 +44,56 @@ pub const RuleBuilder = struct {
 
     /// 全標準ルールを構築して返す
     pub fn buildAll(self: RuleBuilder) ![]const CatRule {
-        var rules = std.ArrayList(CatRule).init(self.arena);
+        var rules: std.ArrayList(CatRule) = .{};
 
         // 圏論基本
-        try rules.append(.{ .name = "id-left", .lhs = try self.a2(try self.s("∘"), try self.s("id"), try self.v("f")), .rhs = try self.v("f") });
-        try rules.append(.{ .name = "id-right", .lhs = try self.a2(try self.s("∘"), try self.v("f"), try self.s("id")), .rhs = try self.v("f") });
+        try rules.append(self.arena, .{ .name = "id-left", .lhs = try self.a2(try self.s("∘"), try self.s("id"), try self.v("f")), .rhs = try self.v("f") });
+        try rules.append(self.arena, .{ .name = "id-right", .lhs = try self.a2(try self.s("∘"), try self.v("f"), try self.s("id")), .rhs = try self.v("f") });
 
         // 積
-        try rules.append(.{ .name = "fst-β", .lhs = try self.a1(try self.s("pi1"), try self.a2(try self.s("pair"), try self.v("a"), try self.v("b"))), .rhs = try self.v("a") });
-        try rules.append(.{ .name = "snd-β", .lhs = try self.a1(try self.s("pi2"), try self.a2(try self.s("pair"), try self.v("a"), try self.v("b"))), .rhs = try self.v("b") });
-        try rules.append(.{ .name = "product-η", .lhs = try self.a2(try self.s("pair"), try self.a1(try self.s("pi1"), try self.v("p")), try self.a1(try self.s("pi2"), try self.v("p"))), .rhs = try self.v("p") });
+        try rules.append(self.arena, .{ .name = "fst-β", .lhs = try self.a1(try self.s("pi1"), try self.a2(try self.s("pair"), try self.v("a"), try self.v("b"))), .rhs = try self.v("a") });
+        try rules.append(self.arena, .{ .name = "snd-β", .lhs = try self.a1(try self.s("pi2"), try self.a2(try self.s("pair"), try self.v("a"), try self.v("b"))), .rhs = try self.v("b") });
+        try rules.append(self.arena, .{ .name = "product-η", .lhs = try self.a2(try self.s("pair"), try self.a1(try self.s("pi1"), try self.v("p")), try self.a1(try self.s("pi2"), try self.v("p"))), .rhs = try self.v("p") });
 
         // 余積
-        try rules.append(.{ .name = "case-inl-β", .lhs = try self.a3(try self.s("case"), try self.a1(try self.s("inl"), try self.v("x")), try self.v("f"), try self.v("g")), .rhs = try self.a1(try self.v("f"), try self.v("x")) });
-        try rules.append(.{ .name = "case-inr-β", .lhs = try self.a3(try self.s("case"), try self.a1(try self.s("inr"), try self.v("y")), try self.v("f"), try self.v("g")), .rhs = try self.a1(try self.v("g"), try self.v("y")) });
+        try rules.append(self.arena, .{ .name = "case-inl-β", .lhs = try self.a3(try self.s("case"), try self.a1(try self.s("inl"), try self.v("x")), try self.v("f"), try self.v("g")), .rhs = try self.a1(try self.v("f"), try self.v("x")) });
+        try rules.append(self.arena, .{ .name = "case-inr-β", .lhs = try self.a3(try self.s("case"), try self.a1(try self.s("inr"), try self.v("y")), try self.v("f"), try self.v("g")), .rhs = try self.a1(try self.v("g"), try self.v("y")) });
 
         // 等式
-        try rules.append(.{ .name = "eq-refl", .lhs = try self.a1(try self.s("refl"), try self.v("a")), .rhs = try self.a2(try self.s("="), try self.v("a"), try self.v("a")) });
+        try rules.append(self.arena, .{ .name = "eq-refl", .lhs = try self.a1(try self.s("refl"), try self.v("a")), .rhs = try self.a2(try self.s("="), try self.v("a"), try self.v("a")) });
 
         // 論理射 (Logic-Category correspondence)
-        try rules.append(.{ .name = "and-is-×", .lhs = try self.a2(try self.s("∧"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("×"), try self.v("A"), try self.v("B")) });
-        try rules.append(.{ .name = "or-is-+", .lhs = try self.a2(try self.s("∨"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("+"), try self.v("A"), try self.v("B")) });
-        try rules.append(.{ .name = "→-is-^", .lhs = try self.a2(try self.s("→"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("^"), try self.v("B"), try self.v("A")) });
-        try rules.append(.{ .name = "⊤-is-1", .lhs = try self.s("⊤"), .rhs = try self.s("1") });
-        try rules.append(.{ .name = "⊥-is-0", .lhs = try self.s("⊥"), .rhs = try self.s("0") });
+        try rules.append(self.arena, .{ .name = "and-is-×", .lhs = try self.a2(try self.s("∧"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("×"), try self.v("A"), try self.v("B")) });
+        try rules.append(self.arena, .{ .name = "or-is-+", .lhs = try self.a2(try self.s("∨"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("+"), try self.v("A"), try self.v("B")) });
+        try rules.append(self.arena, .{ .name = "→-is-^", .lhs = try self.a2(try self.s("→"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("^"), try self.v("B"), try self.v("A")) });
+        try rules.append(self.arena, .{ .name = "⊤-is-1", .lhs = try self.s("⊤"), .rhs = try self.s("1") });
+        try rules.append(self.arena, .{ .name = "⊥-is-0", .lhs = try self.s("⊥"), .rhs = try self.s("0") });
 
         // 線形論理
-        try rules.append(.{ .name = "tensor-is-×", .lhs = try self.a2(try self.s("⊗"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("×"), try self.v("A"), try self.v("B")) });
-        try rules.append(.{ .name = "⊸-is-^", .lhs = try self.a2(try self.s("⊸"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("^"), try self.v("B"), try self.v("A")) });
-        try rules.append(.{ .name = "linear-bang-elim", .lhs = try self.a1(try self.s("!"), try self.v("A")), .rhs = try self.v("A") });
+        try rules.append(self.arena, .{ .name = "tensor-is-×", .lhs = try self.a2(try self.s("⊗"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("×"), try self.v("A"), try self.v("B")) });
+        try rules.append(self.arena, .{ .name = "⊸-is-^", .lhs = try self.a2(try self.s("⊸"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("^"), try self.v("B"), try self.v("A")) });
+        try rules.append(self.arena, .{ .name = "linear-bang-elim", .lhs = try self.a1(try self.s("!"), try self.v("A")), .rhs = try self.v("A") });
 
         // モーダル
-        try rules.append(.{ .name = "modal-T", .lhs = try self.a1(try self.s("□"), try self.v("A")), .rhs = try self.v("A") });
+        try rules.append(self.arena, .{ .name = "modal-T", .lhs = try self.a1(try self.s("□"), try self.v("A")), .rhs = try self.v("A") });
 
         // 時相
-        try rules.append(.{ .name = "F-expansion", .lhs = try self.a1(try self.s("F"), try self.v("A")), .rhs = try self.a2(try self.s("∨"), try self.v("A"), try self.a1(try self.s("X"), try self.a1(try self.s("F"), try self.v("A")))) });
+        try rules.append(self.arena, .{ .name = "F-expansion", .lhs = try self.a1(try self.s("F"), try self.v("A")), .rhs = try self.a2(try self.s("∨"), try self.v("A"), try self.a1(try self.s("X"), try self.a1(try self.s("F"), try self.v("A")))) });
 
         // HoTT
-        try rules.append(.{ .name = "path-refl", .lhs = try self.a1(try self.s("refl"), try self.v("a")), .rhs = try self.a3(try self.s("path"), try self.v("A"), try self.v("a"), try self.v("a")) });
+        try rules.append(self.arena, .{ .name = "path-refl", .lhs = try self.a1(try self.s("refl"), try self.v("a")), .rhs = try self.a3(try self.s("path"), try self.v("A"), try self.v("a"), try self.v("a")) });
 
         // Nat演算
-        try rules.append(.{ .name = "plus_0", .lhs = try self.a2(try self.s("plus"), try self.s("0"), try self.v("n")), .rhs = try self.v("n") });
-        try rules.append(.{ .name = "plus_S", .lhs = try self.a2(try self.s("plus"), try self.a1(try self.s("S"), try self.v("n")), try self.v("m")), .rhs = try self.a1(try self.s("S"), try self.a2(try self.s("plus"), try self.v("n"), try self.v("m"))) });
-        try rules.append(.{ .name = "plus_n_0", .lhs = try self.a2(try self.s("plus"), try self.v("n"), try self.s("0")), .rhs = try self.v("n") });
+        try rules.append(self.arena, .{ .name = "plus_0", .lhs = try self.a2(try self.s("plus"), try self.s("0"), try self.v("n")), .rhs = try self.v("n") });
+        try rules.append(self.arena, .{ .name = "plus_S", .lhs = try self.a2(try self.s("plus"), try self.a1(try self.s("S"), try self.v("n")), try self.v("m")), .rhs = try self.a1(try self.s("S"), try self.a2(try self.s("plus"), try self.v("n"), try self.v("m"))) });
+        try rules.append(self.arena, .{ .name = "plus_n_0", .lhs = try self.a2(try self.s("plus"), try self.v("n"), try self.s("0")), .rhs = try self.v("n") });
 
         // List演算
-        try rules.append(.{ .name = "append_nil", .lhs = try self.a2(try self.s("append"), try self.s("nil"), try self.v("ys")), .rhs = try self.v("ys") });
-        try rules.append(.{ .name = "append_cons", .lhs = try self.a2(try self.s("append"), try self.a2(try self.s("cons"), try self.v("x"), try self.v("xs")), try self.v("ys")), .rhs = try self.a2(try self.s("cons"), try self.v("x"), try self.a2(try self.s("append"), try self.v("xs"), try self.v("ys"))) });
+        try rules.append(self.arena, .{ .name = "append_nil", .lhs = try self.a2(try self.s("append"), try self.s("nil"), try self.v("ys")), .rhs = try self.v("ys") });
+        try rules.append(self.arena, .{ .name = "append_cons", .lhs = try self.a2(try self.s("append"), try self.a2(try self.s("cons"), try self.v("x"), try self.v("xs")), try self.v("ys")), .rhs = try self.a2(try self.s("cons"), try self.v("x"), try self.a2(try self.s("append"), try self.v("xs"), try self.v("ys"))) });
 
         // 分離論理
-        try rules.append(.{ .name = "sep-and-comm", .lhs = try self.a2(try self.s("*"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("*"), try self.v("B"), try self.v("A")) });
+        try rules.append(self.arena, .{ .name = "sep-and-comm", .lhs = try self.a2(try self.s("*"), try self.v("A"), try self.v("B")), .rhs = try self.a2(try self.s("*"), try self.v("B"), try self.v("A")) });
 
         return rules.items;
     }

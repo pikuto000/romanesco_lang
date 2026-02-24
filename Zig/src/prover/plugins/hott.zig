@@ -20,7 +20,7 @@ const app1 = expr_mod.app1;
 const app2 = expr_mod.app2;
 
 fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     if (goal.* != .app or goal.app.head.* != .sym) return results.items;
@@ -39,7 +39,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             const x = goal_args[2];
             const sub_tree = args.prover.search(x, args.context, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
             if (search_mod.findSuccess(sub_tree) != null) {
-                try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "transport-refl",
                     .rule_name = "transport-refl",
                     .status = .success,
@@ -64,7 +64,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
                     if (unify1.first()) |s1| {
                         const unify2 = unifier_mod.unify(entry.expr.app.args[2], b_term, s1, args.arena) catch continue;
                         if (unify2.first() != null) {
-                            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                                 .goal = "path-induction",
                                 .rule_name = "path-induction",
                                 .status = .success,
@@ -85,7 +85,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             if (std.mem.eql(u8, type_name, "Nat") or std.mem.eql(u8, type_name, "Bool") or
                 std.mem.eql(u8, type_name, "Unit") or std.mem.eql(u8, type_name, syms.True))
             {
-                try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "isSet-basic",
                     .rule_name = "isSet-basic",
                     .status = .success,

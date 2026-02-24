@@ -18,7 +18,7 @@ const HookArgs = search_mod.HookArgs;
 const HookError = search_mod.HookError;
 
 fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     if (goal.* != .app or goal.app.head.* != .sym) return results.items;
@@ -29,18 +29,18 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     if (std.mem.eql(u8, hn, syms.Box) and goal_args.len == 1) {
         const a = goal_args[0];
         // □仮定のみのコンテキストを構築
-        var modal_ctx = std.ArrayList(ContextEntry).init(args.arena);
+        var modal_ctx: std.ArrayList(ContextEntry) = .{};
         for (args.context) |entry| {
             if (entry.expr.* == .app and entry.expr.app.head.* == .sym and
                 std.mem.eql(u8, entry.expr.app.head.sym, syms.Box))
             {
-                try modal_ctx.append(entry);
+                try modal_ctx.append(args.arena, entry);
             }
         }
 
         const sub_tree = args.prover.search(a, modal_ctx.items, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "box-intro",
                 .rule_name = "box-intro",
                 .status = .success,
@@ -54,7 +54,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         const a = goal_args[0];
         const sub_tree = args.prover.search(a, args.context, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "diamond-intro",
                 .rule_name = "diamond-intro",
                 .status = .success,
@@ -67,7 +67,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
 }
 
 fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
 
     // □除去: □Aがコンテキストにある場合、Aを追加
     for (args.context) |entry| {
@@ -75,15 +75,15 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             std.mem.eql(u8, entry.expr.app.head.sym, syms.Box) and entry.expr.app.args.len == 1)
         {
             const a = entry.expr.app.args[0];
-            var new_ctx = std.ArrayList(ContextEntry).init(args.arena);
+            var new_ctx: std.ArrayList(ContextEntry) = .{};
             var buf: [32]u8 = undefined;
-            const n = try std.fmt.bufPrint(&buf, "{s}_unbox", .{entry.name});
-            try new_ctx.append(.{ .name = try args.arena.dupe(u8, n), .expr = a });
-            for (args.context) |e2| try new_ctx.append(e2);
+            const n = std.fmt.bufPrint(&buf, "{s}_unbox", .{entry.name}) catch unreachable;
+            try new_ctx.append(args.arena, .{ .name = try args.arena.dupe(u8, n), .expr = a });
+            for (args.context) |e2| try new_ctx.append(args.arena, e2);
 
             const sub_tree = args.prover.search(args.goal, new_ctx.items, args.state, args.subst, args.depth + 1, args.limit) catch continue;
             if (search_mod.findSuccess(sub_tree) != null) {
-                try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "box-elim",
                     .rule_name = "box-elim",
                     .status = .success,

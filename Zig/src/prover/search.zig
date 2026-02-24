@@ -44,7 +44,7 @@ pub const Plugin = struct {
     normalize_hook: ?*const fn (e: *const Expr, arena: Allocator) ?*const Expr = null,
 };
 
-pub const HookError = error{OutOfMemory};
+pub const HookError = error{OutOfMemory, Timeout};
 
 /// フック関数の引数
 pub const HookArgs = struct {
@@ -131,7 +131,7 @@ pub const ProverEngine = struct {
             // 成功ノードを探す
             if (findSuccess(search_tree)) |node| {
                 return .{ .success = .{
-                    .tree = node.tree,
+                    .tree = .{ .leaf = .{ .goal = goal_expr, .rule_name = node.rule_name } },
                     .search_tree = search_tree,
                 } };
             }
@@ -170,7 +170,7 @@ pub const ProverEngine = struct {
         }
 
         // プラグインからブランチを収集
-        var branches = std.ArrayList(Tree(SearchNode)).init(self.arena);
+        var branches: std.ArrayList(Tree(SearchNode)) = .{};
 
         for (self.plugins) |plugin| {
             self.checkDeadline() catch break;
@@ -188,7 +188,7 @@ pub const ProverEngine = struct {
                 };
                 const results = try hook(hook_args);
                 for (results) |r| {
-                    try branches.append(r);
+                    try branches.append(self.arena, r);
                 }
             }
 
@@ -205,7 +205,7 @@ pub const ProverEngine = struct {
                 };
                 const results = try hook(hook_args);
                 for (results) |r| {
-                    try branches.append(r);
+                    try branches.append(self.arena, r);
                 }
             }
         }
@@ -249,7 +249,7 @@ pub const ProverEngine = struct {
         goal: *const Expr,
         subst: Subst,
     ) ![]const RuleApplication {
-        var results = std.ArrayList(RuleApplication).init(self.arena);
+        var results: std.ArrayList(RuleApplication) = .{};
         const head = goal.headSymbol();
 
         for (self.config.rules) |rule| {
@@ -260,7 +260,7 @@ pub const ProverEngine = struct {
             const unify_result = try unifier_mod.unify(goal, inst_rule.rhs, subst, self.arena);
             if (unify_result.first()) |s| {
                 const lhs = try self.normalize(try unifier_mod.applySubst(inst_rule.lhs, &s, self.arena));
-                try results.append(.{
+                try results.append(self.arena, .{
                     .new_goal = lhs,
                     .rule_name = rule.name,
                     .subst = s,
@@ -276,7 +276,7 @@ pub const ProverEngine = struct {
                 const unify_result = try unifier_mod.unify(goal, inst_rule.rhs, subst, self.arena);
                 if (unify_result.first()) |s| {
                     const lhs = try self.normalize(try unifier_mod.applySubst(inst_rule.lhs, &s, self.arena));
-                    try results.append(.{
+                    try results.append(self.arena, .{
                         .new_goal = lhs,
                         .rule_name = rule.name,
                         .subst = s,
@@ -294,7 +294,7 @@ pub const ProverEngine = struct {
         e: *const Expr,
         subst: Subst,
     ) ![]const ForwardResult {
-        var results = std.ArrayList(ForwardResult).init(self.arena);
+        var results: std.ArrayList(ForwardResult) = .{};
         const head = e.headSymbol();
 
         for (self.config.rules) |rule| {
@@ -303,7 +303,7 @@ pub const ProverEngine = struct {
             const unify_result = try unifier_mod.unify(e, inst_rule.lhs, subst, self.arena);
             if (unify_result.first()) |s| {
                 const rhs = try self.normalize(try unifier_mod.applySubst(inst_rule.rhs, &s, self.arena));
-                try results.append(.{
+                try results.append(self.arena, .{
                     .result = rhs,
                     .rule_name = rule.name,
                     .subst = s,

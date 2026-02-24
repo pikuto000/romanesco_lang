@@ -16,7 +16,7 @@ const HookArgs = search_mod.HookArgs;
 const HookError = search_mod.HookError;
 
 fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     // ゴールが等式 a = b の場合、両辺を正規化して比較
@@ -27,7 +27,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         const r_norm = rewriter_mod.normalize(r, args.prover.config.rules, args.arena) catch return results.items;
 
         if (l_norm.eql(r_norm)) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "rewrite-normalize",
                 .rule_name = "rewrite-normalize",
                 .status = .success,
@@ -49,7 +49,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         if (!rewritten.eql(goal)) {
             const sub_tree = args.prover.search(rewritten, args.context, args.state, args.subst, args.depth + 1, args.limit) catch continue;
             if (search_mod.findSuccess(sub_tree) != null) {
-                try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "rewrite",
                     .rule_name = "rewrite",
                     .status = .success,

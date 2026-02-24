@@ -18,10 +18,10 @@ const HookArgs = search_mod.HookArgs;
 const HookError = search_mod.HookError;
 
 fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
 
     // Modus Ponens: A → B と A がコンテキストにあればBを追加
-    var new_facts = std.ArrayList(ContextEntry).init(args.arena);
+    var new_facts: std.ArrayList(ContextEntry) = .{};
 
     for (args.context) |entry| {
         if (entry.expr.* != .app or entry.expr.app.head.* != .sym) continue;
@@ -37,8 +37,8 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
                 if (unify_result.first()) |s| {
                     const derived = unifier_mod.applySubst(b, &s, args.arena) catch continue;
                     var buf: [32]u8 = undefined;
-                    const n = try std.fmt.bufPrint(&buf, "mp_{s}", .{entry.name});
-                    try new_facts.append(.{ .name = try args.arena.dupe(u8, n), .expr = derived });
+                    const n = std.fmt.bufPrint(&buf, "mp_{s}", .{entry.name}) catch unreachable;
+                    try new_facts.append(args.arena, .{ .name = try args.arena.dupe(u8, n), .expr = derived });
                 }
             }
         }
@@ -46,13 +46,13 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
 
     if (new_facts.items.len > 0) {
         // 導出された事実をコンテキストに追加して再探索
-        var new_ctx = std.ArrayList(ContextEntry).init(args.arena);
-        for (new_facts.items) |fact| try new_ctx.append(fact);
-        for (args.context) |entry| try new_ctx.append(entry);
+        var new_ctx: std.ArrayList(ContextEntry) = .{};
+        for (new_facts.items) |fact| try new_ctx.append(args.arena, fact);
+        for (args.context) |entry| try new_ctx.append(args.arena, entry);
 
         const sub_tree = args.prover.search(args.goal, new_ctx.items, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "forward-reasoning",
                 .rule_name = "forward-reasoning",
                 .status = .success,
@@ -65,13 +65,13 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     for (args.context) |entry| {
         const forward_results = args.prover.forwardApplyRules(entry.expr, args.subst) catch continue;
         for (forward_results) |fr| {
-            var new_ctx2 = std.ArrayList(ContextEntry).init(args.arena);
-            try new_ctx2.append(.{ .name = fr.rule_name, .expr = fr.result });
-            for (args.context) |e2| try new_ctx2.append(e2);
+            var new_ctx2: std.ArrayList(ContextEntry) = .{};
+            try new_ctx2.append(args.arena, .{ .name = fr.rule_name, .expr = fr.result });
+            for (args.context) |e2| try new_ctx2.append(args.arena, e2);
 
             const sub_tree2 = args.prover.search(args.goal, new_ctx2.items, args.state, fr.subst, args.depth + 1, args.limit) catch continue;
             if (search_mod.findSuccess(sub_tree2) != null) {
-                try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "forward-rule",
                     .rule_name = "forward-rule",
                     .status = .success,

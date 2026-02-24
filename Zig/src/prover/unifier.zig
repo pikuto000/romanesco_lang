@@ -282,7 +282,7 @@ fn solveHigherOrderOrMeta(meta_app: *const Expr, target: *const Expr, subst: Sub
     const vars = try arena.alloc([]const u8, args.len);
     for (0..args.len) |i| {
         var buf: [16]u8 = undefined;
-        const name = try std.fmt.bufPrint(&buf, "bv{d}", .{i});
+        const name = std.fmt.bufPrint(&buf, "bv{d}", .{i}) catch unreachable;
         vars[i] = try arena.dupe(u8, name);
     }
 

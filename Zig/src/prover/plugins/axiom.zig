@@ -20,7 +20,7 @@ const HookError = search_mod.HookError;
 const sym = expr_mod.sym;
 
 fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
     const goal = args.goal;
 
     // 正規化
@@ -30,7 +30,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
 
     // ⊤の導入
     if (goal_norm.* == .sym and (std.mem.eql(u8, goal_norm.sym, syms.True) or std.mem.eql(u8, goal_norm.sym, "⊤"))) {
-        try results.append(try Tree(SearchNode).leaf(args.arena, .{
+        try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
             .goal = "⊤",
             .rule_name = "true-intro",
             .status = .success,
@@ -41,7 +41,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     // 爆発律 (⊥がコンテキストにある場合)
     for (args.context) |entry| {
         if (entry.expr.* == .sym and (std.mem.eql(u8, entry.expr.sym, syms.False) or std.mem.eql(u8, entry.expr.sym, "⊥"))) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "explosion",
                 .rule_name = "explosion",
                 .status = .success,
@@ -53,7 +53,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     // 線形コンテキストも確認
     for (args.state.linear_context) |entry| {
         if (entry.expr.* == .sym and (std.mem.eql(u8, entry.expr.sym, syms.False) or std.mem.eql(u8, entry.expr.sym, "⊥"))) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "explosion",
                 .rule_name = "explosion",
                 .status = .success,
@@ -78,7 +78,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
                 const r_norm = args.prover.normalize(r) catch r;
                 const unify_result = unifier_mod.unify(l_norm, r_norm, args.subst, args.arena) catch return results.items;
                 if (unify_result.first() != null) {
-                    try results.append(try Tree(SearchNode).leaf(args.arena, .{
+                    try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                         .goal = "reflexivity",
                         .rule_name = "reflexivity",
                         .status = .success,
@@ -96,7 +96,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         ) catch continue;
         const unify_result = unifier_mod.unify(h_norm, goal_norm, args.subst, args.arena) catch continue;
         if (unify_result.first() != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = entry.name,
                 .rule_name = entry.name,
                 .status = .success,
@@ -111,7 +111,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         ) catch continue;
         const unify_result = unifier_mod.unify(h_norm, goal_norm, args.subst, args.arena) catch continue;
         if (unify_result.first() != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = entry.name,
                 .rule_name = entry.name,
                 .status = .success,

@@ -13,7 +13,7 @@ const HookArgs = search_mod.HookArgs;
 const HookError = search_mod.HookError;
 
 fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
-    var results = std.ArrayList(Tree(SearchNode)).init(args.arena);
+    var results: std.ArrayList(Tree(SearchNode)) = .{};
 
     // ルール適用 (バックワード推論)
     const applications = args.prover.applyRules(args.goal, args.subst) catch return results.items;
@@ -29,7 +29,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         ) catch continue;
 
         if (search_mod.findSuccess(sub_tree) != null) {
-            try results.append(try Tree(SearchNode).leaf(args.arena, .{
+            try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = ra.rule_name,
                 .rule_name = ra.rule_name,
                 .status = .success,
