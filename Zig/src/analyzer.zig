@@ -9,12 +9,14 @@ pub const RangeAnalysisResult = struct {
     bit_widths: std.AutoHashMap(u32, u8),
     escapes: std.AutoHashMap(u32, void),
     stable_values: std.AutoHashMap(u32, u64),
+    inlining_hints: std.AutoHashMap(usize, usize), // pc -> block_idx
     allocator: Allocator,
 
     pub fn deinit(self: *RangeAnalysisResult) void {
         self.bit_widths.deinit();
         self.escapes.deinit();
         self.stable_values.deinit();
+        self.inlining_hints.deinit();
     }
 
     pub fn bitWidth(self: RangeAnalysisResult, reg: u32) u8 {
@@ -38,16 +40,29 @@ pub const RangeAnalyzer = struct {
         return @as(u8, @intCast(64 - @clz(val)));
     }
 
-    pub fn analyze(self: *RangeAnalyzer, code: []const Op, profile: ?*ProfileData) !RangeAnalysisResult {
+    pub fn analyze(self: *RangeAnalyzer, code: []const Op, profile: ?*ProfileData, current_block_idx: usize) !RangeAnalysisResult {
         var widths = std.AutoHashMap(u32, u8).init(self.allocator);
         var escapes = std.AutoHashMap(u32, void).init(self.allocator);
         const stable_values = std.AutoHashMap(u32, u64).init(self.allocator);
+        var inlining_hints = std.AutoHashMap(usize, usize).init(self.allocator);
         var worklist = try std.ArrayList(u32).initCapacity(self.allocator, 0);
         defer worklist.deinit(self.allocator);
 
-        // Heuristic: If we have profile data, we could find constants.
-        // For now, let's assume we don't have detailed value profiling, but the framework is ready.
-        _ = profile;
+        // Populate inlining hints from profile
+        if (profile) |p| {
+            for (code, 0..) |op, pc| {
+                if (op == .call) {
+                    if (p.getDominantCallTarget(pc, 5)) |target| {
+                        try inlining_hints.put(pc, target);
+                        
+                        if (target == current_block_idx) {
+                            // RECURSION DETECTED: We could use this to trigger unrolling
+                            std.debug.print("  Recursion detected at PC {d} calling block {d}\n", .{pc, target});
+                        }
+                    }
+                }
+            }
+        }
 
         // Forward pass: Bit-width inference
         for (code) |op| {
@@ -84,13 +99,16 @@ pub const RangeAnalyzer = struct {
         }
 
         // Backward pass: Escape analysis
-        // Seed worklist with returning values and closures
         for (code) |op| {
             switch (op) {
                 .ret => |r| try worklist.append(self.allocator, r.src),
                 .make_closure => |mc| {
-                    try worklist.append(self.allocator, mc.dst); // Closure itself escapes
-                    for (mc.captures) |c| try worklist.append(self.allocator, c); // Captures escape
+                    try worklist.append(self.allocator, mc.dst);
+                    for (mc.captures) |c| try worklist.append(self.allocator, c);
+                },
+                .call => |c| {
+                    try worklist.append(self.allocator, c.func);
+                    for (c.args) |a| try worklist.append(self.allocator, a);
                 },
                 else => {},
             }
@@ -104,8 +122,6 @@ pub const RangeAnalyzer = struct {
                 try processed_escapes.put(reg, {});
                 try escapes.put(reg, {});
 
-                // Naive backward scan: Find definitions of 'reg'
-                // A better approach would be to build a Def-Use chain first.
                 for (code) |op| {
                     switch (op) {
                         .make_pair => |mp| {
@@ -120,8 +136,6 @@ pub const RangeAnalyzer = struct {
                         .borrow => |b| {
                              if (b.dst == reg) try worklist.append(self.allocator, b.src);
                         },
-                        // Projections don't propagate escape to the source pair structure itself in this model,
-                        // but the *content* might if we tracked types deeper.
                         else => {},
                     }
                 }
@@ -132,6 +146,7 @@ pub const RangeAnalyzer = struct {
             .bit_widths = widths,
             .escapes = escapes,
             .stable_values = stable_values,
+            .inlining_hints = inlining_hints,
             .allocator = self.allocator,
         };
     }

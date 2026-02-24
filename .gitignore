@@ -21,3 +21,11 @@ project/metals.sbt
 project/build.properties
 
 .claude
+
+Zig/.zig-cache
+
+.jit_tmp
+
+Zig/.jit_tmp
+
+Zig/zig-out

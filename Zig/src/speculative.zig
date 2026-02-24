@@ -23,6 +23,7 @@ pub const SpeculativeExecutor = struct {
     optimizer: optimizer_mod.Optimizer,
     analyzer: analyzer_mod.RangeAnalyzer,
     codegen: codegen_mod.CodeGen,
+    cpu_features: vm.CpuFeatures,
     
     // Config
     hot_threshold: usize = 5,
@@ -40,6 +41,7 @@ pub const SpeculativeExecutor = struct {
             .optimizer = optimizer_mod.Optimizer.init(allocator),
             .analyzer = analyzer_mod.RangeAnalyzer.init(allocator),
             .codegen = codegen_mod.CodeGen.init(allocator),
+            .cpu_features = vm.CpuFeatures.detect(),
             .artifacts = std.ArrayList(TieredArtifact).initCapacity(allocator, 0) catch unreachable,
         };
     }
@@ -110,7 +112,7 @@ pub const SpeculativeExecutor = struct {
                 self.allocator.free(optimized_code);
             }
             
-            var analysis = try self.analyzer.analyze(optimized_code, profile);
+            var analysis = try self.analyzer.analyze(optimized_code, profile, 0); // Assuming main block 0 for now
             defer analysis.deinit();
             
             // LEVEL 2+ SPECIALIZATION:
@@ -130,7 +132,7 @@ pub const SpeculativeExecutor = struct {
             var name_buf: [64]u8 = undefined;
             const entry_name = try std.fmt.bufPrint(&name_buf, "tier_{d}_{d}", .{ next_tier, timestamp });
             
-            const ir = try self.codegen.generate(program, analysis, entry_name);
+            const ir = try self.codegen.generate(program, analysis, entry_name, self.cpu_features);
             defer self.allocator.free(ir);
             
             var dll_name_buf: [128]u8 = undefined;

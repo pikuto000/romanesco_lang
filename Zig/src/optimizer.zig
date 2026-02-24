@@ -300,7 +300,7 @@ pub const Optimizer = struct {
         switch (op) {
             .make_closure => |o| {
                 const caps = try allocator.dupe(u32, o.captures);
-                return Op{ .make_closure = .{ .dst = o.dst, .body = o.body, .captures = caps, .arity = o.arity } };
+                return Op{ .make_closure = .{ .dst = o.dst, .body = o.body, .captures = caps, .arity = o.arity, .block_idx = o.block_idx } };
             },
             .call => |o| {
                 const args = try allocator.dupe(u32, o.args);

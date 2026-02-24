@@ -187,6 +187,7 @@ pub const BytecodeLoader = struct {
                             .body = blocks_mut[ro.u2],
                             .captures = caps,
                             .arity = ro.u3,
+                            .block_idx = ro.u2,
                         } };
                     },
                     0x04 => {

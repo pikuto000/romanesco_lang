@@ -75,6 +75,33 @@ pub const Value = union(ValueTag) {
     }
 };
 
+pub const CpuFeatures = struct {
+    has_avx2: bool,
+    has_neon: bool,
+    vector_width: u16, // bits (e.g., 256 for AVX2)
+
+    pub fn detect() CpuFeatures {
+        const target = @import("builtin").target;
+        var features = CpuFeatures{
+            .has_avx2 = false,
+            .has_neon = false,
+            .vector_width = 64,
+        };
+
+        if (target.cpu.arch.isX86()) {
+            if (std.Target.x86.featureSetHas(target.cpu.features, .avx2)) {
+                features.has_avx2 = true;
+                features.vector_width = 256;
+            }
+        } else if (target.cpu.arch.isARM() or target.cpu.arch.isAARCH64()) {
+            // Neon detection logic... simplified for now
+            features.has_neon = true;
+            features.vector_width = 128;
+        }
+        return features;
+    }
+};
+
 pub const Tier = u32;
 
 pub const LLVMValue = extern struct {
@@ -90,12 +117,13 @@ pub const Closure = struct {
     arity: usize,
     tier: Tier = 0,
     native_ptr: ?NativeEntry = null,
+    block_idx: usize = 0, // Reference to original block
 };
 
 pub const Op = union(enum) {
     move: struct { dst: u32, src: u32 },
     load_const: struct { dst: u32, val: Value },
-    make_closure: struct { dst: u32, body: []const Op, captures: []const u32, arity: usize },
+    make_closure: struct { dst: u32, body: []const Op, captures: []const u32, arity: usize, block_idx: usize },
     call: struct { dst: u32, func: u32, args: []const u32 },
     ret: struct { src: u32 },
     make_pair: struct { dst: u32, fst: u32, snd: u32 },
@@ -177,6 +205,7 @@ pub const VM = struct {
                         .body = mc.body,
                         .env = env,
                         .arity = mc.arity,
+                        .block_idx = mc.block_idx,
                     };
                     regs[mc.dst].deinit(self.allocator);
                     regs[mc.dst] = .{ .closure = closure };
@@ -262,9 +291,20 @@ pub const VM = struct {
                 },
                 .call => |c| {
                     const func_val = regs[c.func];
+                    // Record call target before consuming reg
+                    if (profile) |p| {
+                        switch (func_val) {
+                            .closure => |cl| try p.recordCall(pc, cl.block_idx),
+                            else => {},
+                        }
+                    }
                     regs[c.func] = .unit;
                     switch (func_val) {
                         .closure => |cl| {
+                            // Record call target for inlining
+                            if (profile) |p| {
+                                try p.recordCall(pc, cl.block_idx);
+                            }
                             // TIERED DISPATCH: Check if we should jump to Native code
                             if (cl.native_ptr) |native_func| {
                                 var native_regs: [32]LLVMValue = undefined;
@@ -416,7 +456,7 @@ test "VM closure" {
             .{ .ret = .{ .src = 0 } }, // In this VM, args start at 0 (after env)
         };
         const code = &[_]Op{
-            .{ .make_closure = .{ .dst = 0, .body = id_body, .captures = &[_]u32{}, .arity = 1 } },
+            .{ .make_closure = .{ .dst = 0, .body = id_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 0 } },
             .{ .load_const = .{ .dst = 1, .val = .{ .int = 42 } } },
             .{ .call = .{ .dst = 2, .func = 0, .args = &[_]u32{1} } },
             .{ .ret = .{ .src = 2 } },
@@ -482,12 +522,12 @@ test "VM nested closure" {
         .{ .ret = .{ .src = 0 } }, // Capture is at 0, arg y would be at 1
     };
     const outer_body = &[_]Op{
-        .{ .make_closure = .{ .dst = 1, .body = inner_body, .captures = &[_]u32{0}, .arity = 1 } },
+        .{ .make_closure = .{ .dst = 1, .body = inner_body, .captures = &[_]u32{0}, .arity = 1, .block_idx = 100 } },
         .{ .ret = .{ .src = 1 } },
     };
 
     const code = &[_]Op{
-        .{ .make_closure = .{ .dst = 0, .body = outer_body, .captures = &[_]u32{}, .arity = 1 } },
+        .{ .make_closure = .{ .dst = 0, .body = outer_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 101 } },
         .{ .load_const = .{ .dst = 1, .val = .{ .int = 100 } } },
         .{ .call = .{ .dst = 2, .func = 0, .args = &[_]u32{1} } }, // returns inner closure capturing 100
         .{ .load_const = .{ .dst = 3, .val = .unit } }, // unit arg
@@ -504,12 +544,15 @@ pub const ProfileData = struct {
     counts: std.AutoHashMap(usize, usize),
     // pc -> reg -> value frequency
     value_profiles: std.AutoHashMap(usize, std.AutoHashMap(u32, std.AutoHashMap(u64, usize))),
+    // pc -> block_idx -> frequency
+    call_profiles: std.AutoHashMap(usize, std.AutoHashMap(usize, usize)),
     allocator: Allocator,
 
     pub fn init(allocator: Allocator) ProfileData {
         return .{
             .counts = std.AutoHashMap(usize, usize).init(allocator),
             .value_profiles = std.AutoHashMap(usize, std.AutoHashMap(u32, std.AutoHashMap(u64, usize))).init(allocator),
+            .call_profiles = std.AutoHashMap(usize, std.AutoHashMap(usize, usize)).init(allocator),
             .allocator = allocator,
         };
     }
@@ -525,6 +568,12 @@ pub const ProfileData = struct {
             entry.value_ptr.deinit();
         }
         self.value_profiles.deinit();
+
+        var call_it = self.call_profiles.iterator();
+        while (call_it.next()) |entry| {
+            entry.value_ptr.deinit();
+        }
+        self.call_profiles.deinit();
     }
 
     pub fn record(self: *ProfileData, pc: usize) !void {
@@ -534,6 +583,28 @@ pub const ProfileData = struct {
         } else {
             entry.value_ptr.* = 1;
         }
+    }
+
+    pub fn recordCall(self: *ProfileData, pc: usize, block_idx: usize) !void {
+        var pc_entry = try self.call_profiles.getOrPut(pc);
+        if (!pc_entry.found_existing) {
+            pc_entry.value_ptr.* = std.AutoHashMap(usize, usize).init(self.allocator);
+        }
+        const freq_entry = try pc_entry.value_ptr.getOrPut(block_idx);
+        if (freq_entry.found_existing) {
+            freq_entry.value_ptr.* += 1;
+        } else {
+            freq_entry.value_ptr.* = 1;
+        }
+    }
+
+    pub fn getDominantCallTarget(self: ProfileData, pc: usize, threshold: usize) ?usize {
+        const pc_map = self.call_profiles.get(pc) orelse return null;
+        var it = pc_map.iterator();
+        while (it.next()) |entry| {
+            if (entry.value_ptr.* >= threshold) return entry.key_ptr.*;
+        }
+        return null;
     }
 
     pub fn recordValue(self: *ProfileData, pc: usize, reg: u32, val: Value) !void {
