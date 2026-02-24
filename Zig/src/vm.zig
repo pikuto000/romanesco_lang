@@ -366,6 +366,7 @@ pub const VM = struct {
                 .ret => |r| {
                     const val = regs[r.src];
                     regs[r.src] = .unit;
+                    ret_val.deinit(self.allocator); // 前の呼び出しで蓄積したクローンを解放
                     return ExecutionResult{ .val = val };
                 },
                 .case_op => |c| {

@@ -8,6 +8,7 @@ pub const optimizer = @import("optimizer.zig");
 pub const speculative = @import("speculative.zig");
 pub const aot = @import("aot.zig");
 pub const loader = @import("loader.zig");
+pub const tests = @import("tests.zig");
 
 pub fn bufferedPrint() !void {
     // Stdout is for the actual output of your application, for example if you
