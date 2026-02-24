@@ -228,15 +228,65 @@ fn builtinRules(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr
         if (args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, syms.Refl)) return args[0];
     }
 
-    // transport(_, refl(_), x) → x
+    // transport の完全実装
     if (std.mem.eql(u8, hn, syms.Transport) and args.len == 3) {
-        if (args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, syms.Refl)) {
-            return args[2];
+        const type_fam = args[0];
+        const path_arg = args[1];
+        const val = args[2];
+
+        // transport(_, refl(_), x) → x
+        if (path_arg.* == .app and path_arg.app.head.* == .sym and std.mem.eql(u8, path_arg.app.head.sym, syms.Refl)) {
+            return val;
         }
-        // transport(λz. body, p, v) where body doesn't depend on z → v
-        if (args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "λ") and args[0].app.args.len == 2 and args[0].app.args[0].* == .var_) {
-            if (!args[0].app.args[1].contains(args[0].app.args[0])) {
-                return args[2];
+
+        // transport(λz. body, p, v) → 各種簡約
+        if (type_fam.* == .app and type_fam.app.head.* == .sym and std.mem.eql(u8, type_fam.app.head.sym, "λ") and type_fam.app.args.len == 2 and type_fam.app.args[0].* == .var_) {
+            const z = type_fam.app.args[0];
+            const body = type_fam.app.args[1];
+
+            // 定数型: body に z が自由出現しない → v
+            if (!body.contains(z)) {
+                return val;
+            }
+
+            // 積型: λz. A(z) × B(z)
+            if (body.* == .app and body.app.head.* == .sym and
+                (std.mem.eql(u8, body.app.head.sym, syms.Product) or std.mem.eql(u8, body.app.head.sym, syms.And)) and
+                body.app.args.len == 2)
+            {
+                const a_fam = try arena.create(Expr);
+                a_fam.* = .{ .app = .{ .head = try sym(arena, "λ"), .args = try arena.dupe(*const Expr, &[_]*const Expr{ z, body.app.args[0] }) } };
+                const b_fam = try arena.create(Expr);
+                b_fam.* = .{ .app = .{ .head = try sym(arena, "λ"), .args = try arena.dupe(*const Expr, &[_]*const Expr{ z, body.app.args[1] }) } };
+                const pi1_sym = try sym(arena, syms.Proj1);
+                const pi2_sym = try sym(arena, syms.Proj2);
+                const transport_sym = try sym(arena, syms.Transport);
+                const pair_sym = try sym(arena, syms.Pair);
+                const t1 = try app(arena, transport_sym, &[_]*const Expr{ a_fam, path_arg, try app1(arena, pi1_sym, val) });
+                const t2 = try app(arena, transport_sym, &[_]*const Expr{ b_fam, path_arg, try app1(arena, pi2_sym, val) });
+                return app2(arena, pair_sym, t1, t2);
+            }
+
+            // 余積型 (coproduct / +): λz. A(z) + B(z)
+            if (body.* == .app and body.app.head.* == .sym and
+                (std.mem.eql(u8, body.app.head.sym, syms.Coproduct) or std.mem.eql(u8, body.app.head.sym, syms.Or)) and
+                body.app.args.len == 2)
+            {
+                // inl(x) → inl(transport(λz.A(z), p, x))
+                if (val.* == .app and val.app.head.* == .sym and std.mem.eql(u8, val.app.head.sym, syms.Inl) and val.app.args.len == 1) {
+                    const a_fam = try arena.create(Expr);
+                    a_fam.* = .{ .app = .{ .head = try sym(arena, "λ"), .args = try arena.dupe(*const Expr, &[_]*const Expr{ z, body.app.args[0] }) } };
+                    const transport_sym = try sym(arena, syms.Transport);
+                    const new_val = try app(arena, transport_sym, &[_]*const Expr{ a_fam, path_arg, val.app.args[0] });
+                    return app1(arena, try sym(arena, syms.Inl), new_val);
+                }
+                if (val.* == .app and val.app.head.* == .sym and std.mem.eql(u8, val.app.head.sym, syms.Inr) and val.app.args.len == 1) {
+                    const b_fam = try arena.create(Expr);
+                    b_fam.* = .{ .app = .{ .head = try sym(arena, "λ"), .args = try arena.dupe(*const Expr, &[_]*const Expr{ z, body.app.args[1] }) } };
+                    const transport_sym = try sym(arena, syms.Transport);
+                    const new_val = try app(arena, transport_sym, &[_]*const Expr{ b_fam, path_arg, val.app.args[0] });
+                    return app1(arena, try sym(arena, syms.Inr), new_val);
+                }
             }
         }
     }
@@ -340,6 +390,58 @@ fn builtinRules(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr
     }
     if (std.mem.eql(u8, hn, "tail") and args.len == 1 and args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "cons_stream") and args[0].app.args.len == 2) {
         return args[0].app.args[1];
+    }
+
+    // ==========================================
+    // List モナド/ファンクタ
+    // ==========================================
+    // fmap(f, nil) → nil
+    if (std.mem.eql(u8, hn, "fmap") and args.len == 2) {
+        if (isSym(args[1], "nil")) return sym(arena, "nil");
+        // fmap(f, cons(x, xs)) → cons(f(x), fmap(f, xs))
+        if (args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, "cons") and args[1].app.args.len == 2) {
+            const cons_sym = try sym(arena, "cons");
+            const fmap_sym = try sym(arena, "fmap");
+            const fx = try app1(arena, args[0], args[1].app.args[0]);
+            const fxs = try app2(arena, fmap_sym, args[0], args[1].app.args[1]);
+            return app2(arena, cons_sym, fx, fxs);
+        }
+    }
+
+    // bind(nil, f) → nil
+    if (std.mem.eql(u8, hn, "bind") and args.len == 2) {
+        if (isSym(args[0], "nil")) return sym(arena, "nil");
+        // bind(m, return) → m (モナド右単位律)
+        if (args[1].* == .sym and std.mem.eql(u8, args[1].sym, "return")) return args[0];
+        if (args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, "return") and args[1].app.args.len == 0) return args[0];
+    }
+
+    // Maybe モナド
+    // bind(just(x), f) → f(x)
+    if (std.mem.eql(u8, hn, "bind") and args.len == 2) {
+        if (args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "just") and args[0].app.args.len == 1) {
+            return app1(arena, args[1], args[0].app.args[0]);
+        }
+        // bind(nothing, f) → nothing
+        if (isSym(args[0], "nothing")) return sym(arena, "nothing");
+    }
+
+    // ==========================================
+    // ベクタ演算
+    // ==========================================
+    // vlength(vnil) → 0
+    if (std.mem.eql(u8, hn, "vlength") and args.len == 1 and isSym(args[0], "vnil")) {
+        return sym(arena, "0");
+    }
+    // vlength(vcons(_, v)) → S(vlength(v))
+    if (std.mem.eql(u8, hn, "vlength") and args.len == 1 and args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "vcons") and args[0].app.args.len == 2) {
+        const vlength_sym = try sym(arena, "vlength");
+        const succ_sym = try sym(arena, "S");
+        return app1(arena, succ_sym, try app1(arena, vlength_sym, args[0].app.args[1]));
+    }
+    // vhead(vcons(x, _)) → x
+    if (std.mem.eql(u8, hn, "vhead") and args.len == 1 and args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "vcons") and args[0].app.args.len == 2) {
+        return args[0].app.args[0];
     }
 
     return e;

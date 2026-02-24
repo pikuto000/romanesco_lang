@@ -134,7 +134,8 @@ test "axiom plugin true-intro" {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    var engine = search_mod.ProverEngine.init(expr_mod.ProverConfig{}, &.{}, arena);
+    var engine = search_mod.ProverEngine.init(expr_mod.ProverConfig{}, &.{}, arena, std.testing.allocator);
+    defer engine.deinit();
     const true_sym = try sym(arena, "⊤");
     const results = try goalHooks(.{
         .goal = true_sym,

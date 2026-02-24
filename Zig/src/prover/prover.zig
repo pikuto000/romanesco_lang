@@ -13,6 +13,7 @@ pub const rules = @import("rules.zig");
 pub const tactics = @import("tactics.zig");
 pub const parser = @import("parser.zig");
 pub const repl = @import("repl.zig");
+pub const lemma_manager = @import("lemma_manager.zig");
 
 // 主要型のre-export
 pub const Expr = expr.Expr;
@@ -50,6 +51,10 @@ pub const Plugin = search.Plugin;
 pub const all_plugins = plugin.all_plugins;
 pub const RuleBuilder = rules.RuleBuilder;
 
+// 補題管理のre-export
+pub const saveLemmas = lemma_manager.saveLemmas;
+pub const loadLemmas = lemma_manager.loadLemmas;
+
 test {
     _ = expr;
     _ = symbols;
@@ -61,5 +66,6 @@ test {
     _ = tactics;
     _ = parser;
     _ = repl;
+    _ = lemma_manager;
     _ = @import("integration_test.zig");
 }

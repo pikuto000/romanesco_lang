@@ -137,6 +137,40 @@ pub const Expr = union(enum) {
         return new_expr;
     }
 
+    /// Expr のハッシュ値 (発散検出・キャッシュキー用)
+    pub fn hash(self: *const Expr) u64 {
+        var h = std.hash.Wyhash.init(0x52_6f_6d_61); // 'Roma'
+        hashInto(self, &h);
+        return h.final();
+    }
+
+    fn hashInto(self: *const Expr, h: *std.hash.Wyhash) void {
+        switch (self.*) {
+            .sym => |n| {
+                h.update("s");
+                h.update(n);
+            },
+            .var_ => |n| {
+                h.update("v");
+                h.update(n);
+            },
+            .meta => |id| {
+                h.update("m");
+                h.update(std.mem.sliceAsBytes(id.ids));
+            },
+            .app => |a| {
+                h.update("a");
+                hashInto(a.head, h);
+                var len_bytes: [4]u8 = undefined;
+                std.mem.writeInt(u32, &len_bytes, @intCast(a.args.len), .little);
+                h.update(&len_bytes);
+                for (a.args) |arg| {
+                    hashInto(arg, h);
+                }
+            },
+        }
+    }
+
     /// フォーマット出力
     pub fn format(self: *const Expr, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
         switch (self.*) {

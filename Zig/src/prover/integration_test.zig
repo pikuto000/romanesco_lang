@@ -27,7 +27,8 @@ const app2 = expr_mod.app2;
 
 /// ヘルパー: 証明が成功することを検証
 fn expectProved(goal: *const Expr, max_depth: u32, plugins: []const Plugin, config: ProverConfig, arena: std.mem.Allocator) !void {
-    var engine = ProverEngine.init(config, plugins, arena);
+    var engine = ProverEngine.init(config, plugins, arena, std.testing.allocator);
+    defer engine.deinit();
     const result = engine.prove(goal, max_depth, 5000) catch |err| {
         std.debug.print("Prove error: {}\n", .{err});
         return error.TestUnexpectedResult;
@@ -40,7 +41,8 @@ fn expectProved(goal: *const Expr, max_depth: u32, plugins: []const Plugin, conf
 
 /// ヘルパー: 証明が失敗することを検証
 fn expectNotProved(goal: *const Expr, max_depth: u32, plugins: []const Plugin, config: ProverConfig, arena: std.mem.Allocator) !void {
-    var engine = ProverEngine.init(config, plugins, arena);
+    var engine = ProverEngine.init(config, plugins, arena, std.testing.allocator);
+    defer engine.deinit();
     const result = engine.prove(goal, max_depth, 5000) catch return; // timeout = not proved
     if (result == .success) {
         return error.TestUnexpectedResult;

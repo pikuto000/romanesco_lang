@@ -56,26 +56,115 @@ pub const HookArgs = struct {
     limit: u32,
     arena: Allocator,
     prover: *ProverEngine,
+    /// 余帰納法ガード: trueのとき循環検出で成功を返す
+    guarded: bool = false,
 };
+
+// ==========================================
+// キャッシュ・発散検出用型定義
+// ==========================================
+
+/// 失敗キャッシュのキー: (goal_hash XOR ctx_hash, guarded)
+const FailureCacheKey = struct {
+    state_hash: u64,
+    guarded: bool,
+};
+
+const FailureCacheKeyContext = struct {
+    pub fn hash(_: FailureCacheKeyContext, k: FailureCacheKey) u64 {
+        var h = std.hash.Wyhash.init(0);
+        h.update(std.mem.asBytes(&k.state_hash));
+        h.update(std.mem.asBytes(&k.guarded));
+        return h.final();
+    }
+    pub fn eql(_: FailureCacheKeyContext, a: FailureCacheKey, b: FailureCacheKey) bool {
+        return a.state_hash == b.state_hash and a.guarded == b.guarded;
+    }
+};
+
+/// ゴール+コンテキストのハッシュを計算
+fn computeStateHash(goal: *const Expr, context: []const ContextEntry) u64 {
+    var goal_hash = goal.hash();
+    // コンテキストをXOR（順序独立）
+    for (context) |entry| {
+        goal_hash ^= entry.expr.hash();
+    }
+    return goal_hash;
+}
+
+/// e1がe2に埋め込まれているかチェック（発散検出用）
+/// Scala: Utils/Misc.scala isEmbedding()
+fn isEmbedding(e1: *const Expr, e2: *const Expr) bool {
+    if (e1.eql(e2)) return true;
+    // coupling: 同じAppの場合、各要素が埋め込まれている
+    if (e1.* == .app and e2.* == .app) {
+        const a1 = e1.app;
+        const a2 = e2.app;
+        if (a1.head.eql(a2.head) and a1.args.len == a2.args.len) {
+            var all_embedded = true;
+            for (a1.args, a2.args) |arg1, arg2| {
+                if (!isEmbedding(arg1, arg2)) {
+                    all_embedded = false;
+                    break;
+                }
+            }
+            if (all_embedded) return true;
+        }
+    }
+    // diving: e2がAppの場合、その関数または引数にe1が埋め込まれている
+    if (e2.* == .app) {
+        const a2 = e2.app;
+        if (isEmbedding(e1, a2.head)) return true;
+        for (a2.args) |arg| {
+            if (isEmbedding(e1, arg)) return true;
+        }
+    }
+    return false;
+}
 
 /// 証明探索エンジン
 pub const ProverEngine = struct {
     config: ProverConfig,
     plugins: []const Plugin,
     arena: Allocator,
+    gpa: Allocator,  // キャッシュ管理用（長期）
     meta_counter: i32 = 0,
     deadline_ms: i64 = 0,
 
-    // キャッシュ
-    // NOTE: Zigではアリーナ単位なのでprove()呼び出し毎にリセットされる
+    // グローバルキャッシュ（prove()呼び出し間で永続）
+    failure_cache: std.HashMap(FailureCacheKey, u32, FailureCacheKeyContext, std.hash_map.default_max_load_percentage),
+    lemma_cache: std.AutoHashMap(u64, void),
 
-    /// 初期化
-    pub fn init(config: ProverConfig, plugins: []const Plugin, arena: Allocator) ProverEngine {
+    // 現在の探索パス（サイクル・発散検出用）
+    path_goals: std.ArrayList(*const Expr),
+    path_hashes: std.ArrayList(u64),
+
+    /// 初期化 (arena: per-search, gpa: キャッシュ用)
+    pub fn init(config: ProverConfig, plugins: []const Plugin, arena: Allocator, gpa: Allocator) ProverEngine {
         return .{
             .config = config,
             .plugins = plugins,
             .arena = arena,
+            .gpa = gpa,
+            .failure_cache = std.HashMap(FailureCacheKey, u32, FailureCacheKeyContext, std.hash_map.default_max_load_percentage).init(gpa),
+            .lemma_cache = std.AutoHashMap(u64, void).init(gpa),
+            .path_goals = .{},
+            .path_hashes = .{},
         };
+    }
+
+    /// 後片付け
+    pub fn deinit(self: *ProverEngine) void {
+        self.failure_cache.deinit();
+        self.lemma_cache.deinit();
+        self.path_goals.deinit(self.gpa);
+        self.path_hashes.deinit(self.gpa);
+    }
+
+    /// キャッシュのリセット（新しいprove()セッション開始時）
+    pub fn resetCaches(self: *ProverEngine) void {
+        self.failure_cache.clearRetainingCapacity();
+        self.lemma_cache.clearRetainingCapacity();
     }
 
     /// フレッシュメタ変数の生成
@@ -106,6 +195,11 @@ pub const ProverEngine = struct {
     ) ProveError!ProveResult {
         self.deadline_ms = if (timeout_ms > 0) std.time.milliTimestamp() + timeout_ms else 0;
 
+        // キャッシュとパス履歴をリセット
+        self.resetCaches();
+        self.path_goals.clearRetainingCapacity();
+        self.path_hashes.clearRetainingCapacity();
+
         const initial_goal = Goal{
             .target = goal_expr,
         };
@@ -118,6 +212,10 @@ pub const ProverEngine = struct {
                 .reason = "Timeout",
                 .depth = d,
             } };
+
+            // 反復深化ごとにパス履歴をクリア
+            self.path_goals.clearRetainingCapacity();
+            self.path_hashes.clearRetainingCapacity();
 
             const search_tree = try self.search(
                 goal_expr,
@@ -169,13 +267,70 @@ pub const ProverEngine = struct {
             return makeFailNode(self.arena, current_goal, "Complexity limit", depth);
         }
 
+        // ==========================================
+        // キャッシュ・サイクル・発散検出
+        // ==========================================
+        const state_hash = computeStateHash(current_goal, context);
+        const remaining = limit - depth;
+
+        // LemmaCacheチェック
+        if (self.lemma_cache.contains(state_hash)) {
+            return Tree(SearchNode).leaf(self.arena, .{
+                .goal = "lemma-cache",
+                .rule_name = "lemma-cache",
+                .status = .success,
+                .depth = depth,
+            }) catch .empty;
+        }
+
+        // FailureCacheチェック（サブセット考慮: 残り深さが十分）
+        const fc_key = FailureCacheKey{ .state_hash = state_hash, .guarded = false };
+        if (self.failure_cache.get(fc_key)) |cached_remaining| {
+            if (cached_remaining >= remaining) {
+                return makeFailNode(self.arena, current_goal, "failure-cache", depth);
+            }
+        }
+
+        // サイクル検出
+        for (self.path_hashes.items) |h| {
+            if (h == state_hash) {
+                // 余帰納法: guardedの場合は成功
+                // (guardedは現在プラグイン層でサポート; 基本はサイクル失敗)
+                return makeFailNode(self.arena, current_goal, "cycle", depth);
+            }
+        }
+
+        // 発散検出: 探索パス上に同じhead記号を持ちより単純な式が存在してisEmbedding
+        const goal_head = current_goal.headSymbol();
+        const goal_complexity = current_goal.complexity();
+        for (self.path_goals.items) |prev| {
+            if (std.mem.eql(u8, prev.headSymbol(), goal_head) and
+                prev.complexity() < goal_complexity and
+                isEmbedding(prev, current_goal))
+            {
+                return makeFailNode(self.arena, current_goal, "divergence", depth);
+            }
+        }
+
+        // 現在ゴールをパス履歴に追加（deferで巻き戻す）
+        const prev_goals_len = self.path_goals.items.len;
+        const prev_hashes_len = self.path_hashes.items.len;
+        try self.path_goals.append(self.gpa, current_goal);
+        try self.path_hashes.append(self.gpa, state_hash);
+        defer {
+            self.path_goals.shrinkRetainingCapacity(prev_goals_len);
+            self.path_hashes.shrinkRetainingCapacity(prev_hashes_len);
+        }
+
+        // ==========================================
         // プラグインからブランチを収集
+        // ==========================================
         var branches: std.ArrayList(Tree(SearchNode)) = .{};
 
-        for (self.plugins) |plugin| {
+        for (self.plugins) |plugin_item| {
             self.checkDeadline() catch break;
 
-            if (plugin.goal_hooks) |hook| {
+            if (plugin_item.goal_hooks) |hook| {
                 const hook_args = HookArgs{
                     .goal = current_goal,
                     .context = context,
@@ -192,7 +347,7 @@ pub const ProverEngine = struct {
                 }
             }
 
-            if (plugin.context_hooks) |hook| {
+            if (plugin_item.context_hooks) |hook| {
                 const hook_args = HookArgs{
                     .goal = current_goal,
                     .context = context,
@@ -217,7 +372,6 @@ pub const ProverEngine = struct {
                 best_success = branch.node.value;
                 break;
             }
-            // 子ノードも探索
             if (findSuccess(branch)) |node| {
                 best_success = node;
                 break;
@@ -225,10 +379,14 @@ pub const ProverEngine = struct {
         }
 
         if (best_success) |s| {
+            // 成功をLemmaCacheに保存
+            self.lemma_cache.put(state_hash, {}) catch {};
             return Tree(SearchNode).leaf(self.arena, s);
         }
 
-        // 失敗
+        // 失敗をFailureCacheに保存
+        self.failure_cache.put(fc_key, remaining) catch {};
+
         const fail_node = SearchNode{
             .goal = "failed",
             .rule_name = if (branches.items.len == 0) "failure" else "choice",
@@ -432,7 +590,8 @@ test "ProverEngine initialization" {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    var engine = ProverEngine.init(ProverConfig{}, &.{}, arena);
+    var engine = ProverEngine.init(ProverConfig{}, &.{}, arena, std.testing.allocator);
+    defer engine.deinit();
     const m = try engine.freshMeta();
     try std.testing.expect(m.* == .meta);
 }
@@ -442,7 +601,8 @@ test "ProverEngine normalize" {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    var engine = ProverEngine.init(ProverConfig{}, &.{}, arena);
+    var engine = ProverEngine.init(ProverConfig{}, &.{}, arena, std.testing.allocator);
+    defer engine.deinit();
     const a = try sym(arena, "A");
     const result = try engine.normalize(a);
     try std.testing.expect(result.eql(a));
@@ -469,7 +629,8 @@ test "ProverEngine prove simple tautology" {
     const arena = arena_state.allocator();
 
     // ⊤の証明 (プラグインなしだと失敗するが、エンジン自体は動く)
-    var engine = ProverEngine.init(ProverConfig{}, &.{}, arena);
+    var engine = ProverEngine.init(ProverConfig{}, &.{}, arena, std.testing.allocator);
+    defer engine.deinit();
     const goal = try sym(arena, "⊤");
     const result = engine.prove(goal, 5, 1000) catch |err| switch (err) {
         error.Timeout => ProveResult{ .fail = .{ .goal = Goal{ .target = goal }, .reason = "Timeout", .depth = 0 } },
@@ -477,4 +638,20 @@ test "ProverEngine prove simple tautology" {
     };
     // プラグインなしなので失敗するはず
     try std.testing.expect(result == .fail);
+}
+
+test "isEmbedding detection" {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    // f(a) がf(f(a))に埋め込まれているかチェック
+    const f = try sym(arena, "f");
+    const a = try sym(arena, "a");
+    const fa = try app1(arena, f, a);
+    const ffa = try app1(arena, f, fa);
+
+    try std.testing.expect(isEmbedding(fa, ffa));
+    try std.testing.expect(!isEmbedding(ffa, fa)); // 逆は偽
+    try std.testing.expect(isEmbedding(a, fa)); // diving
 }

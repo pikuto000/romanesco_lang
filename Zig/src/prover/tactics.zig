@@ -139,7 +139,9 @@ pub fn auto(state: ProofState, plugins: []const search_mod.Plugin, arena: Alloca
         expr_mod.ProverConfig{ .rules = state.rules },
         plugins,
         arena,
+        arena,
     );
+    defer engine.deinit();
 
     const result = engine.prove(goal.target, 10, 5000) catch return .{ .err = "auto: timeout or error" };
 
