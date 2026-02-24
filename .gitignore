@@ -29,3 +29,11 @@ Zig/.zig-cache
 Zig/.jit_tmp
 
 Zig/zig-out
+*.rbc
+*.ll
+*.exp
+*.lib
+*.dll
+*.so
+*.obj
+*.pdb
