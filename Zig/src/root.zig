@@ -6,6 +6,7 @@ pub const codegen = @import("codegen.zig");
 pub const analyzer = @import("analyzer.zig");
 pub const optimizer = @import("optimizer.zig");
 pub const speculative = @import("speculative.zig");
+pub const aot = @import("aot.zig");
 pub const loader = @import("loader.zig");
 
 pub fn bufferedPrint() !void {
