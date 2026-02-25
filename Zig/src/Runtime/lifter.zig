@@ -235,6 +235,11 @@ pub const Lifter = struct {
         return ops.toOwnedSlice(aa);
     }
 
+    fn parseIntWidth(type_str: []const u8) u16 {
+        if (type_str.len < 2 or type_str[0] != 'i') return 64;
+        return std.fmt.parseInt(u16, type_str[1..], 10) catch 64;
+    }
+
     fn liftInstructionLocal(self: *Lifter, insn: ir_parser.Instruction, global_reg_map: *std.StringHashMap(u32), local_map: *std.AutoHashMap(u32, u32), local_next: *u32, ops: *std.ArrayList(Op), live_ins: []const LiveSet, global_offset: usize, local_idx: usize, func: ir_parser.ParsedFunction, aa: Allocator) !void {
         const a = aa;
         if (std.mem.eql(u8, insn.opcode, "add") or std.mem.eql(u8, insn.opcode, "sub") or std.mem.eql(u8, insn.opcode, "mul") or
@@ -250,7 +255,8 @@ pub const Lifter = struct {
             const dst = try self.allocLocal(insn.result.?, global_reg_map, local_map, local_next);
             const lhs = try self.useLocal(insn.operands[1], global_reg_map, local_map, local_next, ops, a);
             const rhs = try self.useLocal(insn.operands[2], global_reg_map, local_map, local_next, ops, a);
-            try ops.append(a, .{ .ibin = .{ .dst = dst, .lhs = lhs, .rhs = rhs, .op = op, .width = 64 } });
+            const w = parseIntWidth(insn.operands[0]);
+            try ops.append(a, .{ .ibin = .{ .dst = dst, .lhs = lhs, .rhs = rhs, .op = op, .width = w } });
         } else if (std.mem.eql(u8, insn.opcode, "ret")) {
             if (insn.operands.len >= 2) {
                 const src = try self.useLocal(insn.operands[1], global_reg_map, local_map, local_next, ops, a);
@@ -298,7 +304,8 @@ pub const Lifter = struct {
                 else if (std.mem.eql(u8, pred_str, "sgt")) .sgt else if (std.mem.eql(u8, pred_str, "sge")) .sge
                 else if (std.mem.eql(u8, pred_str, "ult")) .ult else if (std.mem.eql(u8, pred_str, "ule")) .ule
                 else if (std.mem.eql(u8, pred_str, "ugt")) .ugt else .uge;
-            try ops.append(a, .{ .icmp = .{ .dst = dst, .lhs = lhs, .rhs = rhs, .pred = pred, .width = 64 } });
+            const w = parseIntWidth(insn.operands[1]);
+            try ops.append(a, .{ .icmp = .{ .dst = dst, .lhs = lhs, .rhs = rhs, .pred = pred, .width = w } });
         }
     }
 
@@ -557,4 +564,31 @@ test "Lifter: If-Else" {
         defer result.val.deinit(allocator);
         try std.testing.expectEqual(@as(u64, 0), result.val.bits);
     }
+}
+
+test "Lifter: i128 add" {
+    const allocator = std.testing.allocator;
+    const ir =
+        \\define i128 @test_i128(i128 %a, i128 %b) {
+        \\entry:
+        \\  %c = add i128 %a, %b
+        \\  ret i128 %c
+        \\}
+    ;
+    var l = Lifter.init(allocator);
+    var prog = try l.lift(ir);
+    defer prog.deinit();
+
+    // The first few ops might be borrows from arguments
+    var ibin_op: ?vm.Op = null;
+    for (prog.blocks[0]) |op| {
+        if (op == .ibin) {
+            ibin_op = op;
+            break;
+        }
+    }
+    
+    try std.testing.expect(ibin_op != null);
+    try std.testing.expectEqual(vm.IBinOp.add, ibin_op.?.ibin.op);
+    try std.testing.expectEqual(@as(u16, 128), ibin_op.?.ibin.width);
 }

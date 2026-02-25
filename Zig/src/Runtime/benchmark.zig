@@ -257,3 +257,39 @@ test "Bench: Codegen ibin programs" {
     try std.testing.expect(std.mem.indexOf(u8, ir, "add i64") != null);
     try std.testing.expect(std.mem.indexOf(u8, ir, "rt_make_int") != null);
 }
+
+// ---- VM bigint multiply i128 ----
+test "Bench: VM bigint multiply i128" {
+    const allocator = std.testing.allocator;
+    const code = [_]vm.Op{
+        .{ .ibin = .{ .dst = 2, .lhs = 0, .rhs = 1, .op = .mul, .width = 128 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    var machine = vm.VM.init(allocator);
+    const regs = try allocator.alloc(vm.Value, 16);
+    defer {
+        for (regs) |r| r.deinit(allocator);
+        allocator.free(regs);
+    }
+    for (regs) |*r| r.* = .unit;
+
+    var timer = try std.time.Timer.start();
+    var i: u32 = 0;
+    while (i < 10_000) : (i += 1) {
+        for (regs) |*r| { r.deinit(allocator); r.* = .unit; }
+        regs[0] = .{ .wide = try allocator.dupe(u64, &[_]u64{ 3, 0 }) };
+        regs[1] = .{ .wide = try allocator.dupe(u64, &[_]u64{ 5, 0 }) };
+        const result = try machine.exec(&code, regs, 0, null);
+        result.val.deinit(allocator);
+    }
+    const ns = timer.read();
+    std.debug.print("  [Bench: VM bigint mul 10k] {d:.2} ms\n", .{@as(f64, @floatFromInt(ns)) / 1e6});
+
+    // 正確性確認: 3 * 5 = 15
+    for (regs) |*r| { r.deinit(allocator); r.* = .unit; }
+    regs[0] = .{ .wide = try allocator.dupe(u64, &[_]u64{ 3, 0 }) };
+    regs[1] = .{ .wide = try allocator.dupe(u64, &[_]u64{ 5, 0 }) };
+    const result = try machine.exec(&code, regs, 0, null);
+    defer result.val.deinit(allocator);
+    try std.testing.expectEqual(@as(u64, 15), result.val.wide[0]);
+}

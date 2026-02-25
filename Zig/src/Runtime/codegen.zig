@@ -91,6 +91,7 @@ pub const CodeGen = struct {
         \\declare ptr @malloc(i64)
         \\declare void @free(ptr)
         \\declare void @exit(i32)
+        \\declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
         \\
         \\define void @rt_cleanup_value(%Value %v) {
         \\  %tag = extractvalue %Value %v, 0
@@ -100,6 +101,7 @@ pub const CodeGen = struct {
         \\    i64 2, label %free_pair
         \\    i64 3, label %free_sum
         \\    i64 4, label %free_sum
+        \\    i64 7, label %free_wide
         \\  ]
         \\free_cl:
         \\  call void @free(ptr %ptr)
@@ -115,6 +117,9 @@ pub const CodeGen = struct {
         \\free_sum:
         \\  %inner = load %Value, ptr %ptr
         \\  call void @rt_cleanup_value(%Value %inner)
+        \\  call void @free(ptr %ptr)
+        \\  br label %done
+        \\free_wide:
         \\  call void @free(ptr %ptr)
         \\  br label %done
         \\done:
@@ -165,6 +170,33 @@ pub const CodeGen = struct {
         \\  ret i64 %n
         \\fail:
         \\  ret i64 0
+        \\}
+        \\
+        \\define void @rt_make_wide(ptr %out, ptr %limbs, i64 %count) {
+        \\entry:
+        \\  %old = load %Value, ptr %out
+        \\  call void @rt_cleanup_value(%Value %old)
+        \\  %data_bytes = mul i64 %count, 8
+        \\  %total = add i64 %data_bytes, 8
+        \\  %mem = call ptr @malloc(i64 %total)
+        \\  store i64 %count, ptr %mem
+        \\  %dst_limbs = getelementptr i8, ptr %mem, i64 8
+        \\  call void @llvm.memcpy.p0.p0.i64(ptr %dst_limbs, ptr %limbs, i64 %data_bytes, i1 false)
+        \\  %p1 = getelementptr %Value, ptr %out, i32 0, i32 0
+        \\  store i64 7, ptr %p1
+        \\  %p2 = getelementptr %Value, ptr %out, i32 0, i32 1
+        \\  store ptr %mem, ptr %p2
+        \\  ret void
+        \\}
+        \\
+        \\define i64 @rt_get_wide_limb(ptr %v, i64 %idx) {
+        \\entry:
+        \\  %p2 = getelementptr %Value, ptr %v, i32 0, i32 1
+        \\  %mem = load ptr, ptr %p2
+        \\  %limbs_base = getelementptr i8, ptr %mem, i64 8
+        \\  %limb_ptr = getelementptr i64, ptr %limbs_base, i64 %idx
+        \\  %val = load i64, ptr %limb_ptr
+        \\  ret i64 %val
         \\}
         \\
         \\define void @rt_make_unit(ptr %out) {
@@ -798,10 +830,20 @@ pub const CodeGen = struct {
                     try writer.print("  call void @rt_make_int(ptr %lb_dst_{d}, i64 {d})\n", .{o.dst, @as(i64, @bitCast(o.val))});
                 },
                 .load_wide => |o| {
-                    // 暫定: 最初のリムだけ使う (TODO: 多倍長対応)
-                    const first_limb: u64 = if (o.limbs.len > 0) o.limbs[0] else 0;
+                    const w = o.width;
+                    const lc = (w + 63) / 64;  // limbCount
+                    // スタックにリム配列を構築
+                    try writer.print("  %lw_arr_{d} = alloca [{d} x i64]\n", .{o.dst, lc});
+                    for (0..lc) |li| {
+                        const val: i64 = @bitCast(if (li < o.limbs.len) o.limbs[li] else 0);
+                        const gep = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = getelementptr [{d} x i64], ptr %lw_arr_{d}, i32 0, i32 {d}\n",
+                            .{gep, lc, o.dst, li});
+                        try writer.print("  store i64 {d}, ptr %v{d}\n", .{val, gep});
+                    }
                     try writer.print("  %lw_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
-                    try writer.print("  call void @rt_make_int(ptr %lw_dst_{d}, i64 {d})\n", .{o.dst, @as(i64, @bitCast(first_limb))});
+                    try writer.print("  call void @rt_make_wide(ptr %lw_dst_{d}, ptr %lw_arr_{d}, i64 {d})\n",
+                        .{o.dst, o.dst, lc});
                 },
                 .ibin => |o| {
                     const llvm_op: []const u8 = switch (o.op) {
@@ -814,24 +856,81 @@ pub const CodeGen = struct {
                     const w = o.width;
                     try writer.print("  %ibin_lhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.lhs, o.lhs});
                     try writer.print("  %ibin_rhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.rhs, o.rhs});
-                    const lv = next_temp(&temp_counter);
-                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %ibin_lhs_{d})\n", .{lv, o.lhs});
-                    const rv = next_temp(&temp_counter);
-                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %ibin_rhs_{d})\n", .{rv, o.rhs});
-                    const res = next_temp(&temp_counter);
-                    if (w < 64) {
-                        const lt = next_temp(&temp_counter);
-                        const rt_t = next_temp(&temp_counter);
-                        try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{lt, lv, w});
-                        try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{rt_t, rv, w});
-                        const op_r = next_temp(&temp_counter);
-                        try writer.print("  %v{d} = {s} i{d} %v{d}, %v{d}\n", .{op_r, llvm_op, w, lt, rt_t});
-                        try writer.print("  %v{d} = zext i{d} %v{d} to i64\n", .{res, w, op_r});
+                    if (w <= 64) {
+                        const lv = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = call i64 @rt_get_int(ptr %ibin_lhs_{d})\n", .{lv, o.lhs});
+                        const rv = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = call i64 @rt_get_int(ptr %ibin_rhs_{d})\n", .{rv, o.rhs});
+                        const res = next_temp(&temp_counter);
+                        if (w < 64) {
+                            const lt = next_temp(&temp_counter);
+                            const rt_t = next_temp(&temp_counter);
+                            try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{lt, lv, w});
+                            try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{rt_t, rv, w});
+                            const op_r = next_temp(&temp_counter);
+                            try writer.print("  %v{d} = {s} i{d} %v{d}, %v{d}\n", .{op_r, llvm_op, w, lt, rt_t});
+                            try writer.print("  %v{d} = zext i{d} %v{d} to i64\n", .{res, w, op_r});
+                        } else {
+                            try writer.print("  %v{d} = {s} i64 %v{d}, %v{d}\n", .{res, llvm_op, lv, rv});
+                        }
+                        try writer.print("  %ibin_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                        try writer.print("  call void @rt_make_int(ptr %ibin_dst_{d}, i64 %v{d})\n", .{o.dst, res});
                     } else {
-                        try writer.print("  %v{d} = {s} i64 %v{d}, %v{d}\n", .{res, llvm_op, lv, rv});
+                        // LLVM ネイティブ iN 型で演算（N = w）
+                        const lc = (w + 63) / 64;
+
+                        // lhs をリムから iN に再構築
+                        var lhs_acc = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %ibin_lhs_{d}, i64 0)\n", .{lhs_acc, o.lhs});
+                        const lhs_e0 = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{lhs_e0, lhs_acc, w});
+                        lhs_acc = lhs_e0;
+                        for (1..lc) |li| {
+                            const lr = next_temp(&temp_counter); const le = next_temp(&temp_counter);
+                            const ls = next_temp(&temp_counter); const la = next_temp(&temp_counter);
+                            try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %ibin_lhs_{d}, i64 {d})\n", .{lr, o.lhs, li});
+                            try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{le, lr, w});
+                            try writer.print("  %v{d} = shl i{d} %v{d}, {d}\n", .{ls, w, le, li * 64});
+                            try writer.print("  %v{d} = or i{d} %v{d}, %v{d}\n", .{la, w, lhs_acc, ls});
+                            lhs_acc = la;
+                        }
+                        // rhs を同様に再構築
+                        var rhs_acc = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %ibin_rhs_{d}, i64 0)\n", .{rhs_acc, o.rhs});
+                        const rhs_e0 = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{rhs_e0, rhs_acc, w});
+                        rhs_acc = rhs_e0;
+                        for (1..lc) |li| {
+                            const rr = next_temp(&temp_counter); const re = next_temp(&temp_counter);
+                            const rs = next_temp(&temp_counter); const ra = next_temp(&temp_counter);
+                            try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %ibin_rhs_{d}, i64 {d})\n", .{rr, o.rhs, li});
+                            try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{re, rr, w});
+                            try writer.print("  %v{d} = shl i{d} %v{d}, {d}\n", .{rs, w, re, li * 64});
+                            try writer.print("  %v{d} = or i{d} %v{d}, %v{d}\n", .{ra, w, rhs_acc, rs});
+                            rhs_acc = ra;
+                        }
+                        // 演算
+                        const op_res = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = {s} i{d} %v{d}, %v{d}\n", .{op_res, llvm_op, w, lhs_acc, rhs_acc});
+                        // 結果リムをスタック配列に抽出
+                        try writer.print("  %ibin_wide_{d} = alloca [{d} x i64]\n", .{o.dst, lc});
+                        for (0..lc) |li| {
+                            const to_trunc = if (li == 0) op_res else blk: {
+                                const s = next_temp(&temp_counter);
+                                try writer.print("  %v{d} = lshr i{d} %v{d}, {d}\n", .{s, w, op_res, li * 64});
+                                break :blk s;
+                            };
+                            const tr = next_temp(&temp_counter);
+                            const gp = next_temp(&temp_counter);
+                            try writer.print("  %v{d} = trunc i{d} %v{d} to i64\n", .{tr, w, to_trunc});
+                            try writer.print("  %v{d} = getelementptr [{d} x i64], ptr %ibin_wide_{d}, i32 0, i32 {d}\n",
+                                .{gp, lc, o.dst, li});
+                            try writer.print("  store i64 %v{d}, ptr %v{d}\n", .{tr, gp});
+                        }
+                        try writer.print("  %ibin_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                        try writer.print("  call void @rt_make_wide(ptr %ibin_dst_{d}, ptr %ibin_wide_{d}, i64 {d})\n",
+                            .{o.dst, o.dst, lc});
                     }
-                    try writer.print("  %ibin_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
-                    try writer.print("  call void @rt_make_int(ptr %ibin_dst_{d}, i64 %v{d})\n", .{o.dst, res});
                 },
                 .icmp => |o| {
                     const llvm_pred: []const u8 = switch (o.pred) {
@@ -1175,4 +1274,36 @@ test "Codegen: icmp eq32 emits br i1 and rt_make_sum" {
     defer allocator.free(ir);
     try std.testing.expect(std.mem.indexOf(u8, ir, "br i1") != null);
     try std.testing.expect(std.mem.indexOf(u8, ir, "rt_make_sum") != null);
+}
+
+test "Codegen: load_wide emits rt_make_wide" {
+    const allocator = std.testing.allocator;
+    const code = [_]Op{
+        .{ .load_wide = .{ .dst = 0, .limbs = &[_]u64{ 1, 2 }, .width = 128 } },
+        .{ .ret = .{ .src = 0 } },
+    };
+    const program = [_][]const Op{&code};
+    var analysis = makeEmptyAnalysis(allocator);
+    defer analysis.deinit();
+    var cg = CodeGen.init(allocator);
+    const ir = try cg.generate(&program, analysis, "test_load_wide", default_cpu);
+    defer allocator.free(ir);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "rt_make_wide") != null);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "alloca [2 x i64]") != null);
+}
+
+test "Codegen: ibin add128 emits add i128 and rt_make_wide" {
+    const allocator = std.testing.allocator;
+    const code = [_]Op{
+        .{ .ibin = .{ .dst = 2, .lhs = 0, .rhs = 1, .op = .add, .width = 128 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const program = [_][]const Op{&code};
+    var analysis = makeEmptyAnalysis(allocator);
+    defer analysis.deinit();
+    var cg = CodeGen.init(allocator);
+    const ir = try cg.generate(&program, analysis, "test_ibin_add128", default_cpu);
+    defer allocator.free(ir);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "add i128") != null);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "rt_make_wide") != null);
 }

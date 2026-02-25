@@ -205,8 +205,8 @@ pub const VM = struct {
     fn maskTopLimb(self: VM, limbs: []u64, width: IntWidth) void {
         _ = self;
         const top = (width - 1) / 64;
-        const used = @as(u6, @intCast((width - 1) % 64 + 1));
-        const mask = if (used == 64) ~@as(u64, 0) else (@as(u64, 1) << used) - 1;
+        const used_val = (width - 1) % 64 + 1;
+        const mask = if (used_val == 64) ~@as(u64, 0) else (@as(u64, 1) << @as(u6, @intCast(used_val))) - 1;
         limbs[top] &= mask;
     }
 
@@ -237,6 +237,42 @@ pub const VM = struct {
             const res2 = @subWithOverflow(res1[0], borrow);
             dst[i] = res2[0];
             borrow = res1[1] | res2[1];
+        }
+        self.maskTopLimb(dst, width);
+        return dst;
+    }
+
+    fn bigintMul(self: *VM, lhs: []const u64, rhs: []const u64, width: IntWidth) ![]u64 {
+        const n = self.limbCount(width);
+        const dst = try self.allocator.alloc(u64, n);
+        @memset(dst, 0);
+
+        for (0..lhs.len) |i| {
+            var carry: u64 = 0;
+            for (0..rhs.len) |j| {
+                if (i + j >= n) break;
+                const prod = @as(u128, lhs[i]) * @as(u128, rhs[j]) +
+                            @as(u128, dst[i + j]) + @as(u128, carry);
+                dst[i + j] = @truncate(prod);
+                carry = @truncate(prod >> 64);
+            }
+        }
+        self.maskTopLimb(dst, width);
+        return dst;
+    }
+
+    fn bigintBitwise(self: *VM, lhs: []const u64, rhs: []const u64, op: IBinOp, width: IntWidth) ![]u64 {
+        const n = self.limbCount(width);
+        const dst = try self.allocator.alloc(u64, n);
+        for (0..n) |i| {
+            const l = if (i < lhs.len) lhs[i] else 0;
+            const r = if (i < rhs.len) rhs[i] else 0;
+            dst[i] = switch (op) {
+                .and_ => l & r,
+                .or_  => l | r,
+                .xor_ => l ^ r,
+                else  => unreachable,
+            };
         }
         self.maskTopLimb(dst, width);
         return dst;
@@ -473,7 +509,15 @@ pub const VM = struct {
                             regs[o.dst].deinit(self.allocator); regs[o.dst] = .{ .bits = raw & mask };
                         } else {
                             const l = regs[o.lhs].wide; const r = regs[o.rhs].wide;
-                            const res = switch (o.op) { .add => try self.bigintAdd(l, r, o.width), .sub => try self.bigintSub(l, r, o.width), else => return error.UnsupportedBigIntOp };
+                            const res = switch (o.op) {
+                                .add => try self.bigintAdd(l, r, o.width),
+                                .sub => try self.bigintSub(l, r, o.width),
+                                .mul => try self.bigintMul(l, r, o.width),
+                                .and_ => try self.bigintBitwise(l, r, .and_, o.width),
+                                .or_  => try self.bigintBitwise(l, r, .or_, o.width),
+                                .xor_ => try self.bigintBitwise(l, r, .xor_, o.width),
+                                else => return error.UnsupportedBigIntOp,
+                            };
                             regs[o.dst].deinit(self.allocator); regs[o.dst] = .{ .wide = res };
                         }
                     },
@@ -687,3 +731,76 @@ pub const ProfilingVM = struct {
     pub fn deinit(self: *ProfilingVM) void { self.profile_data.deinit(); }
     pub fn run(self: *ProfilingVM, code: []const Op) !Value { const regs = try self.vm.allocator.alloc(Value, 128); defer self.vm.allocator.free(regs); for (regs) |*r| r.* = .unit; const result = try self.vm.exec(code, regs, 0, &self.profile_data); for (regs) |r| r.deinit(self.vm.allocator); return result.val; }
 };
+
+test "bigintMul: 3 * 5 = 15" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    const lhs = [_]u64{3};
+    const rhs = [_]u64{5};
+    const res = try vm_inst.bigintMul(&lhs, &rhs, 64);
+    defer allocator.free(res);
+    try std.testing.expectEqual(@as(usize, 1), res.len);
+    try std.testing.expectEqual(@as(u64, 15), res[0]);
+}
+
+test "bigintMul: 2^64 * 1" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    const lhs = [_]u64{ 0, 1 }; // 2^64
+    const rhs = [_]u64{1};
+    const res = try vm_inst.bigintMul(&lhs, &rhs, 128);
+    defer allocator.free(res);
+    try std.testing.expectEqual(@as(usize, 2), res.len);
+    try std.testing.expectEqual(@as(u64, 0), res[0]);
+    try std.testing.expectEqual(@as(u64, 1), res[1]);
+}
+
+test "bigintBitwise: and/or/xor 128bit" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    const lhs = [_]u64{ 0xF0F0F0F0F0F0F0F0, 0xAAAAAAAAAAAAAAA };
+    const rhs = [_]u64{ 0x0F0F0F0F0F0F0F0F, 0x555555555555555 };
+    
+    {
+        const res = try vm_inst.bigintBitwise(&lhs, &rhs, .and_, 128);
+        defer allocator.free(res);
+        try std.testing.expectEqual(@as(u64, 0), res[0]);
+        try std.testing.expectEqual(@as(u64, 0), res[1]);
+    }
+    {
+        const res = try vm_inst.bigintBitwise(&lhs, &rhs, .or_, 128);
+        defer allocator.free(res);
+        try std.testing.expectEqual(@as(u64, 0xFFFFFFFFFFFFFFFF), res[0]);
+        try std.testing.expectEqual(@as(u64, 0xFFFFFFFFFFFFFFF), res[1]);
+    }
+}
+
+test "ibin wide add i128: (2^64-1) + 1" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    const code = &[_]Op{
+        .{ .load_wide = .{ .dst = 0, .limbs = &[_]u64{ 0xFFFFFFFFFFFFFFFF, 0 }, .width = 128 } },
+        .{ .load_wide = .{ .dst = 1, .limbs = &[_]u64{ 1, 0 }, .width = 128 } },
+        .{ .ibin = .{ .dst = 2, .lhs = 0, .rhs = 1, .op = .add, .width = 128 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const result = try vm_inst.run(code);
+    defer result.deinit(allocator);
+    try std.testing.expectEqual(@as(u64, 0), result.wide[0]);
+    try std.testing.expectEqual(@as(u64, 1), result.wide[1]);
+}
+
+test "ibin wide mul i128: 3 * 5 = 15" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    const code = &[_]Op{
+        .{ .load_wide = .{ .dst = 0, .limbs = &[_]u64{ 3, 0 }, .width = 128 } },
+        .{ .load_wide = .{ .dst = 1, .limbs = &[_]u64{ 5, 0 }, .width = 128 } },
+        .{ .ibin = .{ .dst = 2, .lhs = 0, .rhs = 1, .op = .mul, .width = 128 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const result = try vm_inst.run(code);
+    defer result.deinit(allocator);
+    try std.testing.expectEqual(@as(u64, 15), result.wide[0]);
+    try std.testing.expectEqual(@as(u64, 0), result.wide[1]);
+}
