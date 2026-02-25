@@ -14,6 +14,11 @@ pub const CodeGen = struct {
     }
 
     pub fn generate(self: *CodeGen, program: []const []const Op, analysis: RangeAnalysisResult, entry_name: []const u8, cpu: vm.CpuFeatures) ![]u8 {
+        return self.generateWithImports(program, analysis, entry_name, cpu, &[_][]const u8{});
+    }
+
+    /// 外部LLVM IRファイルの内容を imports として渡すと、モジュールヘッダーを除去して末尾に追記する。
+    pub fn generateWithImports(self: *CodeGen, program: []const []const Op, analysis: RangeAnalysisResult, entry_name: []const u8, cpu: vm.CpuFeatures, imports: []const []const u8) ![]u8 {
         var buffer = try std.ArrayList(u8).initCapacity(self.allocator, 0);
         errdefer buffer.deinit(self.allocator);
         const writer = buffer.writer(self.allocator);
@@ -51,21 +56,41 @@ pub const CodeGen = struct {
         // Runtime implementation
         try writer.writeAll(runtime_implementation);
 
+        // External IR imports (ヘッダー行を除去して追記)
+        for (imports) |import_ir| {
+            try writer.writeAll("\n; --- imported IR ---\n");
+            try writeStrippedImport(writer, import_ir);
+        }
+
         return buffer.toOwnedSlice(self.allocator);
+    }
+
+    /// 外部LLVM IRからモジュールヘッダー行を除いた本体部分を writer に書き出す。
+    /// 除外対象: ModuleIDコメント、source_filename、target datalayout/triple、型定義、SIMDイントリンシック宣言
+    fn writeStrippedImport(writer: anytype, ir_text: []const u8) !void {
+        var lines = std.mem.splitScalar(u8, ir_text, '\n');
+        while (lines.next()) |line| {
+            const t = std.mem.trim(u8, line, " \t\r");
+            if (std.mem.startsWith(u8, t, "; ModuleID") or
+                std.mem.startsWith(u8, t, "; SIMD") or
+                std.mem.startsWith(u8, t, "source_filename") or
+                std.mem.startsWith(u8, t, "target datalayout") or
+                std.mem.startsWith(u8, t, "target triple") or
+                std.mem.indexOf(u8, t, " = type ") != null or
+                std.mem.startsWith(u8, t, "declare <"))
+            {
+                continue;
+            }
+            try writer.writeAll(line);
+            try writer.writeAll("\n");
+        }
     }
 
     const runtime_implementation =
         \\
         \\declare ptr @malloc(i64)
         \\declare void @free(ptr)
-        \\declare i32 @printf(ptr, ...)
         \\declare void @exit(i32)
-        \\
-        \\@.str_int_fmt = private unnamed_addr constant [6 x i8] c"%lld\0A\00"
-        \\@.str_deopt_msg = private unnamed_addr constant [35 x i8] c"Deoptimization at PC %d triggered\0A\00"
-        \\@.str_reg_dump = private unnamed_addr constant [24 x i8] c"REG %d TAG %lld VAL %p\0A\00"
-        \\@.str_deopt_start = private unnamed_addr constant [19 x i8] c"DEOPT_STATE_START\0A\00"
-        \\@.str_deopt_end = private unnamed_addr constant [17 x i8] c"DEOPT_STATE_END\0A\00"
         \\
         \\define void @rt_cleanup_value(%Value %v) {
         \\  %tag = extractvalue %Value %v, 0
@@ -93,30 +118,6 @@ pub const CodeGen = struct {
         \\  call void @free(ptr %ptr)
         \\  br label %done
         \\done:
-        \\  ret void
-        \\}
-        \\
-        \\define void @rt_dump_regs(ptr %regs, i32 %count) {
-        \\  %start_msg = call i32 (ptr, ...) @printf(ptr @.str_deopt_start)
-        \\  %i_ptr = alloca i32
-        \\  store i32 0, ptr %i_ptr
-        \\  br label %loop
-        \\loop:
-        \\  %i = load i32, ptr %i_ptr
-        \\  %cond = icmp ult i32 %i, %count
-        \\  br i1 %cond, label %body, label %done
-        \\body:
-        \\  %ptr = getelementptr %Value, ptr %regs, i32 %i
-        \\  %tag_ptr = getelementptr %Value, ptr %ptr, i32 0, i32 0
-        \\  %tag = load i64, ptr %tag_ptr
-        \\  %val_ptr = getelementptr %Value, ptr %ptr, i32 0, i32 1
-        \\  %val = load ptr, ptr %val_ptr
-        \\  %dump_msg = call i32 (ptr, ...) @printf(ptr @.str_reg_dump, i32 %i, i64 %tag, ptr %val)
-        \\  %next = add i32 %i, 1
-        \\  store i32 %next, ptr %i_ptr
-        \\  br label %loop
-        \\done:
-        \\  %end_msg = call i32 (ptr, ...) @printf(ptr @.str_deopt_end)
         \\  ret void
         \\}
         \\

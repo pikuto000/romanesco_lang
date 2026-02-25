@@ -13,10 +13,15 @@ pub const JIT = struct {
     }
 
     pub fn compile(self: *JIT, ir: []const u8, dll_name: []const u8) !void {
+        return self.compileWithImports(ir, dll_name, &[_][]const u8{});
+    }
+
+    /// extra_ll_paths: clang に追加で渡す外部 .ll ファイルのパス一覧
+    pub fn compileWithImports(self: *JIT, ir: []const u8, dll_name: []const u8, extra_ll_paths: []const []const u8) !void {
         const timestamp = std.time.nanoTimestamp();
         var ll_name_buf: [128]u8 = undefined;
         const ll_name = try std.fmt.bufPrint(&ll_name_buf, "jit_{d}.ll", .{timestamp});
-        
+
         const tmp_path = ".jit_tmp";
         std.fs.cwd().makeDir(tmp_path) catch |err| { if (err != error.PathAlreadyExists) return err; };
         var tmp_dir = try std.fs.cwd().openDir(tmp_path, .{});
@@ -30,19 +35,22 @@ pub const JIT = struct {
 
         const cwd_path = try std.fs.cwd().realpathAlloc(self.allocator, ".");
         defer self.allocator.free(cwd_path);
-        
+
         const ll_full_path = try std.fs.path.join(self.allocator, &[_][]const u8{ cwd_path, tmp_path, ll_name });
         defer self.allocator.free(ll_full_path);
 
-        const argv = [_][]const u8{ "clang", "-shared", "-O3", "-Wno-override-module", "-o", dll_name, ll_full_path };
-        
-        var child = std.process.Child.init(&argv, self.allocator);
+        var argv = try std.ArrayList([]const u8).initCapacity(self.allocator, 7 + extra_ll_paths.len);
+        defer argv.deinit(self.allocator);
+        try argv.appendSlice(self.allocator, &[_][]const u8{ "clang", "-shared", "-O3", "-Wno-override-module", "-o", dll_name, ll_full_path });
+        for (extra_ll_paths) |p| try argv.append(self.allocator, p);
+
+        var child = std.process.Child.init(argv.items, self.allocator);
         const term = try child.spawnAndWait();
         switch (term) {
             .Exited => |code| if (code != 0) return error.CompilationFailed,
             else => return error.CompilationFailed,
         }
-        
+
         if (!self.keep_artifacts) {
             tmp_dir.deleteFile(ll_name) catch {};
         }
@@ -81,11 +89,15 @@ pub const JIT = struct {
     }
 
     pub fn compileAndRun(self: *JIT, ir: []const u8, entry_name: []const u8, vm_regs: []Value) !u64 {
+        return self.compileAndRunWithImports(ir, entry_name, vm_regs, &[_][]const u8{});
+    }
+
+    pub fn compileAndRunWithImports(self: *JIT, ir: []const u8, entry_name: []const u8, vm_regs: []Value, extra_ll_paths: []const []const u8) !u64 {
         const timestamp = std.time.nanoTimestamp();
         var dll_name_buf: [128]u8 = undefined;
         const dll_name = try std.fmt.bufPrint(&dll_name_buf, ".jit_tmp/jit_{d}.dll", .{timestamp});
-        
-        try self.compile(ir, dll_name);
+
+        try self.compileWithImports(ir, dll_name, extra_ll_paths);
         
         var lib: std.DynLib = undefined;
         var retry: usize = 0;
