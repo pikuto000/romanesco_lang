@@ -19,7 +19,10 @@ pub const CodeGen = struct {
 
     /// 外部LLVM IRファイルの内容を imports として渡すと、モジュールヘッダーを除去して末尾に追記する。
     pub fn generateWithImports(self: *CodeGen, program: []const []const Op, analysis: RangeAnalysisResult, entry_name: []const u8, cpu: vm.CpuFeatures, imports: []const []const u8) ![]u8 {
-        var buffer = try std.ArrayList(u8).initCapacity(self.allocator, 0);
+        var total_ops: usize = 0;
+        for (program) |block| total_ops += block.len;
+        const estimated = @max(4096, total_ops * 200 + runtime_implementation.len);
+        var buffer = try std.ArrayList(u8).initCapacity(self.allocator, estimated);
         errdefer buffer.deinit(self.allocator);
         const writer = buffer.writer(self.allocator);
 
@@ -493,20 +496,22 @@ pub const CodeGen = struct {
                     if (cpu.has_avx2 and w == 64) {
                         try writer.print("  ; SIMD Vector Add Candidate\n", .{});
                         // In a real unrolled loop, we'd gather 4 independent adds into one AVX2 padd.q
-                        // For this demo, we'll emit a comment and keep scalar for safety, 
+                        // For this demo, we'll emit a comment and keep scalar for safety,
                         // but provide the infrastructure.
                     }
-                    
-                    try writer.print("  %lhs_ptr_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{a.lhs, a.lhs});
-                    try writer.print("  %rhs_ptr_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{a.rhs, a.rhs});
-                    
+
                     const l_stable = analysis.stable_values.get(a.lhs);
                     const r_stable = analysis.stable_values.get(a.rhs);
 
                     const l_val = next_temp(&temp_counter);
                     if (l_stable) |v| {
                         try writer.print("  %v{d} = add i64 0, {d}\n", .{l_val, v});
+                    } else if (analysis.isProvenBits(a.lhs)) {
+                        // タグ証明済み：ガードなしで直接取得（.sub/.mulと同等）
+                        try writer.print("  %lhs_ptr_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{a.lhs, a.lhs});
+                        try writer.print("  %v{d} = call i64 @rt_get_int(ptr %lhs_ptr_{d})\n", .{l_val, a.lhs});
                     } else {
+                        try writer.print("  %lhs_ptr_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{a.lhs, a.lhs});
                         try writer.print("  %v_lhs_{d} = load %Value, ptr %lhs_ptr_{d}\n", .{next_temp(&temp_counter), a.lhs});
                         const f1 = next_temp(&temp_counter);
                         try writer.print("  %v{d} = call i1 @rt_guard_tag(%Value %v_lhs_{d}, i64 6)\n", .{f1, temp_counter-2});
@@ -519,7 +524,12 @@ pub const CodeGen = struct {
                     const r_val = next_temp(&temp_counter);
                     if (r_stable) |v| {
                         try writer.print("  %v{d} = add i64 0, {d}\n", .{r_val, v});
+                    } else if (analysis.isProvenBits(a.rhs)) {
+                        // タグ証明済み：ガードなしで直接取得
+                        try writer.print("  %rhs_ptr_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{a.rhs, a.rhs});
+                        try writer.print("  %v{d} = call i64 @rt_get_int(ptr %rhs_ptr_{d})\n", .{r_val, a.rhs});
                     } else {
+                        try writer.print("  %rhs_ptr_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{a.rhs, a.rhs});
                         try writer.print("  %v_rhs_{d} = load %Value, ptr %rhs_ptr_{d}\n", .{next_temp(&temp_counter), a.rhs});
                         const f2 = next_temp(&temp_counter);
                         try writer.print("  %v{d} = call i1 @rt_guard_tag(%Value %v_rhs_{d}, i64 6)\n", .{f2, temp_counter-2});
@@ -1253,6 +1263,7 @@ fn makeEmptyAnalysis(allocator: std.mem.Allocator) analyzer.RangeAnalysisResult 
         .escapes = std.AutoHashMap(u32, void).init(allocator),
         .stable_values = std.AutoHashMap(u32, u64).init(allocator),
         .inlining_hints = std.AutoHashMap(usize, usize).init(allocator),
+        .tag_types = std.AutoHashMap(u32, analyzer.TagType).init(allocator),
         .allocator = allocator,
     };
 }
@@ -1367,4 +1378,51 @@ test "Codegen: icmp eq128 emits icmp eq i128 and rt_get_wide_limb" {
     defer allocator.free(ir);
     try std.testing.expect(std.mem.indexOf(u8, ir, "icmp eq i128") != null);
     try std.testing.expect(std.mem.indexOf(u8, ir, "rt_get_wide_limb") != null);
+}
+
+test "Codegen: add with proven bits skips rt_guard_tag" {
+    // load_const bits → add → ret のIRを生成し、rt_guard_tag の呼び出しが含まれないことを確認
+    // （定義文字列 "define i1 @rt_guard_tag" は常に含まれるため、call命令を検索する）
+    const allocator = std.testing.allocator;
+    const code = [_]Op{
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 10 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 20 } } },
+        .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const program = [_][]const Op{&code};
+    // analyzerで実際にタグ推論を行う
+    var az = analyzer.RangeAnalyzer.init(allocator);
+    var analysis = try az.analyze(&code, null, 0);
+    defer analysis.deinit();
+    var cg = CodeGen.init(allocator);
+    const ir = try cg.generate(&program, analysis, "test_add_bits_proven", default_cpu);
+    defer allocator.free(ir);
+    // bits証明済みなのでrt_guard_tagのcall命令が含まれないことを確認
+    try std.testing.expect(std.mem.indexOf(u8, ir, "call i1 @rt_guard_tag") == null);
+    // rt_get_intは含まれることを確認
+    try std.testing.expect(std.mem.indexOf(u8, ir, "rt_get_int") != null);
+}
+
+test "Codegen: add with unknown type keeps rt_guard_tag" {
+    // callの結果(unknown) → add の場合、ガードが残ることを確認
+    const allocator = std.testing.allocator;
+    const args: []const u32 = &[_]u32{};
+    const code = [_]Op{
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 0 } } },
+        .{ .call = .{ .dst = 1, .func = 0, .args = args } },
+        .{ .add = .{ .dst = 2, .lhs = 1, .rhs = 0 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const program = [_][]const Op{&code};
+    var az = analyzer.RangeAnalyzer.init(allocator);
+    var analysis = try az.analyze(&code, null, 0);
+    defer analysis.deinit();
+    // reg 1 (call結果) は unknown なのでガードが必要
+    try std.testing.expect(!analysis.isProvenBits(1));
+    var cg = CodeGen.init(allocator);
+    const ir = try cg.generate(&program, analysis, "test_add_unknown", default_cpu);
+    defer allocator.free(ir);
+    // lhsがunknownなのでrt_guard_tagのcall命令が含まれることを確認
+    try std.testing.expect(std.mem.indexOf(u8, ir, "call i1 @rt_guard_tag") != null);
 }
