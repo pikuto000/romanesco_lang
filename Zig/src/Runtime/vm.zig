@@ -1,6 +1,33 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+pub const CpuFeatures = struct {
+    has_avx2: bool,
+    has_neon: bool,
+    vector_width: u16, // bits (e.g., 256 for AVX2)
+
+    pub fn detect() CpuFeatures {
+        const target = @import("builtin").target;
+        var features = CpuFeatures{
+            .has_avx2 = false,
+            .has_neon = false,
+            .vector_width = 64,
+        };
+        if (target.cpu.arch.isX86()) {
+            if (std.Target.x86.featureSetHas(target.cpu.features, .avx2)) {
+                features.has_avx2 = true;
+                features.vector_width = 256;
+            }
+        } else if (target.cpu.arch.isARM() or target.cpu.arch.isAARCH64()) {
+            features.has_neon = true;
+            features.vector_width = 128;
+        }
+        return features;
+    }
+};
+
+pub const Tier = u32;
+
 pub const IntWidth = u16;
 
 pub const IBinOp = enum {

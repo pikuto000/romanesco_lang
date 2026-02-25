@@ -70,8 +70,8 @@ pub const ProfileData = struct {
     }
 
     pub fn recordValue(self: *ProfileData, pc: usize, reg: u32, val: Value) !void {
-        if (val != .int) return;
-        const v = val.int;
+        if (val != .bits) return;
+        const v = val.bits;
 
         var pc_entry = try self.value_profiles.getOrPut(pc);
         if (!pc_entry.found_existing) {

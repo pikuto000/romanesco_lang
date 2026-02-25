@@ -68,8 +68,8 @@ pub const RangeAnalyzer = struct {
         for (code) |op| {
             switch (op) {
                 .load_const => |lc| {
-                    if (lc.val == .int) {
-                        try widths.put(lc.dst, requiredBits(lc.val.int));
+                    if (lc.val == .bits) {
+                        try widths.put(lc.dst, requiredBits(lc.val.bits));
                     } else {
                         try widths.put(lc.dst, 64);
                     }

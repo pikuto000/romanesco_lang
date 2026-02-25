@@ -85,7 +85,7 @@ pub fn main() !void {
     defer last_result.deinit(allocator);
 
     switch (last_result) {
-        .int => |n| std.debug.print("Final Result: {d}\n", .{n}),
+        .bits => |n| std.debug.print("Final Result: {d}\n", .{n}),
         .unit => std.debug.print("Final Result: ()\n", .{}),
         else => std.debug.print("Final Result: <complex value>\n", .{}),
     }

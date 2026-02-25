@@ -295,6 +295,21 @@ pub const Optimizer = struct {
                 .ret => |o| try last_use.put(o.src, pc),
                 .free => |o| try last_use.put(o.reg, pc),
                 .load_const => {},
+                .ibin => |o| { try last_use.put(o.lhs, pc); try last_use.put(o.rhs, pc); },
+                .icmp => |o| { try last_use.put(o.lhs, pc); try last_use.put(o.rhs, pc); },
+                .load_bits => {},
+                .load_wide => {},
+                .sext => |o| try last_use.put(o.src, pc),
+                .zext => |o| try last_use.put(o.src, pc),
+                .trunc => |o| try last_use.put(o.src, pc),
+                .itof => |o| try last_use.put(o.src, pc),
+                .ftoi => |o| try last_use.put(o.src, pc),
+                .fadd => |o| { try last_use.put(o.lhs, pc); try last_use.put(o.rhs, pc); },
+                .fsub => |o| { try last_use.put(o.lhs, pc); try last_use.put(o.rhs, pc); },
+                .fmul => |o| { try last_use.put(o.lhs, pc); try last_use.put(o.rhs, pc); },
+                .fdiv => |o| { try last_use.put(o.lhs, pc); try last_use.put(o.rhs, pc); },
+                .frem => |o| { try last_use.put(o.lhs, pc); try last_use.put(o.rhs, pc); },
+                .fcmp => |o| { try last_use.put(o.lhs, pc); try last_use.put(o.rhs, pc); },
             }
         }
 

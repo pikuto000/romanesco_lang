@@ -332,7 +332,7 @@ const FuncBodyParser = struct {
             if (fc != '-' and (fc < '0' or fc > '9')) return;
             try self.ops.append(a, .{ .load_const = .{
                 .dst = dst,
-                .val = .{ .int = @bitCast(@as(i64, val)) },
+                .val = .{ .bits = @bitCast(@as(i64, val)) },
             } });
             return;
         }
@@ -515,6 +515,16 @@ const ModuleParser = struct {
 
     fn parse(self: *ModuleParser, ir_text: []const u8) !loader.LoadedProgram {
         const a = self.allocator;
+
+        // block/op データの所有権を持つ arena を先に作成する
+        const arena = try a.create(std.heap.ArenaAllocator);
+        arena.* = std.heap.ArenaAllocator.init(a);
+        errdefer {
+            arena.deinit();
+            a.destroy(arena);
+        }
+        const aa = arena.allocator();
+
         var parser = ir_parser.IRParser.init(a);
         var mod = try parser.parse(ir_text);
         defer mod.deinit(a);
@@ -555,21 +565,21 @@ const ModuleParser = struct {
             }
 
             if (is_target and blk_idx < num_blocks) {
-                var fb_parser = FuncBodyParser.init(a, blk_idx, &case_fixups, &closure_fixups);
+                var fb_parser = FuncBodyParser.init(aa, blk_idx, &case_fixups, &closure_fixups);
                 defer fb_parser.deinit();
                 for (func.blocks) |block| {
                     for (block.instructions) |insn| {
                         try fb_parser.processInstruction(insn);
                     }
                 }
-                raw_blocks[blk_idx] = try fb_parser.ops.toOwnedSlice(a);
+                raw_blocks[blk_idx] = try fb_parser.ops.toOwnedSlice(aa);
             }
         }
 
         if (!has_entry) return error.MissingEntryPoint;
 
         for (raw_blocks) |*rb| {
-            if (rb.* == null) rb.* = try a.alloc(Op, 0);
+            if (rb.* == null) rb.* = try aa.alloc(Op, 0);
         }
 
         for (closure_fixups.items) |fx| {
@@ -592,6 +602,7 @@ const ModuleParser = struct {
 
         return loader.LoadedProgram{
             .allocator = a,
+            .arena = arena,
             .constants = try a.alloc(Value, 0),
             .blocks = blocks,
         };
@@ -661,7 +672,7 @@ test "Decompiler: load_const int + ret" {
     const code = prog.mainCode();
     try std.testing.expectEqual(@as(usize, 2), code.len);
     try std.testing.expectEqual(@as(u32, 0), code[0].load_const.dst);
-    try std.testing.expectEqual(@as(u64, 99), code[0].load_const.val.int);
+    try std.testing.expectEqual(@as(u64, 99), code[0].load_const.val.bits);
     try std.testing.expectEqual(@as(u32, 0), code[1].ret.src);
 }
 
@@ -698,8 +709,8 @@ test "Decompiler: add op" {
     defer prog.deinit();
     const code = prog.mainCode();
     try std.testing.expectEqual(@as(usize, 4), code.len);
-    try std.testing.expectEqual(@as(u64, 10), code[0].load_const.val.int);
-    try std.testing.expectEqual(@as(u64, 20), code[1].load_const.val.int);
+    try std.testing.expectEqual(@as(u64, 10), code[0].load_const.val.bits);
+    try std.testing.expectEqual(@as(u64, 20), code[1].load_const.val.bits);
     try std.testing.expectEqual(@as(u32, 2), code[2].add.dst);
     try std.testing.expectEqual(@as(u32, 0), code[2].add.lhs);
     try std.testing.expectEqual(@as(u32, 1), code[2].add.rhs);
@@ -746,7 +757,7 @@ test "Decompiler: make_pair + proj1" {
     const code = prog.mainCode();
     // load_const 7, load_const unit, make_pair 2←0,1, proj1 0←2, ret 0
     try std.testing.expectEqual(@as(usize, 5), code.len);
-    try std.testing.expectEqual(@as(u64, 7), code[0].load_const.val.int);
+    try std.testing.expectEqual(@as(u64, 7), code[0].load_const.val.bits);
     try std.testing.expect(code[1].load_const.val == .unit);
     try std.testing.expectEqual(@as(u32, 2), code[2].make_pair.dst);
     try std.testing.expectEqual(@as(u32, 0), code[2].make_pair.fst);

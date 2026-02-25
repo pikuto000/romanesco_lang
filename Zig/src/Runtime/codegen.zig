@@ -349,6 +349,21 @@ pub const CodeGen = struct {
                 .borrow => |o| if (o.dst > max_reg) { max_reg = o.dst; },
                 .free => |o| if (o.reg > max_reg) { max_reg = o.reg; },
                 .ret => |o| if (o.src > max_reg) { max_reg = o.src; },
+                .ibin => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .icmp => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .load_bits => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .load_wide => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .sext => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .zext => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .trunc => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .itof => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .ftoi => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .fadd => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .fsub => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .fmul => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .fdiv => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .frem => |o| if (o.dst > max_reg) { max_reg = o.dst; },
+                .fcmp => |o| if (o.dst > max_reg) { max_reg = o.dst; },
             }
         }
         
@@ -426,8 +441,8 @@ pub const CodeGen = struct {
             switch (op) {
                 .load_const => |lc| {
                     try writer.print("  %r_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{lc.dst, lc.dst});
-                    if (lc.val == .int) {
-                        try writer.print("  call void @rt_make_int(ptr %r_{d}, i64 {d})\n", .{lc.dst, lc.val.int});
+                    if (lc.val == .bits) {
+                        try writer.print("  call void @rt_make_int(ptr %r_{d}, i64 {d})\n", .{lc.dst, @as(i64, @bitCast(lc.val.bits))});
                     } else if (lc.val == .unit) {
                         try writer.print("  call void @rt_make_unit(ptr %r_{d})\n", .{lc.dst});
                     }
@@ -778,9 +793,386 @@ pub const CodeGen = struct {
                     try writer.print("  store %Value %v{d}, ptr %dst_ptr_{d}\n", .{final_res, c.dst});
                     try writer.print("  call void @rt_init_unit(ptr %scr_ptr_{d})\n", .{c.scrutinee});
                 },
+                .load_bits => |o| {
+                    try writer.print("  %lb_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %lb_dst_{d}, i64 {d})\n", .{o.dst, @as(i64, @bitCast(o.val))});
+                },
+                .load_wide => |o| {
+                    // 暫定: 最初のリムだけ使う (TODO: 多倍長対応)
+                    const first_limb: u64 = if (o.limbs.len > 0) o.limbs[0] else 0;
+                    try writer.print("  %lw_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %lw_dst_{d}, i64 {d})\n", .{o.dst, @as(i64, @bitCast(first_limb))});
+                },
+                .ibin => |o| {
+                    const llvm_op: []const u8 = switch (o.op) {
+                        .add => "add", .sub => "sub", .mul => "mul",
+                        .sdiv => "sdiv", .udiv => "udiv",
+                        .srem => "srem", .urem => "urem",
+                        .and_ => "and", .or_ => "or", .xor_ => "xor",
+                        .shl => "shl", .lshr => "lshr", .ashr => "ashr",
+                    };
+                    const w = o.width;
+                    try writer.print("  %ibin_lhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.lhs, o.lhs});
+                    try writer.print("  %ibin_rhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.rhs, o.rhs});
+                    const lv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %ibin_lhs_{d})\n", .{lv, o.lhs});
+                    const rv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %ibin_rhs_{d})\n", .{rv, o.rhs});
+                    const res = next_temp(&temp_counter);
+                    if (w < 64) {
+                        const lt = next_temp(&temp_counter);
+                        const rt_t = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{lt, lv, w});
+                        try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{rt_t, rv, w});
+                        const op_r = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = {s} i{d} %v{d}, %v{d}\n", .{op_r, llvm_op, w, lt, rt_t});
+                        try writer.print("  %v{d} = zext i{d} %v{d} to i64\n", .{res, w, op_r});
+                    } else {
+                        try writer.print("  %v{d} = {s} i64 %v{d}, %v{d}\n", .{res, llvm_op, lv, rv});
+                    }
+                    try writer.print("  %ibin_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %ibin_dst_{d}, i64 %v{d})\n", .{o.dst, res});
+                },
+                .icmp => |o| {
+                    const llvm_pred: []const u8 = switch (o.pred) {
+                        .eq => "eq", .ne => "ne",
+                        .slt => "slt", .sle => "sle", .sgt => "sgt", .sge => "sge",
+                        .ult => "ult", .ule => "ule", .ugt => "ugt", .uge => "uge",
+                    };
+                    const w = o.width;
+                    try writer.print("  %icmp_lhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.lhs, o.lhs});
+                    try writer.print("  %icmp_rhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.rhs, o.rhs});
+                    const lv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %icmp_lhs_{d})\n", .{lv, o.lhs});
+                    const rv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %icmp_rhs_{d})\n", .{rv, o.rhs});
+                    const cmp_id = next_temp(&temp_counter);
+                    if (w < 64) {
+                        const lt = next_temp(&temp_counter);
+                        const rt_t = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{lt, lv, w});
+                        try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{rt_t, rv, w});
+                        try writer.print("  %v{d} = icmp {s} i{d} %v{d}, %v{d}\n", .{cmp_id, llvm_pred, w, lt, rt_t});
+                    } else {
+                        try writer.print("  %v{d} = icmp {s} i64 %v{d}, %v{d}\n", .{cmp_id, llvm_pred, lv, rv});
+                    }
+                    const bid = next_temp(&temp_counter);
+                    var t_lab_buf: [64]u8 = undefined;
+                    var f_lab_buf: [64]u8 = undefined;
+                    var e_lab_buf: [64]u8 = undefined;
+                    const t_lab = try std.fmt.bufPrint(&t_lab_buf, "icmp_t_{d}", .{bid});
+                    const f_lab = try std.fmt.bufPrint(&f_lab_buf, "icmp_f_{d}", .{bid});
+                    const e_lab = try std.fmt.bufPrint(&e_lab_buf, "icmp_end_{d}", .{bid});
+                    try writer.print("  %icmp_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  br i1 %v{d}, label %{s}, label %{s}\n", .{cmp_id, t_lab, f_lab});
+                    try writer.print("{s}:\n", .{t_lab});
+                    const ut = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = alloca %Value\n", .{ut});
+                    try writer.print("  call void @rt_init_unit(ptr %v{d})\n", .{ut});
+                    const uvt = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = load %Value, ptr %v{d}\n", .{uvt, ut});
+                    try writer.print("  call void @rt_make_sum(ptr %icmp_dst_{d}, %Value %v{d}, i64 3)\n", .{o.dst, uvt});
+                    try writer.print("  br label %{s}\n", .{e_lab});
+                    try writer.print("{s}:\n", .{f_lab});
+                    const uf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = alloca %Value\n", .{uf});
+                    try writer.print("  call void @rt_init_unit(ptr %v{d})\n", .{uf});
+                    const uvf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = load %Value, ptr %v{d}\n", .{uvf, uf});
+                    try writer.print("  call void @rt_make_sum(ptr %icmp_dst_{d}, %Value %v{d}, i64 4)\n", .{o.dst, uvf});
+                    try writer.print("  br label %{s}\n", .{e_lab});
+                    try writer.print("{s}:\n", .{e_lab});
+                },
+                .sext => |o| {
+                    const from_w = o.from;
+                    try writer.print("  %sext_src_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.src, o.src});
+                    const sv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %sext_src_{d})\n", .{sv, o.src});
+                    const tr = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{tr, sv, from_w});
+                    const se = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = sext i{d} %v{d} to i64\n", .{se, from_w, tr});
+                    try writer.print("  %sext_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %sext_dst_{d}, i64 %v{d})\n", .{o.dst, se});
+                },
+                .zext => |o| {
+                    const from_w = o.from;
+                    try writer.print("  %zext_src_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.src, o.src});
+                    const sv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %zext_src_{d})\n", .{sv, o.src});
+                    const tr = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{tr, sv, from_w});
+                    const ze = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = zext i{d} %v{d} to i64\n", .{ze, from_w, tr});
+                    try writer.print("  %zext_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %zext_dst_{d}, i64 %v{d})\n", .{o.dst, ze});
+                },
+                .trunc => |o| {
+                    const to_w = o.to;
+                    try writer.print("  %trunc_src_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.src, o.src});
+                    const sv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %trunc_src_{d})\n", .{sv, o.src});
+                    const tr = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{tr, sv, to_w});
+                    const ze = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = zext i{d} %v{d} to i64\n", .{ze, to_w, tr});
+                    try writer.print("  %trunc_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %trunc_dst_{d}, i64 %v{d})\n", .{o.dst, ze});
+                },
+                .itof => |o| {
+                    const w = o.width;
+                    const conv_op: []const u8 = if (o.signed) "sitofp" else "uitofp";
+                    try writer.print("  %itof_src_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.src, o.src});
+                    const sv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %itof_src_{d})\n", .{sv, o.src});
+                    const fp = next_temp(&temp_counter);
+                    if (w < 64) {
+                        const tr = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{tr, sv, w});
+                        try writer.print("  %v{d} = {s} i{d} %v{d} to double\n", .{fp, conv_op, w, tr});
+                    } else {
+                        try writer.print("  %v{d} = {s} i64 %v{d} to double\n", .{fp, conv_op, sv});
+                    }
+                    const bi = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast double %v{d} to i64\n", .{bi, fp});
+                    try writer.print("  %itof_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %itof_dst_{d}, i64 %v{d})\n", .{o.dst, bi});
+                },
+                .ftoi => |o| {
+                    const w = o.width;
+                    const conv_op: []const u8 = if (o.signed) "fptosi" else "fptoui";
+                    try writer.print("  %ftoi_src_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.src, o.src});
+                    const sv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %ftoi_src_{d})\n", .{sv, o.src});
+                    const fp = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{fp, sv});
+                    const iv = next_temp(&temp_counter);
+                    if (w < 64) {
+                        try writer.print("  %v{d} = {s} double %v{d} to i{d}\n", .{iv, conv_op, fp, w});
+                        const ze = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = zext i{d} %v{d} to i64\n", .{ze, w, iv});
+                        try writer.print("  %ftoi_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                        try writer.print("  call void @rt_make_int(ptr %ftoi_dst_{d}, i64 %v{d})\n", .{o.dst, ze});
+                    } else {
+                        try writer.print("  %v{d} = {s} double %v{d} to i64\n", .{iv, conv_op, fp});
+                        try writer.print("  %ftoi_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                        try writer.print("  call void @rt_make_int(ptr %ftoi_dst_{d}, i64 %v{d})\n", .{o.dst, iv});
+                    }
+                },
+                .fadd => |o| {
+                    try writer.print("  %fadd_lhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.lhs, o.lhs});
+                    try writer.print("  %fadd_rhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.rhs, o.rhs});
+                    const lv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %fadd_lhs_{d})\n", .{lv, o.lhs});
+                    const rv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %fadd_rhs_{d})\n", .{rv, o.rhs});
+                    const lf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{lf, lv});
+                    const rf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{rf, rv});
+                    const res = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = fadd double %v{d}, %v{d}\n", .{res, lf, rf});
+                    const bi = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast double %v{d} to i64\n", .{bi, res});
+                    try writer.print("  %fadd_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %fadd_dst_{d}, i64 %v{d})\n", .{o.dst, bi});
+                },
+                .fsub => |o| {
+                    try writer.print("  %fsub_lhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.lhs, o.lhs});
+                    try writer.print("  %fsub_rhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.rhs, o.rhs});
+                    const lv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %fsub_lhs_{d})\n", .{lv, o.lhs});
+                    const rv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %fsub_rhs_{d})\n", .{rv, o.rhs});
+                    const lf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{lf, lv});
+                    const rf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{rf, rv});
+                    const res = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = fsub double %v{d}, %v{d}\n", .{res, lf, rf});
+                    const bi = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast double %v{d} to i64\n", .{bi, res});
+                    try writer.print("  %fsub_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %fsub_dst_{d}, i64 %v{d})\n", .{o.dst, bi});
+                },
+                .fmul => |o| {
+                    try writer.print("  %fmul_lhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.lhs, o.lhs});
+                    try writer.print("  %fmul_rhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.rhs, o.rhs});
+                    const lv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %fmul_lhs_{d})\n", .{lv, o.lhs});
+                    const rv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %fmul_rhs_{d})\n", .{rv, o.rhs});
+                    const lf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{lf, lv});
+                    const rf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{rf, rv});
+                    const res = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = fmul double %v{d}, %v{d}\n", .{res, lf, rf});
+                    const bi = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast double %v{d} to i64\n", .{bi, res});
+                    try writer.print("  %fmul_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %fmul_dst_{d}, i64 %v{d})\n", .{o.dst, bi});
+                },
+                .fdiv => |o| {
+                    try writer.print("  %fdiv_lhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.lhs, o.lhs});
+                    try writer.print("  %fdiv_rhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.rhs, o.rhs});
+                    const lv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %fdiv_lhs_{d})\n", .{lv, o.lhs});
+                    const rv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %fdiv_rhs_{d})\n", .{rv, o.rhs});
+                    const lf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{lf, lv});
+                    const rf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{rf, rv});
+                    const res = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = fdiv double %v{d}, %v{d}\n", .{res, lf, rf});
+                    const bi = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast double %v{d} to i64\n", .{bi, res});
+                    try writer.print("  %fdiv_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %fdiv_dst_{d}, i64 %v{d})\n", .{o.dst, bi});
+                },
+                .frem => |o| {
+                    try writer.print("  %frem_lhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.lhs, o.lhs});
+                    try writer.print("  %frem_rhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.rhs, o.rhs});
+                    const lv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %frem_lhs_{d})\n", .{lv, o.lhs});
+                    const rv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %frem_rhs_{d})\n", .{rv, o.rhs});
+                    const lf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{lf, lv});
+                    const rf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{rf, rv});
+                    const res = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = frem double %v{d}, %v{d}\n", .{res, lf, rf});
+                    const bi = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast double %v{d} to i64\n", .{bi, res});
+                    try writer.print("  %frem_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  call void @rt_make_int(ptr %frem_dst_{d}, i64 %v{d})\n", .{o.dst, bi});
+                },
+                .fcmp => |o| {
+                    const llvm_pred: []const u8 = switch (o.pred) {
+                        .oeq => "oeq", .one => "one",
+                        .olt => "olt", .ole => "ole", .ogt => "ogt", .oge => "oge",
+                        .ord => "ord", .uno => "uno",
+                    };
+                    try writer.print("  %fcmp_lhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.lhs, o.lhs});
+                    try writer.print("  %fcmp_rhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.rhs, o.rhs});
+                    const lv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %fcmp_lhs_{d})\n", .{lv, o.lhs});
+                    const rv = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %fcmp_rhs_{d})\n", .{rv, o.rhs});
+                    const lf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{lf, lv});
+                    const rf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = bitcast i64 %v{d} to double\n", .{rf, rv});
+                    const cmp_id = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = fcmp {s} double %v{d}, %v{d}\n", .{cmp_id, llvm_pred, lf, rf});
+                    const bid = next_temp(&temp_counter);
+                    var t_lab_buf: [64]u8 = undefined;
+                    var f_lab_buf: [64]u8 = undefined;
+                    var e_lab_buf: [64]u8 = undefined;
+                    const t_lab = try std.fmt.bufPrint(&t_lab_buf, "fcmp_t_{d}", .{bid});
+                    const f_lab = try std.fmt.bufPrint(&f_lab_buf, "fcmp_f_{d}", .{bid});
+                    const e_lab = try std.fmt.bufPrint(&e_lab_buf, "fcmp_end_{d}", .{bid});
+                    try writer.print("  %fcmp_dst_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.dst, o.dst});
+                    try writer.print("  br i1 %v{d}, label %{s}, label %{s}\n", .{cmp_id, t_lab, f_lab});
+                    try writer.print("{s}:\n", .{t_lab});
+                    const ut = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = alloca %Value\n", .{ut});
+                    try writer.print("  call void @rt_init_unit(ptr %v{d})\n", .{ut});
+                    const uvt = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = load %Value, ptr %v{d}\n", .{uvt, ut});
+                    try writer.print("  call void @rt_make_sum(ptr %fcmp_dst_{d}, %Value %v{d}, i64 3)\n", .{o.dst, uvt});
+                    try writer.print("  br label %{s}\n", .{e_lab});
+                    try writer.print("{s}:\n", .{f_lab});
+                    const uf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = alloca %Value\n", .{uf});
+                    try writer.print("  call void @rt_init_unit(ptr %v{d})\n", .{uf});
+                    const uvf = next_temp(&temp_counter);
+                    try writer.print("  %v{d} = load %Value, ptr %v{d}\n", .{uvf, uf});
+                    try writer.print("  call void @rt_make_sum(ptr %fcmp_dst_{d}, %Value %v{d}, i64 4)\n", .{o.dst, uvf});
+                    try writer.print("  br label %{s}\n", .{e_lab});
+                    try writer.print("{s}:\n", .{e_lab});
+                },
             }
         }
         try writer.writeAll("  unreachable\n");
         try writer.writeAll("}\n");
     }
 };
+
+// ---- 正確性テスト ----
+
+fn makeEmptyAnalysis(allocator: std.mem.Allocator) analyzer.RangeAnalysisResult {
+    return .{
+        .bit_widths = std.AutoHashMap(u32, u8).init(allocator),
+        .escapes = std.AutoHashMap(u32, void).init(allocator),
+        .stable_values = std.AutoHashMap(u32, u64).init(allocator),
+        .inlining_hints = std.AutoHashMap(usize, usize).init(allocator),
+        .allocator = allocator,
+    };
+}
+
+const default_cpu = vm.CpuFeatures{ .has_avx2 = false, .has_neon = false, .vector_width = 64 };
+
+test "Codegen: load_bits emits rt_make_int" {
+    const allocator = std.testing.allocator;
+    const code = [_]Op{
+        .{ .load_bits = .{ .dst = 0, .val = 42, .width = 64 } },
+        .{ .ret = .{ .src = 0 } },
+    };
+    const program = [_][]const Op{&code};
+    var analysis = makeEmptyAnalysis(allocator);
+    defer analysis.deinit();
+    var cg = CodeGen.init(allocator);
+    const ir = try cg.generate(&program, analysis, "test_load_bits", default_cpu);
+    defer allocator.free(ir);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "rt_make_int") != null);
+}
+
+test "Codegen: ibin add64 emits add i64" {
+    const allocator = std.testing.allocator;
+    const code = [_]Op{
+        .{ .ibin = .{ .dst = 2, .lhs = 0, .rhs = 1, .op = .add, .width = 64 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const program = [_][]const Op{&code};
+    var analysis = makeEmptyAnalysis(allocator);
+    defer analysis.deinit();
+    var cg = CodeGen.init(allocator);
+    const ir = try cg.generate(&program, analysis, "test_ibin_add", default_cpu);
+    defer allocator.free(ir);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "add i64") != null);
+}
+
+test "Codegen: fadd emits bitcast and fadd double" {
+    const allocator = std.testing.allocator;
+    const code = [_]Op{
+        .{ .fadd = .{ .dst = 2, .lhs = 0, .rhs = 1 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const program = [_][]const Op{&code};
+    var analysis = makeEmptyAnalysis(allocator);
+    defer analysis.deinit();
+    var cg = CodeGen.init(allocator);
+    const ir = try cg.generate(&program, analysis, "test_fadd", default_cpu);
+    defer allocator.free(ir);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "bitcast i64") != null);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "fadd double") != null);
+}
+
+test "Codegen: icmp eq32 emits br i1 and rt_make_sum" {
+    const allocator = std.testing.allocator;
+    const code = [_]Op{
+        .{ .icmp = .{ .dst = 2, .lhs = 0, .rhs = 1, .pred = .eq, .width = 32 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const program = [_][]const Op{&code};
+    var analysis = makeEmptyAnalysis(allocator);
+    defer analysis.deinit();
+    var cg = CodeGen.init(allocator);
+    const ir = try cg.generate(&program, analysis, "test_icmp_eq32", default_cpu);
+    defer allocator.free(ir);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "br i1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "rt_make_sum") != null);
+}

@@ -177,7 +177,7 @@ pub const SpeculativeExecutor = struct {
                 return res.val;
             }
 
-            return Value{ .int = res_u64 };
+            return Value{ .bits = res_u64 };
         }
 
         // TIER 0: Interpreter
@@ -191,8 +191,8 @@ test "SpeculativeExecutor Tiered demo" {
     defer executor.deinit(); 
     
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 10 } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 32 } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 10 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 32 } } },
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },
         .{ .ret = .{ .src = 2 } },
     };
@@ -201,7 +201,7 @@ test "SpeculativeExecutor Tiered demo" {
     while (i < 30) : (i += 1) {
         const res = try executor.execute(&[_][]const Op{code}, code);
         defer res.deinit(allocator);
-        try std.testing.expectEqual(@as(u64, 42), res.int);
+        try std.testing.expectEqual(@as(u64, 42), res.bits);
     }
 }
 
