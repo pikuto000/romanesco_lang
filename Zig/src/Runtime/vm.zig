@@ -210,6 +210,98 @@ pub const VM = struct {
         limbs[top] &= mask;
     }
 
+    fn bigintCmp(self: *VM, lhs: []const u64, rhs: []const u64, width: IntWidth, signed: bool) std.math.Order {
+        const n = self.limbCount(width);
+        if (signed) {
+            const top = (width - 1) / 64;
+            const bit = @as(u6, @intCast((width - 1) % 64));
+            const l_sign = (lhs[top] >> bit) & 1;
+            const r_sign = (rhs[top] >> bit) & 1;
+            if (l_sign != r_sign) {
+                return if (l_sign == 1) .lt else .gt;
+            }
+        }
+        var i: usize = n;
+        while (i > 0) {
+            i -= 1;
+            const lv = if (i < lhs.len) lhs[i] else 0;
+            const rv = if (i < rhs.len) rhs[i] else 0;
+            if (lv < rv) return .lt;
+            if (lv > rv) return .gt;
+        }
+        return .eq;
+    }
+
+    fn bigintShift(self: *VM, lhs: []const u64, amount: u64, op: IBinOp, width: IntWidth) ![]u64 {
+        const n = self.limbCount(width);
+        const dst = try self.allocator.alloc(u64, n);
+        @memset(dst, 0);
+
+        const limb_shift = amount / 64;
+        const bit_shift = @as(u6, @intCast(amount % 64));
+
+        if (limb_shift >= n) {
+            if (op == .ashr) {
+                const top = (width - 1) / 64;
+                const bit = @as(u6, @intCast((width - 1) % 64));
+                const sign = (lhs[top] >> bit) & 1;
+                if (sign == 1) @memset(dst, 0xFFFFFFFFFFFFFFFF);
+            }
+            self.maskTopLimb(dst, width);
+            return dst;
+        }
+
+        switch (op) {
+            .shl => {
+                var i = n - 1;
+                while (i >= limb_shift) {
+                    const src_idx = i - limb_shift;
+                    var val = lhs[src_idx] << bit_shift;
+                    if (bit_shift > 0 and src_idx > 0) {
+                        val |= lhs[src_idx - 1] >> @as(u6, @intCast(64 - @as(u7, bit_shift)));
+                    }
+                    dst[i] = val;
+                    if (i == 0) break;
+                    i -= 1;
+                }
+            },
+            .lshr => {
+                for (0..n - limb_shift) |i| {
+                    const src_idx = i + limb_shift;
+                    var val = lhs[src_idx] >> bit_shift;
+                    if (bit_shift > 0 and src_idx + 1 < lhs.len) {
+                        val |= lhs[src_idx + 1] << @as(u6, @intCast(64 - @as(u7, bit_shift)));
+                    }
+                    dst[i] = val;
+                }
+            },
+            .ashr => {
+                const top = (width - 1) / 64;
+                const bit = @as(u6, @intCast((width - 1) % 64));
+                const sign = (lhs[top] >> bit) & 1;
+
+                for (0..n - limb_shift) |i| {
+                    const src_idx = i + limb_shift;
+                    var val = lhs[src_idx] >> bit_shift;
+                    if (bit_shift > 0 and src_idx + 1 < lhs.len) {
+                        val |= lhs[src_idx + 1] << @as(u6, @intCast(64 - @as(u7, bit_shift)));
+                    }
+                    dst[i] = val;
+                }
+
+                if (sign == 1) {
+                    for (n - limb_shift..n) |i| dst[i] = 0xFFFFFFFFFFFFFFFF;
+                    if (bit_shift > 0) {
+                        dst[n - limb_shift - 1] |= (~@as(u64, 0)) << @as(u6, @intCast(64 - @as(u7, bit_shift)));
+                    }
+                }
+            },
+            else => unreachable,
+        }
+        self.maskTopLimb(dst, width);
+        return dst;
+    }
+
     fn bigintAdd(self: *VM, lhs: []const u64, rhs: []const u64, width: IntWidth) ![]u64 {
         const n = self.limbCount(width);
         const dst = try self.allocator.alloc(u64, n);
@@ -508,15 +600,18 @@ pub const VM = struct {
                             };
                             regs[o.dst].deinit(self.allocator); regs[o.dst] = .{ .bits = raw & mask };
                         } else {
-                            const l = regs[o.lhs].wide; const r = regs[o.rhs].wide;
+                            const l = regs[o.lhs].wide;
                             const res = switch (o.op) {
-                                .add => try self.bigintAdd(l, r, o.width),
-                                .sub => try self.bigintSub(l, r, o.width),
-                                .mul => try self.bigintMul(l, r, o.width),
-                                .and_ => try self.bigintBitwise(l, r, .and_, o.width),
-                                .or_  => try self.bigintBitwise(l, r, .or_, o.width),
-                                .xor_ => try self.bigintBitwise(l, r, .xor_, o.width),
-                                else => return error.UnsupportedBigIntOp,
+                                .add => try self.bigintAdd(l, regs[o.rhs].wide, o.width),
+                                .sub => try self.bigintSub(l, regs[o.rhs].wide, o.width),
+                                .mul => try self.bigintMul(l, regs[o.rhs].wide, o.width),
+                                .and_ => try self.bigintBitwise(l, regs[o.rhs].wide, .and_, o.width),
+                                .or_  => try self.bigintBitwise(l, regs[o.rhs].wide, .or_, o.width),
+                                .xor_ => try self.bigintBitwise(l, regs[o.rhs].wide, .xor_, o.width),
+                                .shl  => try self.bigintShift(l, regs[o.rhs].bits, .shl, o.width),
+                                .lshr => try self.bigintShift(l, regs[o.rhs].bits, .lshr, o.width),
+                                .ashr => try self.bigintShift(l, regs[o.rhs].bits, .ashr, o.width),
+                                else  => return error.UnsupportedBigIntOp,
                             };
                             regs[o.dst].deinit(self.allocator); regs[o.dst] = .{ .wide = res };
                         }
@@ -529,7 +624,24 @@ pub const VM = struct {
                             };
                             const v = try self.allocator.create(Value); v.* = .unit;
                             regs[o.dst].deinit(self.allocator); regs[o.dst] = if (cond) .{ .inl = v } else .{ .inr = v };
-                        } else return error.UnsupportedBigInt;
+                        } else {
+                            const l = regs[o.lhs].wide; const r = regs[o.rhs].wide;
+                            const signed = switch (o.pred) {
+                                .slt, .sle, .sgt, .sge => true,
+                                else => false,
+                            };
+                            const ord = self.bigintCmp(l, r, o.width, signed);
+                            const cond: bool = switch (o.pred) {
+                                .eq => ord == .eq,
+                                .ne => ord != .eq,
+                                .slt, .ult => ord == .lt,
+                                .sle, .ule => ord != .gt,
+                                .sgt, .ugt => ord == .gt,
+                                .sge, .uge => ord != .lt,
+                            };
+                            const v = try self.allocator.create(Value); v.* = .unit;
+                            regs[o.dst].deinit(self.allocator); regs[o.dst] = if (cond) .{ .inl = v } else .{ .inr = v };
+                        }
                     },
                     .fcmp => |o| {
                         const l: f64 = @bitCast(regs[o.lhs].bits); const r: f64 = @bitCast(regs[o.rhs].bits);
@@ -803,4 +915,101 @@ test "ibin wide mul i128: 3 * 5 = 15" {
     defer result.deinit(allocator);
     try std.testing.expectEqual(@as(u64, 15), result.wide[0]);
     try std.testing.expectEqual(@as(u64, 0), result.wide[1]);
+}
+
+test "bigintCmp: unsigned 128bit" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    const lhs = [_]u64{ 0, 1 }; // 2^64
+    const rhs = [_]u64{ 0xFFFFFFFFFFFFFFFF, 0 }; // 2^64 - 1
+    
+    try std.testing.expect(vm_inst.bigintCmp(&lhs, &rhs, 128, false) == .gt);
+    try std.testing.expect(vm_inst.bigintCmp(&rhs, &lhs, 128, false) == .lt);
+    try std.testing.expect(vm_inst.bigintCmp(&lhs, &lhs, 128, false) == .eq);
+}
+
+test "bigintCmp: signed 128bit" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    const pos = [_]u64{ 1, 0 };
+    const neg = [_]u64{ 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF }; // -1
+    
+    try std.testing.expect(vm_inst.bigintCmp(&pos, &neg, 128, true) == .gt);
+    try std.testing.expect(vm_inst.bigintCmp(&neg, &pos, 128, true) == .lt);
+}
+
+test "ibin wide shl i128" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    const code = &[_]Op{
+        .{ .load_wide = .{ .dst = 0, .limbs = &[_]u64{ 1, 0 }, .width = 128 } },
+        .{ .load_bits = .{ .dst = 1, .val = 64, .width = 64 } },
+        .{ .ibin = .{ .dst = 2, .lhs = 0, .rhs = 1, .op = .shl, .width = 128 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const result = try vm_inst.run(code);
+    defer result.deinit(allocator);
+    try std.testing.expectEqual(@as(u64, 0), result.wide[0]);
+    try std.testing.expectEqual(@as(u64, 1), result.wide[1]);
+}
+
+test "ibin wide lshr i128" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    const code = &[_]Op{
+        .{ .load_wide = .{ .dst = 0, .limbs = &[_]u64{ 0, 1 }, .width = 128 } },
+        .{ .load_bits = .{ .dst = 1, .val = 64, .width = 64 } },
+        .{ .ibin = .{ .dst = 2, .lhs = 0, .rhs = 1, .op = .lshr, .width = 128 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const result = try vm_inst.run(code);
+    defer result.deinit(allocator);
+    try std.testing.expectEqual(@as(u64, 1), result.wide[0]);
+    try std.testing.expectEqual(@as(u64, 0), result.wide[1]);
+}
+
+test "ibin wide ashr i128" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    const code = &[_]Op{
+        // -2^127
+        .{ .load_wide = .{ .dst = 0, .limbs = &[_]u64{ 0, 0x8000000000000000 }, .width = 128 } },
+        .{ .load_bits = .{ .dst = 1, .val = 1, .width = 64 } },
+        .{ .ibin = .{ .dst = 2, .lhs = 0, .rhs = 1, .op = .ashr, .width = 128 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const result = try vm_inst.run(code);
+    defer result.deinit(allocator);
+    // Should be -2^126 = 0xC000000000000000 in top limb
+    try std.testing.expectEqual(@as(u64, 0), result.wide[0]);
+    try std.testing.expectEqual(@as(u64, 0xC000000000000000), result.wide[1]);
+}
+
+test "icmp wide 128bit" {
+    const allocator = std.testing.allocator;
+    var vm_inst = VM.init(allocator);
+    {
+        // 2^64 > 2^64 - 1
+        const code = &[_]Op{
+            .{ .load_wide = .{ .dst = 0, .limbs = &[_]u64{ 0, 1 }, .width = 128 } },
+            .{ .load_wide = .{ .dst = 1, .limbs = &[_]u64{ 0xFFFFFFFFFFFFFFFF, 0 }, .width = 128 } },
+            .{ .icmp = .{ .dst = 2, .lhs = 0, .rhs = 1, .pred = .ugt, .width = 128 } },
+            .{ .ret = .{ .src = 2 } },
+        };
+        const result = try vm_inst.run(code);
+        defer result.deinit(allocator);
+        try std.testing.expect(std.meta.activeTag(result) == .inl); // true
+    }
+    {
+        // 2^64 == 2^64
+        const code = &[_]Op{
+            .{ .load_wide = .{ .dst = 0, .limbs = &[_]u64{ 0, 1 }, .width = 128 } },
+            .{ .load_wide = .{ .dst = 1, .limbs = &[_]u64{ 0, 1 }, .width = 128 } },
+            .{ .icmp = .{ .dst = 2, .lhs = 0, .rhs = 1, .pred = .eq, .width = 128 } },
+            .{ .ret = .{ .src = 2 } },
+        };
+        const result = try vm_inst.run(code);
+        defer result.deinit(allocator);
+        try std.testing.expect(std.meta.activeTag(result) == .inl); // true
+    }
 }

@@ -894,20 +894,28 @@ pub const CodeGen = struct {
                             try writer.print("  %v{d} = or i{d} %v{d}, %v{d}\n", .{la, w, lhs_acc, ls});
                             lhs_acc = la;
                         }
-                        // rhs を同様に再構築
+                        // rhs を再構築
                         var rhs_acc = next_temp(&temp_counter);
-                        try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %ibin_rhs_{d}, i64 0)\n", .{rhs_acc, o.rhs});
-                        const rhs_e0 = next_temp(&temp_counter);
-                        try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{rhs_e0, rhs_acc, w});
-                        rhs_acc = rhs_e0;
-                        for (1..lc) |li| {
-                            const rr = next_temp(&temp_counter); const re = next_temp(&temp_counter);
-                            const rs = next_temp(&temp_counter); const ra = next_temp(&temp_counter);
-                            try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %ibin_rhs_{d}, i64 {d})\n", .{rr, o.rhs, li});
-                            try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{re, rr, w});
-                            try writer.print("  %v{d} = shl i{d} %v{d}, {d}\n", .{rs, w, re, li * 64});
-                            try writer.print("  %v{d} = or i{d} %v{d}, %v{d}\n", .{ra, w, rhs_acc, rs});
-                            rhs_acc = ra;
+                        const is_shift = o.op == .shl or o.op == .lshr or o.op == .ashr;
+                        if (is_shift) {
+                            try writer.print("  %v{d} = call i64 @rt_get_int(ptr %ibin_rhs_{d})\n", .{rhs_acc, o.rhs});
+                            const rhs_e = next_temp(&temp_counter);
+                            try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{rhs_e, rhs_acc, w});
+                            rhs_acc = rhs_e;
+                        } else {
+                            try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %ibin_rhs_{d}, i64 0)\n", .{rhs_acc, o.rhs});
+                            const rhs_e0 = next_temp(&temp_counter);
+                            try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{rhs_e0, rhs_acc, w});
+                            rhs_acc = rhs_e0;
+                            for (1..lc) |li| {
+                                const rr = next_temp(&temp_counter); const re = next_temp(&temp_counter);
+                                const rs = next_temp(&temp_counter); const ra = next_temp(&temp_counter);
+                                try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %ibin_rhs_{d}, i64 {d})\n", .{rr, o.rhs, li});
+                                try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{re, rr, w});
+                                try writer.print("  %v{d} = shl i{d} %v{d}, {d}\n", .{rs, w, re, li * 64});
+                                try writer.print("  %v{d} = or i{d} %v{d}, %v{d}\n", .{ra, w, rhs_acc, rs});
+                                rhs_acc = ra;
+                            }
                         }
                         // 演算
                         const op_res = next_temp(&temp_counter);
@@ -941,19 +949,56 @@ pub const CodeGen = struct {
                     const w = o.width;
                     try writer.print("  %icmp_lhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.lhs, o.lhs});
                     try writer.print("  %icmp_rhs_{d} = getelementptr %Value, ptr %regs, i32 {d}\n", .{o.rhs, o.rhs});
-                    const lv = next_temp(&temp_counter);
-                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %icmp_lhs_{d})\n", .{lv, o.lhs});
-                    const rv = next_temp(&temp_counter);
-                    try writer.print("  %v{d} = call i64 @rt_get_int(ptr %icmp_rhs_{d})\n", .{rv, o.rhs});
                     const cmp_id = next_temp(&temp_counter);
                     if (w < 64) {
+                        const lv = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = call i64 @rt_get_int(ptr %icmp_lhs_{d})\n", .{lv, o.lhs});
+                        const rv = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = call i64 @rt_get_int(ptr %icmp_rhs_{d})\n", .{rv, o.rhs});
                         const lt = next_temp(&temp_counter);
                         const rt_t = next_temp(&temp_counter);
                         try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{lt, lv, w});
                         try writer.print("  %v{d} = trunc i64 %v{d} to i{d}\n", .{rt_t, rv, w});
                         try writer.print("  %v{d} = icmp {s} i{d} %v{d}, %v{d}\n", .{cmp_id, llvm_pred, w, lt, rt_t});
-                    } else {
+                    } else if (w == 64) {
+                        const lv = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = call i64 @rt_get_int(ptr %icmp_lhs_{d})\n", .{lv, o.lhs});
+                        const rv = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = call i64 @rt_get_int(ptr %icmp_rhs_{d})\n", .{rv, o.rhs});
                         try writer.print("  %v{d} = icmp {s} i64 %v{d}, %v{d}\n", .{cmp_id, llvm_pred, lv, rv});
+                    } else {
+                        const lc = (w + 63) / 64;
+                        // lhs 再構築
+                        var lhs_acc = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %icmp_lhs_{d}, i64 0)\n", .{lhs_acc, o.lhs});
+                        const lhs_e0 = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{lhs_e0, lhs_acc, w});
+                        lhs_acc = lhs_e0;
+                        for (1..lc) |li| {
+                            const lr = next_temp(&temp_counter); const le = next_temp(&temp_counter);
+                            const ls = next_temp(&temp_counter); const la = next_temp(&temp_counter);
+                            try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %icmp_lhs_{d}, i64 {d})\n", .{lr, o.lhs, li});
+                            try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{le, lr, w});
+                            try writer.print("  %v{d} = shl i{d} %v{d}, {d}\n", .{ls, w, le, li * 64});
+                            try writer.print("  %v{d} = or i{d} %v{d}, %v{d}\n", .{la, w, lhs_acc, ls});
+                            lhs_acc = la;
+                        }
+                        // rhs 再構築
+                        var rhs_acc = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %icmp_rhs_{d}, i64 0)\n", .{rhs_acc, o.rhs});
+                        const rhs_e0 = next_temp(&temp_counter);
+                        try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{rhs_e0, rhs_acc, w});
+                        rhs_acc = rhs_e0;
+                        for (1..lc) |li| {
+                            const rr = next_temp(&temp_counter); const re = next_temp(&temp_counter);
+                            const rs = next_temp(&temp_counter); const ra = next_temp(&temp_counter);
+                            try writer.print("  %v{d} = call i64 @rt_get_wide_limb(ptr %icmp_rhs_{d}, i64 {d})\n", .{rr, o.rhs, li});
+                            try writer.print("  %v{d} = zext i64 %v{d} to i{d}\n", .{re, rr, w});
+                            try writer.print("  %v{d} = shl i{d} %v{d}, {d}\n", .{rs, w, re, li * 64});
+                            try writer.print("  %v{d} = or i{d} %v{d}, %v{d}\n", .{ra, w, rhs_acc, rs});
+                            rhs_acc = ra;
+                        }
+                        try writer.print("  %v{d} = icmp {s} i{d} %v{d}, %v{d}\n", .{cmp_id, llvm_pred, w, lhs_acc, rhs_acc});
                     }
                     const bid = next_temp(&temp_counter);
                     var t_lab_buf: [64]u8 = undefined;
@@ -1306,4 +1351,20 @@ test "Codegen: ibin add128 emits add i128 and rt_make_wide" {
     defer allocator.free(ir);
     try std.testing.expect(std.mem.indexOf(u8, ir, "add i128") != null);
     try std.testing.expect(std.mem.indexOf(u8, ir, "rt_make_wide") != null);
+}
+
+test "Codegen: icmp eq128 emits icmp eq i128 and rt_get_wide_limb" {
+    const allocator = std.testing.allocator;
+    const code = [_]Op{
+        .{ .icmp = .{ .dst = 2, .lhs = 0, .rhs = 1, .pred = .eq, .width = 128 } },
+        .{ .ret = .{ .src = 2 } },
+    };
+    const program = [_][]const Op{&code};
+    var analysis = makeEmptyAnalysis(allocator);
+    defer analysis.deinit();
+    var cg = CodeGen.init(allocator);
+    const ir = try cg.generate(&program, analysis, "test_icmp_eq128", default_cpu);
+    defer allocator.free(ir);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "icmp eq i128") != null);
+    try std.testing.expect(std.mem.indexOf(u8, ir, "rt_get_wide_limb") != null);
 }
