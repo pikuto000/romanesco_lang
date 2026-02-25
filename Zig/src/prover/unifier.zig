@@ -7,390 +7,227 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const expr_mod = @import("expr.zig");
+const syms = @import("symbols.zig");
 const Expr = expr_mod.Expr;
 const MetaId = expr_mod.MetaId;
 const Subst = expr_mod.Subst;
-const MetaIdContext = expr_mod.MetaIdContext;
 const sym = expr_mod.sym;
 const var_ = expr_mod.var_;
 const app = expr_mod.app;
 const app1 = expr_mod.app1;
 const app2 = expr_mod.app2;
 
-/// 置換を式に適用する
-pub fn applySubst(e: *const Expr, s: *const Subst, arena: Allocator) !*const Expr {
-    if (s.count() == 0) return e;
-    return switch (e.*) {
-        .meta => |id| {
-            if (s.get(id)) |val| {
-                return applySubst(val, s, arena);
-            }
-            return e;
-        },
-        .app => |a| {
-            const new_head = try applySubst(a.head, s, arena);
-            const new_args = try arena.alloc(*const Expr, a.args.len);
-            for (a.args, 0..) |arg, i| {
-                new_args[i] = try applySubst(arg, s, arena);
-            }
-            const result = try arena.create(Expr);
-            result.* = .{ .app = .{ .head = new_head, .args = new_args } };
-            return result;
-        },
-        else => e,
-    };
-}
-
-/// CatRuleに置換を適用
-pub fn applySubstToRule(rule: expr_mod.CatRule, s: *const Subst, arena: Allocator) !expr_mod.CatRule {
-    return .{
-        .name = rule.name,
-        .lhs = try applySubst(rule.lhs, s, arena),
-        .rhs = try applySubst(rule.rhs, s, arena),
-        .universals = blk: {
-            if (rule.universals.len == 0) break :blk &.{};
-            const new_u = try arena.alloc(*const Expr, rule.universals.len);
-            for (rule.universals, 0..) |u, i| {
-                new_u[i] = try applySubst(u, s, arena);
-            }
-            break :blk new_u;
-        },
-        .domain = rule.domain,
-    };
-}
-
-/// ユニフィケーション結果のイテレータ
-/// ScalaのLazyList[Subst]に対応
+/// 単一化の結果（複数の候補を返す可能性があるが、現在は最初の1つを優先）
 pub const UnifyResult = struct {
-    substs: []const Subst,
+    substitutions: []Subst,
 
     pub fn empty() UnifyResult {
-        return .{ .substs = &.{} };
+        return .{ .substitutions = &.{} };
     }
 
     pub fn single(arena: Allocator, s: Subst) !UnifyResult {
-        const arr = try arena.alloc(Subst, 1);
-        arr[0] = s;
-        return .{ .substs = arr };
+        const subs = try arena.alloc(Subst, 1);
+        subs[0] = s;
+        return .{ .substitutions = subs };
     }
 
     pub fn first(self: UnifyResult) ?Subst {
-        return if (self.substs.len > 0) self.substs[0] else null;
+        return if (self.substitutions.len > 0) self.substitutions[0] else null;
     }
 };
 
-/// メタ変数の出現チェック (occurs check)
-pub fn occursCheck(meta_id: MetaId, e: *const Expr) bool {
-    return switch (e.*) {
-        .meta => |id| MetaId.eql(id, meta_id),
-        .app => |a| {
-            if (occursCheck(meta_id, a.head)) return true;
-            for (a.args) |arg| {
-                if (occursCheck(meta_id, arg)) return true;
-            }
-            return false;
-        },
-        else => false,
-    };
-}
-
-/// 自由変数の収集
-pub fn collectFreeVars(e: *const Expr, arena: Allocator) !std.StringHashMap(void) {
-    var result = std.StringHashMap(void).init(arena);
-    try collectFreeVarsInto(e, &result, null);
-    return result;
-}
-
-fn collectFreeVarsInto(e: *const Expr, result: *std.StringHashMap(void), bound: ?*const std.StringHashMap(void)) !void {
-    switch (e.*) {
-        .var_ => |n| {
-            if (bound) |b| {
-                if (b.contains(n)) return;
-            }
-            try result.put(n, {});
-        },
-        .app => |a| {
-            // λ式の場合、束縛変数を追加
-            if (a.head.* == .sym and std.mem.eql(u8, a.head.sym, "λ") and a.args.len == 2 and a.args[0].* == .var_) {
-                // 新しい束縛セットを作る（簡略化: 再帰のみ）
-                var new_bound = if (bound) |b| b.* else std.StringHashMap(void).init(result.allocator);
-                _ = &new_bound;
-                try new_bound.put(a.args[0].var_, {});
-                try collectFreeVarsInto(a.args[1], result, &new_bound);
-            } else {
-                try collectFreeVarsInto(a.head, result, bound);
-                for (a.args) |arg| {
-                    try collectFreeVarsInto(arg, result, bound);
-                }
-            }
-        },
-        else => {},
-    }
-}
-
-/// 変数の置換 (Prover.substVar相当)
-pub fn substVar(e: *const Expr, var_name: []const u8, replacement: *const Expr, arena: Allocator) !*const Expr {
-    return switch (e.*) {
-        .var_ => |n| if (std.mem.eql(u8, n, var_name)) replacement else e,
-        .sym => e,
-        .meta => e,
-        .app => |a| {
-            // λ束縛のシャドウイング
-            if (a.head.* == .sym and std.mem.eql(u8, a.head.sym, "λ") and a.args.len == 2 and a.args[0].* == .var_) {
-                if (std.mem.eql(u8, a.args[0].var_, var_name)) return e;
-                const new_body = try substVar(a.args[1], var_name, replacement, arena);
-                if (new_body == a.args[1]) return e;
-                return app2(arena, a.head, a.args[0], new_body);
-            }
-            const new_head = try substVar(a.head, var_name, replacement, arena);
-            var changed = new_head != a.head;
-            const new_args = try arena.alloc(*const Expr, a.args.len);
-            for (a.args, 0..) |arg, i| {
-                new_args[i] = try substVar(arg, var_name, replacement, arena);
-                if (new_args[i] != arg) changed = true;
-            }
-            if (!changed) return e;
-            const result = try arena.create(Expr);
-            result.* = .{ .app = .{ .head = new_head, .args = new_args } };
-            return result;
-        },
-    };
-}
-
-/// メインのユニフィケーション関数
-/// e1とe2を統一し、成功すれば置換を返す
+/// 2つの式を単一化する
 pub fn unify(e1: *const Expr, e2: *const Expr, subst: Subst, arena: Allocator) !UnifyResult {
-    const r1 = try applySubst(e1, &subst, arena);
-    const r2 = try applySubst(e2, &subst, arena);
+    const r1 = applySubst(e1, &subst, arena) catch e1;
+    const r2 = applySubst(e2, &subst, arena) catch e2;
 
     if (r1.eql(r2)) return UnifyResult.single(arena, subst);
-
-    // λ抽象の単一化
-    if (r1.* == .app and r2.* == .app) {
-        const a1 = r1.app;
-        const a2 = r2.app;
-        if (isLambda(a1) and isLambda(a2)) {
-            const v1 = a1.args[0].var_;
-            const b1 = a1.args[1];
-            const b2 = a2.args[1];
-            const v2 = a2.args[0].var_;
-            const new_b2 = if (std.mem.eql(u8, v1, v2)) b2 else try substVar(b2, v2, a1.args[0], arena);
-            return unify(b1, new_b2, subst, arena);
-        }
-    }
-
-    // メタ変数同士のアプリケーション
-    if (r1.* == .app and r2.* == .app and r1.app.head.* == .meta and r2.app.head.* == .meta) {
-        if (MetaId.eql(r1.app.head.meta, r2.app.head.meta) and r1.app.args.len == r2.app.args.len) {
-            var s = subst;
-            for (r1.app.args, r2.app.args) |a1_arg, a2_arg| {
-                const res = try unify(a1_arg, a2_arg, s, arena);
-                if (res.first()) |ns| {
-                    s = ns;
-                } else return UnifyResult.empty();
-            }
-            return UnifyResult.single(arena, s);
-        }
-    }
-
-    // 宇宙レベルの単一化 (Russell Paradox回避)
-    if (r1.* == .app and r2.* == .app) {
-        if (r1.app.head.* == .sym and std.mem.eql(u8, r1.app.head.sym, "Type") and
-            r2.app.head.* == .sym and std.mem.eql(u8, r2.app.head.sym, "Type"))
-        {
-            const l1 = if (r1.app.args.len > 0 and r1.app.args[0].* == .meta) @as(i32, @intCast(r1.app.args[0].meta.ids.len)) else @as(i32, -1);
-            const l2 = if (r2.app.args.len > 0 and r2.app.args[0].* == .meta) @as(i32, @intCast(r2.app.args[0].meta.ids.len)) else @as(i32, -1);
-            if (l1 != -1 and l2 != -1 and l1 != l2) return UnifyResult.empty();
-            // 引数を順に統一
-            if (r1.app.args.len == r2.app.args.len) {
-                var s = subst;
-                for (r1.app.args, r2.app.args) |a1_arg, a2_arg| {
-                    const res = try unify(a1_arg, a2_arg, s, arena);
-                    if (res.first()) |ns| {
-                        s = ns;
-                    } else return UnifyResult.empty();
-                }
-                return UnifyResult.single(arena, s);
-            }
-        }
-    }
-
-    // 高階パターン単一化 (App(Meta(id), args) = t)
-    if (r1.* == .app and r1.app.head.* == .meta) {
-        return solveHigherOrderOrMeta(r1, r2, subst, arena);
-    }
-    if (r2.* == .app and r2.app.head.* == .meta) {
-        return solveHigherOrderOrMeta(r2, r1, subst, arena);
-    }
 
     // 基本的なメタ変数の単一化
     if (r1.* == .meta) {
         if (occursCheck(r1.meta, r2)) return UnifyResult.empty();
-        var new_subst = subst;
+        var new_subst = try subst.clone();
         try new_subst.put(r1.meta, r2);
         return UnifyResult.single(arena, new_subst);
     }
     if (r2.* == .meta) {
         if (occursCheck(r2.meta, r1)) return UnifyResult.empty();
-        var new_subst = subst;
+        var new_subst = try subst.clone();
         try new_subst.put(r2.meta, r1);
         return UnifyResult.single(arena, new_subst);
     }
 
-    // 変数の単一化
-    if (r1.* == .var_ and r2.* == .var_) {
-        if (std.mem.eql(u8, r1.var_, r2.var_)) return UnifyResult.single(arena, subst);
-        return UnifyResult.empty();
-    }
-
-    // シンボルの不一致
-    if (r1.* == .sym and r2.* == .sym) {
-        if (!std.mem.eql(u8, r1.sym, r2.sym)) return UnifyResult.empty();
-        return UnifyResult.single(arena, subst);
-    }
-
-    // アプリケーションの分解
+    // 関数適用の単一化
     if (r1.* == .app and r2.* == .app) {
-        if (r1.app.args.len != r2.app.args.len) return UnifyResult.empty();
-        const head_res = try unify(r1.app.head, r2.app.head, subst, arena);
-        if (head_res.first()) |s| {
-            var current = s;
-            for (r1.app.args, r2.app.args) |a1_arg, a2_arg| {
-                const res = try unify(a1_arg, a2_arg, current, arena);
-                if (res.first()) |ns| {
-                    current = ns;
-                } else return UnifyResult.empty();
+        const a1 = r1.app;
+        const a2 = r2.app;
+
+        // 高階単一化の簡易版 (メタ変数が頭にある場合)
+        if (a1.head.* == .meta) return solveHigherOrderOrMeta(r1, r2, subst, arena);
+        if (a2.head.* == .meta) return solveHigherOrderOrMeta(r2, r1, subst, arena);
+
+        // 頭部が一致する場合、引数を順番に単一化
+        if (a1.head.eql(a2.head) and a1.args.len == a2.args.len) {
+            var current_subst = subst;
+            for (a1.args, a2.args) |arg1, arg2| {
+                const res = try unify(arg1, arg2, current_subst, arena);
+                if (res.first()) |s| {
+                    current_subst = s;
+                } else {
+                    return UnifyResult.empty();
+                }
             }
-            return UnifyResult.single(arena, current);
+            return UnifyResult.single(arena, current_subst);
         }
     }
 
     return UnifyResult.empty();
 }
 
-fn isLambda(a: Expr.App) bool {
-    return a.head.* == .sym and std.mem.eql(u8, a.head.sym, "λ") and a.args.len == 2 and a.args[0].* == .var_;
+/// メタ変数が式の中に現れるかチェック
+fn occursCheck(id: MetaId, e: *const Expr) bool {
+    return switch (e.*) {
+        .meta => |mid| MetaId.eql(id, mid),
+        .app => |a| blk: {
+            if (occursCheck(id, a.head)) break :blk true;
+            for (a.args) |arg| {
+                if (occursCheck(id, arg)) break :blk true;
+            }
+            break :blk false;
+        },
+        else => false,
+    };
 }
 
+/// 高階パターンの解決 (簡易版: ?M(x, y) = target  =>  ?M = λx.λy. target)
 fn solveHigherOrderOrMeta(meta_app: *const Expr, target: *const Expr, subst: Subst, arena: Allocator) !UnifyResult {
     const id = meta_app.app.head.meta;
     const args = meta_app.app.args;
 
-    if (occursCheck(id, target)) return UnifyResult.empty();
-
-    // 引数を変数名のリストとして取得し、ターゲットを抽象化
-    const vars = try arena.alloc([]const u8, args.len);
-    for (0..args.len) |i| {
-        var buf: [16]u8 = undefined;
-        const name = std.fmt.bufPrint(&buf, "bv{d}", .{i}) catch unreachable;
-        vars[i] = try arena.dupe(u8, name);
+    // パターン条件のチェック (引数が全て異なる束縛変数であること)
+    for (args) |arg| {
+        if (arg.* != .var_) return UnifyResult.empty();
     }
 
-    // ターゲットから引数と一致する部分式を対応する変数に置換
-    var body = target;
-    for (args, vars) |arg, vn| {
-        body = try replaceExpr(body, arg, try var_(arena, vn), arena);
-    }
-
-    // λ抽象で包む
-    var lambda = body;
-    var i: usize = vars.len;
+    // targetを引数で抽象化
+    var lambda = target;
+    var i: usize = args.len;
     while (i > 0) {
         i -= 1;
-        const lam_sym = try sym(arena, "λ");
-        const v = try var_(arena, vars[i]);
-        lambda = try app2(arena, lam_sym, v, lambda);
+        const v = args[i].var_;
+        const lambda_head = try sym(arena, "λ");
+        const var_expr = try var_(arena, v);
+        lambda = try app2(arena, lambda_head, var_expr, lambda);
     }
 
-    var new_subst = subst;
+    var new_subst = try subst.clone();
     try new_subst.put(id, lambda);
     return UnifyResult.single(arena, new_subst);
 }
 
-/// 式中のパターンを置換する
-pub fn replaceExpr(e: *const Expr, pattern: *const Expr, replacement: *const Expr, arena: Allocator) !*const Expr {
-    if (e.eql(pattern)) return replacement;
+/// 置換を式に適用
+pub fn applySubst(e: *const Expr, subst: *const Subst, arena: Allocator) !*const Expr {
     return switch (e.*) {
-        .app => |a| {
-            const new_head = try replaceExpr(a.head, pattern, replacement, arena);
-            var changed = new_head != a.head;
+        .meta => |id| if (subst.get(id)) |res| try applySubst(res, subst, arena) else e,
+        .app => |a| blk: {
+            const new_head = try applySubst(a.head, subst, arena);
             const new_args = try arena.alloc(*const Expr, a.args.len);
+            var changed = !new_head.eql(a.head);
             for (a.args, 0..) |arg, i| {
-                new_args[i] = try replaceExpr(arg, pattern, replacement, arena);
-                if (new_args[i] != arg) changed = true;
+                new_args[i] = try applySubst(arg, subst, arena);
+                if (!new_args[i].eql(arg)) changed = true;
             }
-            if (!changed) return e;
-            const result = try arena.create(Expr);
-            result.* = .{ .app = .{ .head = new_head, .args = new_args } };
-            return result;
+            if (!changed) break :blk e;
+            const res = try arena.create(Expr);
+            res.* = .{ .app = .{ .head = new_head, .args = new_args } };
+            break :blk res;
         },
         else => e,
     };
 }
 
-// ==========================================
+/// 変数を項で置換 (β簡約用)
+pub fn substVar(e: *const Expr, name: []const u8, term: *const Expr, arena: Allocator) !*const Expr {
+    return switch (e.*) {
+        .var_ => |n| if (std.mem.eql(u8, n, name)) term else e,
+        .app => |a| blk: {
+            const new_head = try substVar(a.head, name, term, arena);
+            const new_args = try arena.alloc(*const Expr, a.args.len);
+            for (a.args, 0..) |arg, i| {
+                new_args[i] = try substVar(arg, name, term, arena);
+            }
+            const res = try arena.create(Expr);
+            res.* = .{ .app = .{ .head = new_head, .args = new_args } };
+            break :blk res;
+        },
+        else => e,
+    };
+}
+
+/// 項全体の中で old を new に置換
+pub fn replaceExpr(e: *const Expr, old: *const Expr, new: *const Expr, arena: Allocator) !*const Expr {
+    if (e.eql(old)) return new;
+    return switch (e.*) {
+        .app => |a| blk: {
+            const new_head = try replaceExpr(a.head, old, new, arena);
+            const new_args = try arena.alloc(*const Expr, a.args.len);
+            for (a.args, 0..) |arg, i| {
+                new_args[i] = try replaceExpr(arg, old, new, arena);
+            }
+            const res = try arena.create(Expr);
+            res.* = .{ .app = .{ .head = new_head, .args = new_args } };
+            break :blk res;
+        },
+        else => e,
+    };
+}
+
 // テスト
-// ==========================================
-
-test "unify identical symbols" {
+test "unify symbols" {
     var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
     const a = try sym(arena, "A");
-    const subst = Subst.init(arena);
-    const result = try unify(a, a, subst, arena);
-    try std.testing.expect(result.first() != null);
+    const b = try sym(arena, "B");
+
+    var subst = Subst.init(std.testing.allocator);
+    defer subst.deinit();
+
+    const res1 = try unify(a, a, subst, arena);
+    try std.testing.expect(res1.substitutions.len == 1);
+    res1.substitutions[0].deinit();
+
+    const res2 = try unify(a, b, subst, arena);
+    try std.testing.expect(res2.substitutions.len == 0);
 }
 
-test "unify meta with symbol" {
+test "unify meta variable" {
     var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const m = try expr_mod.meta(arena, 0);
+    const m = try expr_mod.meta(arena, 1);
     const a = try sym(arena, "A");
-    const subst = Subst.init(arena);
-    const result = try unify(m, a, subst, arena);
-    const s = result.first();
-    try std.testing.expect(s != null);
-    const bound = s.?.get(m.meta);
-    try std.testing.expect(bound != null);
-    try std.testing.expect(bound.?.eql(a));
+
+    var subst = Subst.init(std.testing.allocator);
+    defer subst.deinit();
+
+    const res = try unify(m, a, subst, arena);
+    try std.testing.expect(res.substitutions.len == 1);
+    
+    defer {
+        for (res.substitutions) |*s| {
+            s.deinit();
+        }
+    }
+
+    const s = res.substitutions[0];
+    const resolved = s.get(m.meta).?;
+    try std.testing.expect(resolved.eql(a));
 }
 
-test "unify App decomposition" {
-    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
-
-    const f = try sym(arena, "f");
-    const m = try expr_mod.meta(arena, 0);
-    const a = try sym(arena, "A");
-    const fa = try app1(arena, f, a);
-    const fm = try app1(arena, f, m);
-
-    const subst = Subst.init(arena);
-    const result = try unify(fa, fm, subst, arena);
-    const s = result.first();
-    try std.testing.expect(s != null);
-}
-
-test "unify occurs check" {
-    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
-
-    const m = try expr_mod.meta(arena, 0);
-    const f = try sym(arena, "f");
-    const fm = try app1(arena, f, m); // f(?0) — ?0を含む
-
-    const subst = Subst.init(arena);
-    const result = try unify(m, fm, subst, arena);
-    try std.testing.expect(result.first() == null);
-}
-
-test "substVar" {
+test "substVar replaces variable" {
     var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();

@@ -35,7 +35,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             const b = h_args[1];
             const unify_result = unifier_mod.unify(b, goal, args.subst, args.arena) catch continue;
             if (unify_result.first()) |s| {
-                const sub_tree = args.prover.search(a, args.context, args.state, s, args.depth + 1, args.limit) catch continue;
+                const sub_tree = args.prover.search(a, args.context, args.state, try s.clone(), args.depth + 1, args.limit) catch continue;
                 if (search_mod.findSuccess(sub_tree) != null) {
                     try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                         .goal = "backchain",
@@ -61,7 +61,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             for (args.context) |e2| {
                 if (!std.mem.eql(u8, e2.name, entry.name)) try new_ctx.append(args.arena, e2);
             }
-            const sub_tree = args.prover.search(goal, new_ctx.items, args.state, args.subst, args.depth + 1, args.limit) catch continue;
+            const sub_tree = args.prover.search(goal, new_ctx.items, args.state, try args.subst.clone(), args.depth + 1, args.limit) catch continue;
             if (search_mod.findSuccess(sub_tree) != null) {
                 try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "and-elim",
@@ -85,7 +85,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             for (args.context) |e2| {
                 if (!std.mem.eql(u8, e2.name, entry.name)) try ctx_a.append(args.arena, e2);
             }
-            const tree_a = args.prover.search(goal, ctx_a.items, args.state, args.subst, args.depth + 1, args.limit) catch continue;
+            const tree_a = args.prover.search(goal, ctx_a.items, args.state, try args.subst.clone(), args.depth + 1, args.limit) catch continue;
 
             if (search_mod.findSuccess(tree_a) != null) {
                 // Bのケース
@@ -96,7 +96,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
                 for (args.context) |e2| {
                     if (!std.mem.eql(u8, e2.name, entry.name)) try ctx_b.append(args.arena, e2);
                 }
-                const tree_b = args.prover.search(goal, ctx_b.items, args.state, args.subst, args.depth + 1, args.limit) catch continue;
+                const tree_b = args.prover.search(goal, ctx_b.items, args.state, try args.subst.clone(), args.depth + 1, args.limit) catch continue;
                 if (search_mod.findSuccess(tree_b) != null) {
                     try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                         .goal = "or-elim",

@@ -161,12 +161,19 @@ pub const Parser = struct {
             if (!isBinaryOp(op)) break;
 
             self.advance();
-            const right = try self.parseBinary(prec + 1);
+
+            // 右結合か左結合か
+            const next_min_prec = if (isRightAssoc(op)) prec else prec + 1;
+            const right = try self.parseBinary(next_min_prec);
             const op_sym = try sym(self.arena, try self.arena.dupe(u8, op));
             left = try app2(self.arena, op_sym, left, right);
         }
 
         return left;
+    }
+
+    fn isRightAssoc(op: []const u8) bool {
+        return std.mem.eql(u8, op, "→") or std.mem.eql(u8, op, "⊸") or std.mem.eql(u8, op, "->") or std.mem.eql(u8, op, "^");
     }
 
     fn parseUnary(self: *Parser) ParseError!*const Expr {
@@ -217,6 +224,11 @@ pub const Parser = struct {
                     return expr_mod.app(self.arena, head, args.items);
                 }
 
+                // 知られている定数名かチェック
+                if (isConstantName(owned)) {
+                    return sym(self.arena, owned);
+                }
+
                 // 小文字で始まる = 変数、大文字/数字 = シンボル
                 if (owned.len > 0 and std.ascii.isLower(owned[0])) {
                     return var_(self.arena, owned);
@@ -261,11 +273,12 @@ pub const Parser = struct {
     }
 
     fn getPrec(op: []const u8) u8 {
-        if (std.mem.eql(u8, op, "∨") or std.mem.eql(u8, op, "+")) return 2;
+        if (std.mem.eql(u8, op, "∨") or std.mem.eql(u8, op, "+") or std.mem.eql(u8, op, "|")) return 2;
         if (std.mem.eql(u8, op, "∧") or std.mem.eql(u8, op, "×") or std.mem.eql(u8, op, "*") or std.mem.eql(u8, op, "&")) return 3;
         if (std.mem.eql(u8, op, "→") or std.mem.eql(u8, op, "⊸") or std.mem.eql(u8, op, "->")) return 1;
         if (std.mem.eql(u8, op, "=")) return 4;
         if (std.mem.eql(u8, op, "⊗")) return 3;
+        if (std.mem.eql(u8, op, "∘")) return 5;
         return 0;
     }
 
@@ -275,6 +288,20 @@ pub const Parser = struct {
 
     fn isUnaryOp(op: []const u8) bool {
         return std.mem.eql(u8, op, "¬") or std.mem.eql(u8, op, "□") or std.mem.eql(u8, op, "◇") or std.mem.eql(u8, op, "!");
+    }
+
+    fn isConstantName(name: []const u8) bool {
+        const constants = [_][]const u8{
+            "nil", "cons", "fmap", "bind", "return", "nothing", "just",
+            "id", "pi1", "pi2", "pair", "inl", "inr", "case",
+            "refl", "inv", "concat", "transport", "path", "isSet", "isProp",
+            "comp", "fill", "hcomp", "I0", "I1", "plus", "append", "reverse", "mirror",
+            "list_prop", "vlength", "vhead", "vcons", "vnil",
+        };
+        for (constants) |c| {
+            if (std.mem.eql(u8, name, c)) return true;
+        }
+        return false;
     }
 };
 

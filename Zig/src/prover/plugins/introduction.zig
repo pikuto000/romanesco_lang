@@ -49,7 +49,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             b,
             new_ctx.items,
             args.state,
-            args.subst,
+            try args.subst.clone(),
             args.depth + 1,
             args.limit,
         );
@@ -69,9 +69,9 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         const a = goal_args[0];
         const b = goal_args[1];
 
-        const tree_a = try args.prover.search(a, args.context, args.state, args.subst, args.depth + 1, args.limit);
+        const tree_a = try args.prover.search(a, args.context, args.state, try args.subst.clone(), args.depth + 1, args.limit);
         if (search_mod.findSuccess(tree_a)) |_| {
-            const tree_b = try args.prover.search(b, args.context, args.state, args.subst, args.depth + 1, args.limit);
+            const tree_b = try args.prover.search(b, args.context, args.state, try args.subst.clone(), args.depth + 1, args.limit);
             if (search_mod.findSuccess(tree_b) != null) {
                 try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "product-intro",
@@ -88,7 +88,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         const a = goal_args[0];
         const b = goal_args[1];
 
-        const tree_a = try args.prover.search(a, args.context, args.state, args.subst, args.depth + 1, args.limit);
+        const tree_a = try args.prover.search(a, args.context, args.state, try args.subst.clone(), args.depth + 1, args.limit);
         if (search_mod.findSuccess(tree_a) != null) {
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "coproduct-intro-l",
@@ -98,7 +98,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             }));
         }
 
-        const tree_b = try args.prover.search(b, args.context, args.state, args.subst, args.depth + 1, args.limit);
+        const tree_b = try args.prover.search(b, args.context, args.state, try args.subst.clone(), args.depth + 1, args.limit);
         if (search_mod.findSuccess(tree_b) != null) {
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "coproduct-intro-r",
@@ -127,7 +127,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         try new_ctx.append(args.arena, .{ .name = fresh_owned, .expr = type_expr });
         for (args.context) |entry| try new_ctx.append(args.arena, entry);
 
-        const sub_tree = try args.prover.search(instantiated, new_ctx.items, args.state, args.subst, args.depth + 1, args.limit);
+        const sub_tree = try args.prover.search(instantiated, new_ctx.items, args.state, try args.subst.clone(), args.depth + 1, args.limit);
         if (search_mod.findSuccess(sub_tree) != null) {
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "forall-intro",
@@ -146,7 +146,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         const m = try args.prover.freshMeta();
         const instantiated = try unifier_mod.substVar(body, v_name, m, args.arena);
 
-        const sub_tree = try args.prover.search(instantiated, args.context, args.state, args.subst, args.depth + 1, args.limit);
+        const sub_tree = try args.prover.search(instantiated, args.context, args.state, try args.subst.clone(), args.depth + 1, args.limit);
         if (search_mod.findSuccess(sub_tree) != null) {
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "exists-intro",

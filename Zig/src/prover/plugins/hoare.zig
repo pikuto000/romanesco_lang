@@ -91,8 +91,29 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     return results.items;
 }
 
+const Allocator = std.mem.Allocator;
+
+pub fn buildRules(arena: Allocator) anyerror![]const expr_mod.CatRule {
+    var rules: std.ArrayList(expr_mod.CatRule) = .{};
+    const b = expr_mod.RuleBuilder.init(arena);
+
+    // ==========================================
+    // リソース規則
+    // ==========================================
+    try rules.append(arena, .{ .name = "file-open", .lhs = try b.a1(try b.s("file_exists"), try b.v("f")), .rhs = try b.a1(try b.s("file_open"), try b.v("f")) });
+    try rules.append(arena, .{ .name = "file-close", .lhs = try b.a1(try b.s("file_open"), try b.v("f")), .rhs = try b.s(syms.True) });
+    try rules.append(arena, .{ .name = "file-read", .lhs = try b.a1(try b.s("file_open"), try b.v("f")), .rhs = try b.a1(try b.s("file_open"), try b.v("f")) });
+    try rules.append(arena, .{ .name = "memory-alloc", .lhs = try b.s(syms.True), .rhs = try b.a2(try b.s(syms.PointsTo), try b.v("ptr"), try b.s("_")) });
+    try rules.append(arena, .{ .name = "memory-free", .lhs = try b.a2(try b.s(syms.PointsTo), try b.v("ptr"), try b.v("val")), .rhs = try b.s(syms.True) });
+    try rules.append(arena, .{ .name = "lock-acquire", .lhs = try b.a1(try b.s("lock_free"), try b.v("l")), .rhs = try b.a1(try b.s("lock_held"), try b.v("l")) });
+    try rules.append(arena, .{ .name = "lock-release", .lhs = try b.a1(try b.s("lock_held"), try b.v("l")), .rhs = try b.a1(try b.s("lock_free"), try b.v("l")) });
+
+    return rules.toOwnedSlice(arena);
+}
+
 pub const plugin = Plugin{
     .name = "HoareLogic",
     .priority = 150,
+    .build_rules = &buildRules,
     .goal_hooks = &goalHooks,
 };

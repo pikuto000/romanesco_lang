@@ -38,6 +38,14 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
                 const unify_result = unifier_mod.unify(other.expr, a, args.subst, args.arena) catch continue;
                 if (unify_result.first()) |s| {
                     const derived = unifier_mod.applySubst(b, &s, args.arena) catch continue;
+                    
+                    // 既知の事実はスキップ
+                    var known = false;
+                    for (args.context) |c| {
+                        if (c.expr.eql(derived)) { known = true; break; }
+                    }
+                    if (known) continue;
+
                     var buf: [32]u8 = undefined;
                     const n = std.fmt.bufPrint(&buf, "mp_{s}", .{entry.name}) catch unreachable;
                     try new_facts.append(args.arena, .{ .name = try args.arena.dupe(u8, n), .expr = derived });
@@ -98,7 +106,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         for (new_facts.items) |fact| try new_ctx.append(args.arena, fact);
         for (args.context) |entry| try new_ctx.append(args.arena, entry);
 
-        const sub_tree = args.prover.search(args.goal, new_ctx.items, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
+        const sub_tree = args.prover.search(args.goal, new_ctx.items, args.state, try args.subst.clone(), args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(sub_tree) != null) {
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "forward-reasoning",
@@ -118,7 +126,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             try new_ctx2.append(args.arena, .{ .name = fr.rule_name, .expr = fr.result });
             for (args.context) |e2| try new_ctx2.append(args.arena, e2);
 
-            const sub_tree2 = args.prover.search(args.goal, new_ctx2.items, args.state, fr.subst, args.depth + 1, args.limit) catch continue;
+            const sub_tree2 = args.prover.search(args.goal, new_ctx2.items, args.state, try fr.subst.clone(), args.depth + 1, args.limit) catch continue;
             if (search_mod.findSuccess(sub_tree2) != null) {
                 try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "forward-rule",

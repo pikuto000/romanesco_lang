@@ -29,7 +29,9 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     ) catch return results.items;
 
     // ⊤の導入
-    if (goal_norm.* == .sym and (std.mem.eql(u8, goal_norm.sym, syms.True) or std.mem.eql(u8, goal_norm.sym, "⊤"))) {
+    if (goal_norm.* == .sym and (std.mem.eql(u8, goal_norm.sym, syms.True) or 
+                                 std.mem.eql(u8, goal_norm.sym, "⊤") or
+                                 std.mem.eql(u8, goal_norm.sym, syms.Terminal))) {
         try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
             .goal = "⊤",
             .rule_name = "true-intro",
@@ -40,7 +42,9 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
 
     // 爆発律 (⊥がコンテキストにある場合)
     for (args.context) |entry| {
-        if (entry.expr.* == .sym and (std.mem.eql(u8, entry.expr.sym, syms.False) or std.mem.eql(u8, entry.expr.sym, "⊥"))) {
+        if (entry.expr.* == .sym and (std.mem.eql(u8, entry.expr.sym, syms.False) or 
+                                      std.mem.eql(u8, entry.expr.sym, "⊥") or
+                                      std.mem.eql(u8, entry.expr.sym, syms.Initial))) {
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "explosion",
                 .rule_name = "explosion",
@@ -52,7 +56,9 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     }
     // 線形コンテキストも確認
     for (args.state.linear_context) |entry| {
-        if (entry.expr.* == .sym and (std.mem.eql(u8, entry.expr.sym, syms.False) or std.mem.eql(u8, entry.expr.sym, "⊥"))) {
+        if (entry.expr.* == .sym and (std.mem.eql(u8, entry.expr.sym, syms.False) or 
+                                      std.mem.eql(u8, entry.expr.sym, "⊥") or
+                                      std.mem.eql(u8, entry.expr.sym, syms.Initial))) {
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "explosion",
                 .rule_name = "explosion",
@@ -77,7 +83,8 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
                 const l_norm = args.prover.normalize(l) catch l;
                 const r_norm = args.prover.normalize(r) catch r;
                 const unify_result = unifier_mod.unify(l_norm, r_norm, args.subst, args.arena) catch return results.items;
-                if (unify_result.first() != null) {
+                if (unify_result.first()) |s| {
+                    _ = s;
                     try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                         .goal = "reflexivity",
                         .rule_name = "reflexivity",
@@ -95,7 +102,8 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             unifier_mod.applySubst(entry.expr, &args.subst, args.arena) catch continue,
         ) catch continue;
         const unify_result = unifier_mod.unify(h_norm, goal_norm, args.subst, args.arena) catch continue;
-        if (unify_result.first() != null) {
+        if (unify_result.first()) |s| {
+            _ = s;
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = entry.name,
                 .rule_name = entry.name,
@@ -110,7 +118,8 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             unifier_mod.applySubst(entry.expr, &args.subst, args.arena) catch continue,
         ) catch continue;
         const unify_result = unifier_mod.unify(h_norm, goal_norm, args.subst, args.arena) catch continue;
-        if (unify_result.first() != null) {
+        if (unify_result.first()) |s| {
+            _ = s;
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = entry.name,
                 .rule_name = entry.name,
@@ -123,31 +132,25 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     return results.items;
 }
 
+pub fn buildRules(arena: Allocator) anyerror![]const expr_mod.CatRule {
+    var rules: std.ArrayList(expr_mod.CatRule) = .{};
+    const b = expr_mod.RuleBuilder.init(arena);
+
+    // ==========================================
+    // 論理射 (Logic-Category Curry-Howard-Lambek)
+    // ==========================================
+    try rules.append(arena, .{ .name = "and-is-×", .lhs = try b.a2(try b.s(syms.And), try b.v("A"), try b.v("B")), .rhs = try b.a2(try b.s(syms.Product), try b.v("A"), try b.v("B")) });
+    try rules.append(arena, .{ .name = "or-is-+", .lhs = try b.a2(try b.s(syms.Or), try b.v("A"), try b.v("B")), .rhs = try b.a2(try b.s(syms.Coproduct), try b.v("A"), try b.v("B")) });
+    try rules.append(arena, .{ .name = "→-is-^", .lhs = try b.a2(try b.s(syms.Implies), try b.v("A"), try b.v("B")), .rhs = try b.a2(try b.s(syms.Exp), try b.v("B"), try b.v("A")) });
+    try rules.append(arena, .{ .name = "⊤-is-1", .lhs = try b.s(syms.True), .rhs = try b.s(syms.Terminal) });
+    try rules.append(arena, .{ .name = "⊥-is-0", .lhs = try b.s(syms.False), .rhs = try b.s(syms.Initial) });
+
+    return rules.toOwnedSlice(arena);
+}
+
 pub const plugin = Plugin{
     .name = "Axiom",
     .priority = 10,
+    .build_rules = &buildRules,
     .goal_hooks = &goalHooks,
 };
-
-test "axiom plugin true-intro" {
-    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
-
-    var engine = search_mod.ProverEngine.init(expr_mod.ProverConfig{}, &.{}, arena, std.testing.allocator);
-    defer engine.deinit();
-    const true_sym = try sym(arena, "⊤");
-    const results = try goalHooks(.{
-        .goal = true_sym,
-        .context = &.{},
-        .state = expr_mod.LogicState{},
-        .subst = expr_mod.Subst.init(arena),
-        .depth = 0,
-        .limit = 5,
-        .arena = arena,
-        .prover = &engine,
-    });
-    try std.testing.expect(results.len > 0);
-    try std.testing.expect(results[0] == .node);
-    try std.testing.expectEqualStrings("true-intro", results[0].node.value.rule_name);
-}

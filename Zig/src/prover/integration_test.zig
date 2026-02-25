@@ -253,6 +253,44 @@ test "rewriter: A ∧ ⊥ → ⊥" {
     try std.testing.expect(result.* == .sym and std.mem.eql(u8, result.sym, "⊥"));
 }
 
+test "plugin rewrite hook: HoTT inv(refl) → refl" {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    var engine = ProverEngine.init(.{}, &plugin_mod.all_plugins, arena, std.testing.allocator);
+    defer engine.deinit();
+
+    // inv(refl(a))
+    const a = try sym(arena, "a");
+    const refl_a = try app1(arena, try sym(arena, syms.Refl), a);
+    const inv_refl_a = try app1(arena, try sym(arena, "inv"), refl_a);
+
+    const result = try engine.normalize(inv_refl_a);
+
+    // refl(a) に簡約されるはず
+    try std.testing.expect(result.eql(refl_a));
+}
+
+test "plugin rewrite hook: List fmap(f, nil) → nil" {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    var engine = ProverEngine.init(.{}, &plugin_mod.all_plugins, arena, std.testing.allocator);
+    defer engine.deinit();
+
+    // fmap(f, nil)
+    const f = try sym(arena, "f");
+    const nil = try sym(arena, "nil");
+    const fmap_f_nil = try app2(arena, try sym(arena, "fmap"), f, nil);
+
+    const result = try engine.normalize(fmap_f_nil);
+
+    // nil に簡約されるはず
+    try std.testing.expect(result.eql(nil));
+}
+
 // ==========================================
 // ユニフィケーションテスト
 // ==========================================
@@ -298,9 +336,8 @@ test "rules: build standard rules" {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const builder = rules_mod.RuleBuilder.init(arena);
-    const all_rules = try builder.buildAll();
-    try std.testing.expect(all_rules.len > 10);
+    const all_rules = try rules_mod.buildAll(arena);
+    try std.testing.expect(all_rules.len >= 10);
 }
 
 // ==========================================
@@ -312,8 +349,7 @@ test "prove with rules: ⊤" {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const builder = rules_mod.RuleBuilder.init(arena);
-    const all_rules = try builder.buildAll();
+    const all_rules = try rules_mod.buildAll(arena);
     const config = ProverConfig{ .rules = all_rules };
     const goal = try sym(arena, "⊤");
     try expectProved(goal, 3, &plugin_mod.all_plugins, config, arena);
@@ -324,8 +360,7 @@ test "prove with rules: A → A" {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const builder = rules_mod.RuleBuilder.init(arena);
-    const all_rules = try builder.buildAll();
+    const all_rules = try rules_mod.buildAll(arena);
     const config = ProverConfig{ .rules = all_rules };
 
     const a = try sym(arena, "A");

@@ -45,7 +45,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
             .induction_depth = args.state.induction_depth,
             .raa_depth = args.state.raa_depth,
         };
-        const sub_tree = args.prover.search(b, args.context, new_state, args.subst, args.depth + 1, args.limit) catch return results.items;
+        const sub_tree = args.prover.search(b, args.context, new_state, try args.subst.clone(), args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(sub_tree) != null) {
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "lollipop-intro",
@@ -62,11 +62,11 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
         const b = goal_args[1];
 
         // 簡略化: 全リソースをAに渡し、残りをBに渡す
-        const tree_a = args.prover.search(a, args.context, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
+        const tree_a = args.prover.search(a, args.context, args.state, try args.subst.clone(), args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(tree_a) != null) {
             // Bは残りの線形リソースで証明 (簡略化版: 空の線形コンテキスト)
             const empty_state = LogicState{};
-            const tree_b = args.prover.search(b, args.context, empty_state, args.subst, args.depth + 1, args.limit) catch return results.items;
+            const tree_b = args.prover.search(b, args.context, empty_state, try args.subst.clone(), args.depth + 1, args.limit) catch return results.items;
             if (search_mod.findSuccess(tree_b) != null) {
                 try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "tensor-intro",
@@ -81,7 +81,7 @@ fn goalHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     // !A導入: !A → 持続的にAが使用可能
     if (std.mem.eql(u8, hn, syms.Bang) and goal_args.len == 1) {
         const a = goal_args[0];
-        const sub_tree = args.prover.search(a, args.context, args.state, args.subst, args.depth + 1, args.limit) catch return results.items;
+        const sub_tree = args.prover.search(a, args.context, args.state, try args.subst.clone(), args.depth + 1, args.limit) catch return results.items;
         if (search_mod.findSuccess(sub_tree) != null) {
             try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                 .goal = "bang-intro",
@@ -120,7 +120,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
                     .linear_context = new_linear.items,
                     .meta_counter = args.state.meta_counter,
                 };
-                const sub_tree = args.prover.search(a, args.context, new_state, s, args.depth + 1, args.limit) catch continue;
+                const sub_tree = args.prover.search(a, args.context, new_state, try s.clone(), args.depth + 1, args.limit) catch continue;
                 if (search_mod.findSuccess(sub_tree) != null) {
                     try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                         .goal = "lollipop-elim",
@@ -151,7 +151,7 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
                 .linear_context = new_linear.items,
                 .meta_counter = args.state.meta_counter,
             };
-            const sub_tree = args.prover.search(goal, args.context, new_state, args.subst, args.depth + 1, args.limit) catch continue;
+            const sub_tree = args.prover.search(goal, args.context, new_state, try args.subst.clone(), args.depth + 1, args.limit) catch continue;
             if (search_mod.findSuccess(sub_tree) != null) {
                 try results.append(args.arena, try Tree(SearchNode).leaf(args.arena, .{
                     .goal = "tensor-elim",
@@ -166,9 +166,27 @@ fn contextHooks(args: HookArgs) HookError![]const Tree(SearchNode) {
     return results.items;
 }
 
+pub fn buildRules(arena: Allocator) anyerror![]const expr_mod.CatRule {
+    var rules: std.ArrayList(expr_mod.CatRule) = .{};
+    const b = expr_mod.RuleBuilder.init(arena);
+
+    // tensor-is-×: A ⊗ B → A × B
+    try rules.append(arena, .{ .name = "tensor-is-×", .lhs = try b.a2(try b.s(syms.Tensor), try b.v("A"), try b.v("B")), .rhs = try b.a2(try b.s(syms.Product), try b.v("A"), try b.v("B")) });
+    // ⊸-is-^: A ⊸ B → B ^ A
+    try rules.append(arena, .{ .name = "⊸-is-^", .lhs = try b.a2(try b.s(syms.LImplies), try b.v("A"), try b.v("B")), .rhs = try b.a2(try b.s(syms.Exp), try b.v("B"), try b.v("A")) });
+    // linear-bang-elim: !A → A
+    try rules.append(arena, .{ .name = "linear-bang-elim", .lhs = try b.a1(try b.s(syms.Bang), try b.v("A")), .rhs = try b.v("A") });
+
+    // 分離論理 (分離論理プラグインがないため、ここに暫定配置)
+    try rules.append(arena, .{ .name = "sep-and-comm", .lhs = try b.a2(try b.s(syms.SepAnd), try b.v("A"), try b.v("B")), .rhs = try b.a2(try b.s(syms.SepAnd), try b.v("B"), try b.v("A")) });
+
+    return rules.toOwnedSlice(arena);
+}
+
 pub const plugin = Plugin{
     .name = "LinearLogic",
     .priority = 80,
+    .build_rules = &buildRules,
     .goal_hooks = &goalHooks,
     .context_hooks = &contextHooks,
 };

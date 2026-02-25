@@ -13,21 +13,34 @@ const Expr = expr_mod.Expr;
 const CatRule = expr_mod.CatRule;
 const Subst = expr_mod.Subst;
 const sym = expr_mod.sym;
-const var_ = expr_mod.var_;
 const app = expr_mod.app;
 const app1 = expr_mod.app1;
 const app2 = expr_mod.app2;
 
+/// 簡約フック: 特定ドメインの簡約規則を外部から注入
+pub const RewriteHook = *const fn (
+    e: *const Expr,
+    arena: Allocator,
+) error{OutOfMemory}!?*const Expr;
+
 /// 正規化: 不動点まで反復簡約
 pub fn normalize(e: *const Expr, rules: []const CatRule, arena: Allocator) error{OutOfMemory}!*const Expr {
-    return normalizeN(e, rules, 100, arena);
+    return normalizeWithHooks(e, rules, &.{}, arena);
+}
+
+pub fn normalizeWithHooks(e: *const Expr, rules: []const CatRule, hooks: []const RewriteHook, arena: Allocator) error{OutOfMemory}!*const Expr {
+    return normalizeNWithHooks(e, rules, hooks, 100, arena);
 }
 
 pub fn normalizeN(e: *const Expr, rules: []const CatRule, max_iter: u32, arena: Allocator) error{OutOfMemory}!*const Expr {
+    return normalizeNWithHooks(e, rules, &.{}, max_iter, arena);
+}
+
+pub fn normalizeNWithHooks(e: *const Expr, rules: []const CatRule, hooks: []const RewriteHook, max_iter: u32, arena: Allocator) error{OutOfMemory}!*const Expr {
     var current = e;
     var iter: u32 = 0;
     while (iter < max_iter) : (iter += 1) {
-        const reduced = try step(current, rules, arena);
+        const reduced = try step(current, rules, hooks, arena);
         const ac_normalized = try acNormalize(reduced, arena);
         if (ac_normalized.eql(current)) return current;
         current = ac_normalized;
@@ -36,29 +49,27 @@ pub fn normalizeN(e: *const Expr, rules: []const CatRule, max_iter: u32, arena: 
 }
 
 /// 1ステップの簡約
-fn step(e: *const Expr, rules: []const CatRule, arena: Allocator) error{OutOfMemory}!*const Expr {
+fn step(e: *const Expr, rules: []const CatRule, hooks: []const RewriteHook, arena: Allocator) error{OutOfMemory}!*const Expr {
     return switch (e.*) {
         .app => |a| {
-            const new_head = try step(a.head, rules, arena);
+            const new_head = try step(a.head, rules, hooks, arena);
             const new_args = try arena.alloc(*const Expr, a.args.len);
             for (a.args, 0..) |arg, i| {
-                new_args[i] = try step(arg, rules, arena);
+                new_args[i] = try step(arg, rules, hooks, arena);
             }
             const new_expr = try arena.create(Expr);
             new_expr.* = .{ .app = .{ .head = new_head, .args = new_args } };
-            return rewriteRule(new_expr, rules, arena);
+            return rewriteRule(new_expr, rules, hooks, arena);
         },
-        else => e,
+        else => rewriteRule(e, rules, hooks, arena),
     };
 }
 
 /// AC (Associative-Commutative) 正規化
-/// ⊗,∧,∨,*等の可換・結合的演算子を正規化
 fn acNormalize(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr {
     if (e.* != .app) return e;
     const a = e.app;
     if (a.head.* != .sym) {
-        // 子要素を再帰的に正規化
         const new_head = try acNormalize(a.head, arena);
         const new_args = try arena.alloc(*const Expr, a.args.len);
         for (a.args, 0..) |arg, i| {
@@ -79,7 +90,6 @@ fn acNormalize(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr 
         std.mem.eql(u8, op, syms.FaceOr);
 
     if (!is_ac) {
-        // 子要素を再帰的に正規化
         const new_args = try arena.alloc(*const Expr, a.args.len);
         for (a.args, 0..) |arg, i| {
             new_args[i] = try acNormalize(arg, arena);
@@ -89,7 +99,6 @@ fn acNormalize(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr 
         return result;
     }
 
-    // フラット化: 同じ演算子の入れ子を展開
     var flattened: std.ArrayList(*const Expr) = .{};
     for (a.args) |arg| {
         try collectAC(arg, op, &flattened, arena);
@@ -98,14 +107,12 @@ fn acNormalize(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr 
     const is_and = std.mem.eql(u8, op, syms.And);
     const is_or = std.mem.eql(u8, op, syms.Or);
 
-    // 短絡評価
     if (is_and) {
         for (flattened.items) |item| {
             if (item.* == .sym and (std.mem.eql(u8, item.sym, syms.False) or std.mem.eql(u8, item.sym, "⊥"))) {
                 return sym(arena, syms.False);
             }
         }
-        // ⊤を除去
         var filtered: std.ArrayList(*const Expr) = .{};
         for (flattened.items) |item| {
             if (!(item.* == .sym and (std.mem.eql(u8, item.sym, syms.True) or std.mem.eql(u8, item.sym, "⊤")))) {
@@ -128,7 +135,6 @@ fn acNormalize(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr 
         flattened = filtered;
     }
 
-    // 空の場合の単位元
     if (flattened.items.len == 0) {
         if (std.mem.eql(u8, op, syms.Tensor)) return sym(arena, syms.LPlus);
         if (std.mem.eql(u8, op, syms.SepAnd)) return sym(arena, syms.LOne);
@@ -137,7 +143,6 @@ fn acNormalize(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr 
     }
     if (flattened.items.len == 1) return flattened.items[0];
 
-    // 左畳み込みで二項演算に戻す
     const op_sym = try sym(arena, op);
     var result = flattened.items[0];
     for (flattened.items[1..]) |item| {
@@ -146,7 +151,6 @@ fn acNormalize(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr 
     return result;
 }
 
-/// AC演算子のフラット化
 fn collectAC(e: *const Expr, op: []const u8, list: *std.ArrayList(*const Expr), arena: Allocator) error{OutOfMemory}!void {
     if (e.* == .app and e.app.head.* == .sym and std.mem.eql(u8, e.app.head.sym, op) and e.app.args.len == 2) {
         try collectAC(e.app.args[0], op, list, arena);
@@ -156,8 +160,8 @@ fn collectAC(e: *const Expr, op: []const u8, list: *std.ArrayList(*const Expr), 
     }
 }
 
-/// 規則適用 (ユーザ定義 + 組込み)
-fn rewriteRule(e: *const Expr, rules: []const CatRule, arena: Allocator) error{OutOfMemory}!*const Expr {
+/// 規則適用 (ユーザ定義 + フック + 組込みコア)
+fn rewriteRule(e: *const Expr, rules: []const CatRule, hooks: []const RewriteHook, arena: Allocator) error{OutOfMemory}!*const Expr {
     // 優先度の高い等値チェック
     if (e.* == .app and e.app.args.len == 2) {
         const head = e.app.head;
@@ -167,7 +171,6 @@ fn rewriteRule(e: *const Expr, rules: []const CatRule, arena: Allocator) error{O
                 return sym(arena, syms.True);
             }
             if (std.mem.eql(u8, hn, syms.Path) and e.app.args.len >= 2) {
-                // path(_, l, r) where l == r
                 if (e.app.args.len == 3 and e.app.args[1].eql(e.app.args[2])) {
                     return sym(arena, syms.True);
                 }
@@ -175,28 +178,31 @@ fn rewriteRule(e: *const Expr, rules: []const CatRule, arena: Allocator) error{O
         }
     }
 
-    if (rules.len == 0) return builtinRules(e, arena);
-
-    // ユーザ定義ルールの適用 (先頭記号でフィルタ)
-    const head_sym = e.headSymbol();
-    for (rules) |rule| {
-        if (!std.mem.eql(u8, rule.lhs.headSymbol(), head_sym)) continue;
-        const subst = Subst.init(arena);
-        const result = try unifier.unify(e, rule.lhs, subst, arena);
-        if (result.first()) |s| {
-            return unifier.applySubst(rule.rhs, &s, arena);
+    if (rules.len > 0) {
+        const head_sym = e.headSymbol();
+        for (rules) |rule| {
+            if (!std.mem.eql(u8, rule.lhs.headSymbol(), head_sym)) continue;
+            const subst = Subst.init(arena);
+            const result = try unifier.unify(e, rule.lhs, subst, arena);
+            if (result.first()) |s| {
+                return unifier.applySubst(rule.rhs, &s, arena);
+            }
         }
+    }
+
+    for (hooks) |hook| {
+        if (try hook(e, arena)) |res| return res;
     }
 
     return builtinRules(e, arena);
 }
 
-/// 組込み簡約規則
+/// 組込み簡約規則 (普遍的なコアのみ)
 fn builtinRules(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr {
     if (e.* != .app) return e;
     const a = e.app;
     if (a.head.* != .sym) {
-        // β簡約: ((λv. body) arg) → body[v/arg]
+        // β簡約
         if (a.head.* == .app) {
             const inner = a.head.app;
             if (inner.head.* == .sym and std.mem.eql(u8, inner.head.sym, "λ") and inner.args.len == 2 and inner.args[0].* == .var_ and a.args.len > 0) {
@@ -211,148 +217,20 @@ fn builtinRules(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr
     const hn = a.head.sym;
     const args = a.args;
 
-    // inv(refl(_)) → refl(_) 原式
-    if (std.mem.eql(u8, hn, "inv") and args.len == 1) {
-        if (args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, syms.Refl)) {
-            return args[0];
-        }
-        // inv(inv(p)) → p
-        if (args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "inv") and args[0].app.args.len == 1) {
-            return args[0].app.args[0];
-        }
-    }
-
-    // compose/concat(refl, p) → p, compose/concat(p, refl) → p
-    if ((std.mem.eql(u8, hn, syms.Compose) or std.mem.eql(u8, hn, syms.Concat)) and args.len == 2) {
-        if (args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, syms.Refl)) return args[1];
-        if (args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, syms.Refl)) return args[0];
-    }
-
-    // transport の完全実装
-    if (std.mem.eql(u8, hn, syms.Transport) and args.len == 3) {
-        const type_fam = args[0];
-        const path_arg = args[1];
-        const val = args[2];
-
-        // transport(_, refl(_), x) → x
-        if (path_arg.* == .app and path_arg.app.head.* == .sym and std.mem.eql(u8, path_arg.app.head.sym, syms.Refl)) {
-            return val;
-        }
-
-        // transport(λz. body, p, v) → 各種簡約
-        if (type_fam.* == .app and type_fam.app.head.* == .sym and std.mem.eql(u8, type_fam.app.head.sym, "λ") and type_fam.app.args.len == 2 and type_fam.app.args[0].* == .var_) {
-            const z = type_fam.app.args[0];
-            const body = type_fam.app.args[1];
-
-            // 定数型: body に z が自由出現しない → v
-            if (!body.contains(z)) {
-                return val;
-            }
-
-            // 積型: λz. A(z) × B(z)
-            if (body.* == .app and body.app.head.* == .sym and
-                (std.mem.eql(u8, body.app.head.sym, syms.Product) or std.mem.eql(u8, body.app.head.sym, syms.And)) and
-                body.app.args.len == 2)
-            {
-                const a_fam = try arena.create(Expr);
-                a_fam.* = .{ .app = .{ .head = try sym(arena, "λ"), .args = try arena.dupe(*const Expr, &[_]*const Expr{ z, body.app.args[0] }) } };
-                const b_fam = try arena.create(Expr);
-                b_fam.* = .{ .app = .{ .head = try sym(arena, "λ"), .args = try arena.dupe(*const Expr, &[_]*const Expr{ z, body.app.args[1] }) } };
-                const pi1_sym = try sym(arena, syms.Proj1);
-                const pi2_sym = try sym(arena, syms.Proj2);
-                const transport_sym = try sym(arena, syms.Transport);
-                const pair_sym = try sym(arena, syms.Pair);
-                const t1 = try app(arena, transport_sym, &[_]*const Expr{ a_fam, path_arg, try app1(arena, pi1_sym, val) });
-                const t2 = try app(arena, transport_sym, &[_]*const Expr{ b_fam, path_arg, try app1(arena, pi2_sym, val) });
-                return app2(arena, pair_sym, t1, t2);
-            }
-
-            // 余積型 (coproduct / +): λz. A(z) + B(z)
-            if (body.* == .app and body.app.head.* == .sym and
-                (std.mem.eql(u8, body.app.head.sym, syms.Coproduct) or std.mem.eql(u8, body.app.head.sym, syms.Or)) and
-                body.app.args.len == 2)
-            {
-                // inl(x) → inl(transport(λz.A(z), p, x))
-                if (val.* == .app and val.app.head.* == .sym and std.mem.eql(u8, val.app.head.sym, syms.Inl) and val.app.args.len == 1) {
-                    const a_fam = try arena.create(Expr);
-                    a_fam.* = .{ .app = .{ .head = try sym(arena, "λ"), .args = try arena.dupe(*const Expr, &[_]*const Expr{ z, body.app.args[0] }) } };
-                    const transport_sym = try sym(arena, syms.Transport);
-                    const new_val = try app(arena, transport_sym, &[_]*const Expr{ a_fam, path_arg, val.app.args[0] });
-                    return app1(arena, try sym(arena, syms.Inl), new_val);
-                }
-                if (val.* == .app and val.app.head.* == .sym and std.mem.eql(u8, val.app.head.sym, syms.Inr) and val.app.args.len == 1) {
-                    const b_fam = try arena.create(Expr);
-                    b_fam.* = .{ .app = .{ .head = try sym(arena, "λ"), .args = try arena.dupe(*const Expr, &[_]*const Expr{ z, body.app.args[1] }) } };
-                    const transport_sym = try sym(arena, syms.Transport);
-                    const new_val = try app(arena, transport_sym, &[_]*const Expr{ b_fam, path_arg, val.app.args[0] });
-                    return app1(arena, try sym(arena, syms.Inr), new_val);
-                }
-            }
-        }
-    }
-
     // 圏論的公理
     if (std.mem.eql(u8, hn, syms.Compose) and args.len == 2) {
-        // f ∘ id → f, id ∘ f → f
         if (args[1].* == .sym and std.mem.eql(u8, args[1].sym, syms.Id)) return args[0];
         if (args[0].* == .sym and std.mem.eql(u8, args[0].sym, syms.Id)) return args[1];
-        // (f ∘ g) ∘ h → f ∘ (g ∘ h) (右結合)
         if (args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, syms.Compose) and args[0].app.args.len == 2) {
             const inner_args = args[0].app.args;
             const g_h = try app2(arena, a.head, inner_args[1], args[1]);
             return app2(arena, a.head, inner_args[0], g_h);
         }
-        // pi1 ∘ pair(f, g) → f
         if (args[0].* == .sym and std.mem.eql(u8, args[0].sym, syms.Proj1) and args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, syms.Pair) and args[1].app.args.len == 2) {
             return args[1].app.args[0];
         }
-        // pi2 ∘ pair(f, g) → g
         if (args[0].* == .sym and std.mem.eql(u8, args[0].sym, syms.Proj2) and args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, syms.Pair) and args[1].app.args.len == 2) {
             return args[1].app.args[1];
-        }
-    }
-
-    // 面制約の正規化
-    if (std.mem.eql(u8, hn, syms.FaceAnd) and args.len == 2) {
-        if (args[0].* == .sym and std.mem.eql(u8, args[0].sym, syms.I1)) return args[1];
-        if (args[1].* == .sym and std.mem.eql(u8, args[1].sym, syms.I1)) return args[0];
-        if (args[0].* == .sym and std.mem.eql(u8, args[0].sym, syms.I0)) return sym(arena, syms.I0);
-        if (args[1].* == .sym and std.mem.eql(u8, args[1].sym, syms.I0)) return sym(arena, syms.I0);
-    }
-    if (std.mem.eql(u8, hn, syms.FaceOr) and args.len == 2) {
-        if (args[0].* == .sym and std.mem.eql(u8, args[0].sym, syms.I0)) return args[1];
-        if (args[1].* == .sym and std.mem.eql(u8, args[1].sym, syms.I0)) return args[0];
-        if (args[0].* == .sym and std.mem.eql(u8, args[0].sym, syms.I1)) return sym(arena, syms.I1);
-        if (args[1].* == .sym and std.mem.eql(u8, args[1].sym, syms.I1)) return sym(arena, syms.I1);
-    }
-    if (std.mem.eql(u8, hn, syms.FaceNeg) and args.len == 1) {
-        if (args[0].* == .sym and std.mem.eql(u8, args[0].sym, syms.I0)) return sym(arena, syms.I1);
-        if (args[0].* == .sym and std.mem.eql(u8, args[0].sym, syms.I1)) return sym(arena, syms.I0);
-        // ¬ᶠ(¬ᶠ(φ)) → φ
-        if (args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, syms.FaceNeg) and args[0].app.args.len == 1) {
-            return args[0].app.args[0];
-        }
-    }
-
-    // hcomp(A, I1, u, u0) → u(I1)
-    if (std.mem.eql(u8, hn, syms.HComp) and args.len == 4) {
-        if (args[1].* == .sym and std.mem.eql(u8, args[1].sym, syms.I1)) {
-            return app1(arena, args[2], try sym(arena, syms.I1));
-        }
-        if (args[1].* == .sym and std.mem.eql(u8, args[1].sym, syms.I0)) return args[3];
-    }
-
-    // comp(A, refl, u0) → u0
-    if (std.mem.eql(u8, hn, syms.Comp) and args.len == 3) {
-        if (args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, syms.Refl)) {
-            return args[2];
-        }
-    }
-
-    // fill(A, refl(x), u0) → refl(x)
-    if (std.mem.eql(u8, hn, syms.Fill) and args.len == 3) {
-        if (args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, syms.Refl) and args[1].app.args.len == 1) {
-            return args[1];
         }
     }
 
@@ -363,11 +241,8 @@ fn builtinRules(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr
         return app2(arena, implies_sym, args[0], false_sym);
     }
 
-    // 論理的簡約
-    if (std.mem.eql(u8, hn, "=") and args.len == 2 and args[0].eql(args[1])) return sym(arena, syms.True);
-    if (std.mem.eql(u8, hn, syms.Globally) and args.len == 1 and args[0].* == .sym and std.mem.eql(u8, args[0].sym, syms.True)) return sym(arena, syms.True);
+    if (std.mem.eql(u8, hn, syms.Eq) and args.len == 2 and args[0].eql(args[1])) return sym(arena, syms.True);
 
-    // A ∧ ⊤ → A, A ∧ ⊥ → ⊥, etc.
     if ((std.mem.eql(u8, hn, syms.And) or std.mem.eql(u8, hn, syms.Product)) and args.len == 2) {
         if (isSym(args[0], syms.True)) return args[1];
         if (isSym(args[1], syms.True)) return args[0];
@@ -381,146 +256,11 @@ fn builtinRules(e: *const Expr, arena: Allocator) error{OutOfMemory}!*const Expr
         if (isSym(args[1], syms.False)) return args[0];
     }
 
-    // id(x) → x
     if (std.mem.eql(u8, hn, "id") and args.len == 1) return args[0];
-
-    // head(cons_stream(x, _)) → x, tail(cons_stream(_, s)) → s
-    if (std.mem.eql(u8, hn, "head") and args.len == 1 and args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "cons_stream") and args[0].app.args.len == 2) {
-        return args[0].app.args[0];
-    }
-    if (std.mem.eql(u8, hn, "tail") and args.len == 1 and args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "cons_stream") and args[0].app.args.len == 2) {
-        return args[0].app.args[1];
-    }
-
-    // ==========================================
-    // List モナド/ファンクタ
-    // ==========================================
-    // fmap(f, nil) → nil
-    if (std.mem.eql(u8, hn, "fmap") and args.len == 2) {
-        if (isSym(args[1], "nil")) return sym(arena, "nil");
-        // fmap(f, cons(x, xs)) → cons(f(x), fmap(f, xs))
-        if (args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, "cons") and args[1].app.args.len == 2) {
-            const cons_sym = try sym(arena, "cons");
-            const fmap_sym = try sym(arena, "fmap");
-            const fx = try app1(arena, args[0], args[1].app.args[0]);
-            const fxs = try app2(arena, fmap_sym, args[0], args[1].app.args[1]);
-            return app2(arena, cons_sym, fx, fxs);
-        }
-    }
-
-    // bind(nil, f) → nil
-    if (std.mem.eql(u8, hn, "bind") and args.len == 2) {
-        if (isSym(args[0], "nil")) return sym(arena, "nil");
-        // bind(m, return) → m (モナド右単位律)
-        if (args[1].* == .sym and std.mem.eql(u8, args[1].sym, "return")) return args[0];
-        if (args[1].* == .app and args[1].app.head.* == .sym and std.mem.eql(u8, args[1].app.head.sym, "return") and args[1].app.args.len == 0) return args[0];
-    }
-
-    // Maybe モナド
-    // bind(just(x), f) → f(x)
-    if (std.mem.eql(u8, hn, "bind") and args.len == 2) {
-        if (args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "just") and args[0].app.args.len == 1) {
-            return app1(arena, args[1], args[0].app.args[0]);
-        }
-        // bind(nothing, f) → nothing
-        if (isSym(args[0], "nothing")) return sym(arena, "nothing");
-    }
-
-    // ==========================================
-    // ベクタ演算
-    // ==========================================
-    // vlength(vnil) → 0
-    if (std.mem.eql(u8, hn, "vlength") and args.len == 1 and isSym(args[0], "vnil")) {
-        return sym(arena, "0");
-    }
-    // vlength(vcons(_, v)) → S(vlength(v))
-    if (std.mem.eql(u8, hn, "vlength") and args.len == 1 and args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "vcons") and args[0].app.args.len == 2) {
-        const vlength_sym = try sym(arena, "vlength");
-        const succ_sym = try sym(arena, "S");
-        return app1(arena, succ_sym, try app1(arena, vlength_sym, args[0].app.args[1]));
-    }
-    // vhead(vcons(x, _)) → x
-    if (std.mem.eql(u8, hn, "vhead") and args.len == 1 and args[0].* == .app and args[0].app.head.* == .sym and std.mem.eql(u8, args[0].app.head.sym, "vcons") and args[0].app.args.len == 2) {
-        return args[0].app.args[0];
-    }
 
     return e;
 }
 
 fn isSym(e: *const Expr, name: []const u8) bool {
     return e.* == .sym and std.mem.eql(u8, e.sym, name);
-}
-
-// ==========================================
-// テスト
-// ==========================================
-
-test "normalize identity" {
-    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
-
-    const a = try sym(arena, "A");
-    const result = try normalize(a, &.{}, arena);
-    try std.testing.expect(result.eql(a));
-}
-
-test "normalize compose with id" {
-    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
-
-    const compose = try sym(arena, "∘");
-    const f = try sym(arena, "f");
-    const id = try sym(arena, "id");
-    const f_id = try app2(arena, compose, f, id);
-
-    const result = try normalize(f_id, &.{}, arena);
-    try std.testing.expect(result.eql(f));
-}
-
-test "normalize And with True" {
-    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
-
-    const and_sym = try sym(arena, "∧");
-    const a = try sym(arena, "A");
-    const true_sym = try sym(arena, "⊤");
-    const a_and_true = try app2(arena, and_sym, a, true_sym);
-
-    const result = try normalize(a_and_true, &.{}, arena);
-    try std.testing.expect(result.eql(a));
-}
-
-test "normalize And with False short-circuit" {
-    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
-
-    const and_sym = try sym(arena, "∧");
-    const a = try sym(arena, "A");
-    const false_sym = try sym(arena, "⊥");
-    const a_and_false = try app2(arena, and_sym, a, false_sym);
-
-    const result = try normalize(a_and_false, &.{}, arena);
-    try std.testing.expect(result.* == .sym);
-    try std.testing.expectEqualStrings("⊥", result.sym);
-}
-
-test "normalize pi1 ∘ pair(f, g) = f" {
-    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
-
-    const compose_s = try sym(arena, "∘");
-    const pi1 = try sym(arena, "pi1");
-    const pair_s = try sym(arena, "pair");
-    const f = try sym(arena, "f");
-    const g = try sym(arena, "g");
-    const pair_fg = try app2(arena, pair_s, f, g);
-    const pi1_pair = try app2(arena, compose_s, pi1, pair_fg);
-
-    const result = try normalize(pi1_pair, &.{}, arena);
-    try std.testing.expect(result.eql(f));
 }

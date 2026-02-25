@@ -253,6 +253,42 @@ pub fn app2(arena: Allocator, head: *const Expr, a: *const Expr, b: *const Expr)
 }
 
 // ==========================================
+// RuleBuilder — 規則構築ヘルパー
+// ==========================================
+
+pub const RuleBuilder = struct {
+    arena: Allocator,
+
+    pub fn init(arena: Allocator) RuleBuilder {
+        return .{ .arena = arena };
+    }
+
+    pub fn s(self: RuleBuilder, name: []const u8) !*const Expr {
+        return sym(self.arena, name);
+    }
+
+    pub fn v(self: RuleBuilder, name: []const u8) !*const Expr {
+        return var_(self.arena, name);
+    }
+
+    pub fn a1(self: RuleBuilder, head: *const Expr, arg: *const Expr) !*const Expr {
+        return app1(self.arena, head, arg);
+    }
+
+    pub fn a2(self: RuleBuilder, head: *const Expr, arg1: *const Expr, arg2: *const Expr) !*const Expr {
+        return app2(self.arena, head, arg1, arg2);
+    }
+
+    pub fn a3(self: RuleBuilder, head: *const Expr, arg1: *const Expr, arg2: *const Expr, arg3: *const Expr) !*const Expr {
+        return app(self.arena, head, &[_]*const Expr{ arg1, arg2, arg3 });
+    }
+
+    pub fn a4(self: RuleBuilder, head: *const Expr, a1_: *const Expr, a2_: *const Expr, a3_: *const Expr, a4_: *const Expr) !*const Expr {
+        return app(self.arena, head, &[_]*const Expr{ a1_, a2_, a3_, a4_ });
+    }
+};
+
+// ==========================================
 // CatRule — 圏論的推論規則
 // ==========================================
 
@@ -333,6 +369,7 @@ pub const ProverConfig = struct {
     classical: bool = false,
     rules: []const CatRule = &.{},
     algebras: []const InitialAlgebra = &.{},
+    rewrite_hooks: []const @import("rewriter.zig").RewriteHook = &.{},
     max_raa: u32 = 2,
     max_induction: u32 = 2,
     max_path_level: u32 = 5,
