@@ -1,3 +1,7 @@
+const std = @import("std");
+const vm = @import("vm.zig");
+const Value = vm.Value;
+const Allocator = std.mem.Allocator;
 pub const ProfileData = struct {
     counts: std.AutoHashMap(usize, usize),
     // pc -> reg -> value frequency
@@ -73,7 +77,7 @@ pub const ProfileData = struct {
         if (!pc_entry.found_existing) {
             pc_entry.value_ptr.* = std.AutoHashMap(u32, std.AutoHashMap(u64, usize)).init(self.allocator);
         }
-        
+
         var reg_entry = try pc_entry.value_ptr.getOrPut(reg);
         if (!reg_entry.found_existing) {
             reg_entry.value_ptr.* = std.AutoHashMap(u64, usize).init(self.allocator);

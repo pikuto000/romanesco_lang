@@ -64,7 +64,7 @@ pub const JIT = struct {
         // Sync To Native
         for (vm_regs, 0..) |v, i| {
             native_regs[i] = switch (v) {
-                .int => |n| .{ .tag = 6, .payload = @ptrFromInt(n) },
+                .bits => |n| .{ .tag = 6, .payload = @ptrFromInt(n) },
                 .unit => .{ .tag = 5, .payload = null },
                 else => .{ .tag = 0, .payload = null },
             };
@@ -78,7 +78,7 @@ pub const JIT = struct {
             // Only update if changed or simple types
             if (nv.tag == 6) {
                 v.deinit(self.allocator);
-                v.* = .{ .int = @intFromPtr(nv.payload) };
+                v.* = .{ .bits = @intFromPtr(nv.payload) };
             } else if (nv.tag == 5) {
                 v.deinit(self.allocator);
                 v.* = .unit;
@@ -132,5 +132,35 @@ pub const JIT = struct {
         const func = lib.lookup(vm.NativeEntry, entry_name_z) orelse return error.SymbolNotFound;
 
         return try self.run(func, vm_regs);
+    }
+
+    /// 外部 LLVM IR を Lifter でバイトコード化し、JIT 実行する
+    pub fn liftAndRun(
+        self: *JIT,
+        ir_text: []const u8,
+        entry_name: []const u8,
+        vm_regs: []Value,
+    ) !u64 {
+        const lifter = @import("lifter.zig");
+        var l = lifter.Lifter.init(self.allocator);
+        var prog = try l.lift(ir_text);
+        defer prog.deinit();
+
+        var machine = vm.VM.init(self.allocator);
+        // Note: Simple direct execution for now.
+        // In reality, we should sync vm_regs and find entry_name in prog.blocks.
+        _ = entry_name;
+        const result = try machine.run(prog.mainCode());
+        
+        // Sync results back to vm_regs if needed (simplified)
+        if (vm_regs.len > 0) {
+            vm_regs[0].deinit(self.allocator);
+            vm_regs[0] = try result.clone(self.allocator);
+        }
+
+        switch (result) {
+            .bits => |n| return n,
+            else => return 0,
+        }
     }
 };

@@ -1,13 +1,15 @@
 //! By convention, root.zig is the root source file when making a library.
 const std = @import("std");
-pub const vm = @import("vm.zig");
-pub const jit = @import("jit.zig");
-pub const codegen = @import("codegen.zig");
-pub const analyzer = @import("analyzer.zig");
-pub const optimizer = @import("optimizer.zig");
-pub const speculative = @import("speculative.zig");
-pub const aot = @import("aot.zig");
-pub const loader = @import("loader.zig");
+pub const vm = @import("Runtime/vm.zig");
+pub const jit = @import("Runtime/jit.zig");
+pub const codegen = @import("Runtime/codegen.zig");
+pub const analyzer = @import("Runtime/analyzer.zig");
+pub const optimizer = @import("Runtime/optimizer.zig");
+pub const speculative = @import("Runtime/speculative.zig");
+pub const aot = @import("Runtime/aot.zig");
+pub const loader = @import("Runtime/loader.zig");
+pub const ir_parser = @import("Runtime/ir_parser.zig");
+pub const lifter = @import("Runtime/lifter.zig");
 pub const tests = @import("tests.zig");
 pub const prover = @import("prover/prover.zig");
 

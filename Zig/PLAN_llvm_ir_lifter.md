@@ -88,7 +88,11 @@ pub const IRParser = struct {
 
 ## フェーズ 1: VM 拡張 (`vm.zig`)
 
-### 1-1. Value 型への `float` 追加
+### 1-1. Value 型の拡張
+
+**設計方針（型無し）**: 数値 Value は「意味を持たないビット列」とする。
+整数か浮動小数点かの区別は Value タグに持たせず、**opcode が解釈を決める**。
+構造型（closure / pair / inl / inr / unit）は計算モデルの基盤であるため型タグを保持する。
 
 ```zig
 pub const ValueTag = enum(u64) {
@@ -97,18 +101,40 @@ pub const ValueTag = enum(u64) {
     inl     = 3,
     inr     = 4,
     unit    = 5,
-    int     = 6,
-    float   = 7,   // 追加: f64 の IEEE 754 ビットパターンを u64 で保持
+    bits    = 6,   // ≤64ビットのビット列（int/float/pointer等を区別しない）
+    wide    = 7,   // >64ビットのビット列（ヒープ上のリム配列）
 };
 
 pub const Value = union(ValueTag) {
     // ...既存フィールド...
-    float: u64,    // @bitCast(f64) した値
+    bits: u64,    // ビットパターン（意味はopcodeが決める）
+    wide: []u64,  // 多倍長ビットパターン（リトルエンディアンのリム配列）
 };
 ```
 
-**方針**: `f64` をソフトウェア実装せず、`@bitCast` でビットパターンを `u64` に変換して保持する。
-演算時は `@bitCast` で `f64` に戻してCPUのFPUを利用する。コストは実質ゼロ。
+同じビット列を異なるopcodeが異なる意味で使う例:
+```
+load_bits { val=0x4048F5C28F5C28F6 } → Value.bits（f64の3.14のビットパターン）
+load_bits { val=42 }                 → Value.bits（整数42のビットパターン）
+
+ibin { op=.add, width=64 }  → bits を64bit整数として加算
+fadd                         → bits を f64 として加算
+ibin { op=.add, width=32 }  → bits の下位32ビットを整数として加算
+```
+
+**Valueのサイズについて**: `wide` の payload は `[]u64`（スライス = ポインタ+長さ = 16バイト）。
+これが最大 payload サイズになるため、Value 全体は **24バイト** になる（現状16バイトから増加）。
+`bits` やポインタ系タグのサイズは変わらないが、union 全体のサイズは wide に揃う点に注意。
+
+**wide のリム構造**:
+```
+width=80の例: limbCount = ceil(80/64) = 2
+limbs[0] = 下位64ビット
+limbs[1] = 上位16ビット（上位48ビットはゼロ）
+```
+
+**float の扱い**: `f64` は `@bitCast` でビットパターンを `u64` に変換して `Value.bits` に格納する。
+`fadd` 等のopcodeが実行時に `@bitCast` で `f64` に戻してCPUのFPUを利用する。コストは実質ゼロ。
 
 **FPU 非搭載環境について**: `u64` によるビットパターン保持はアーキテクチャ非依存であるため、
 値の格納・転送は整数操作のみで完結する。実際の演算（`lf + rf` 等の Zig コード）を
@@ -120,80 +146,226 @@ JIT/AOT で生成される LLVM IR 中の `fadd double` 命令も、clang がタ
 
 ### 1-2. Op への新 opcode 追加
 
-#### 整数比較（結果は `inl`=真 / `inr`=偽 の Value になる）
+#### 任意ビット幅整数演算（`ibin`）
+
+`add/sub/mul`（既存、width=64相当）はそのまま残し後方互換を保つ。
+新規コードおよびLiftedコードには `ibin` を使う。
 
 ```zig
-icmp_eq:  struct { dst: u32, lhs: u32, rhs: u32 },  // ==
-icmp_ne:  struct { dst: u32, lhs: u32, rhs: u32 },  // !=
-icmp_slt: struct { dst: u32, lhs: u32, rhs: u32 },  // signed <
-icmp_sle: struct { dst: u32, lhs: u32, rhs: u32 },  // signed <=
-icmp_sgt: struct { dst: u32, lhs: u32, rhs: u32 },  // signed >
-icmp_sge: struct { dst: u32, lhs: u32, rhs: u32 },  // signed >=
-icmp_ult: struct { dst: u32, lhs: u32, rhs: u32 },  // unsigned <
-icmp_ule: struct { dst: u32, lhs: u32, rhs: u32 },  // unsigned <=
+pub const IntWidth = u16;  // 1〜65535ビット（実用上1〜64を主用途とする）
+
+pub const IBinOp = enum {
+    add, sub, mul,
+    sdiv, udiv,   // 符号付き/なし除算
+    srem, urem,   // 符号付き/なし剰余
+    and_, or_, xor_,
+    shl, lshr, ashr,
+};
+
+ibin: struct { dst: u32, lhs: u32, rhs: u32, op: IBinOp, width: IntWidth },
+
+// ビット列定数ロード（width ≤ 64、int/float どちらにも使う）
+load_bits: struct { dst: u32, val: u64, width: IntWidth },
+
+// ビット列定数ロード（width > 64）
+load_wide: struct { dst: u32, limbs: []const u64, width: IntWidth },
 ```
 
-#### 整数拡張演算
+`ibin` の後方互換関係:
+```
+add { dst, lhs, rhs }  ≡  ibin { dst, lhs, rhs, op=.add, width=64 }
+sub { dst, lhs, rhs }  ≡  ibin { dst, lhs, rhs, op=.sub, width=64 }
+mul { dst, lhs, rhs }  ≡  ibin { dst, lhs, rhs, op=.mul, width=64 }
+```
+
+#### 任意ビット幅整数比較（`icmp`）
+
+結果は `inl`=真 / `inr`=偽 の Value になる。
 
 ```zig
-div:  struct { dst: u32, lhs: u32, rhs: u32 },  // 符号付き除算
-udiv: struct { dst: u32, lhs: u32, rhs: u32 },  // 符号なし除算
-rem:  struct { dst: u32, lhs: u32, rhs: u32 },  // 符号付き剰余
-urem: struct { dst: u32, lhs: u32, rhs: u32 },  // 符号なし剰余
-and_op: struct { dst: u32, lhs: u32, rhs: u32 }, // ビット AND
-or_op:  struct { dst: u32, lhs: u32, rhs: u32 }, // ビット OR
-xor_op: struct { dst: u32, lhs: u32, rhs: u32 }, // ビット XOR
-shl:    struct { dst: u32, lhs: u32, rhs: u32 }, // 左シフト
-lshr:   struct { dst: u32, lhs: u32, rhs: u32 }, // 論理右シフト
-ashr:   struct { dst: u32, lhs: u32, rhs: u32 }, // 算術右シフト
+pub const ICmpPred = enum {
+    eq, ne,
+    slt, sle, sgt, sge,   // 符号付き
+    ult, ule, ugt, uge,   // 符号なし
+};
+
+icmp: struct { dst: u32, lhs: u32, rhs: u32, pred: ICmpPred, width: IntWidth },
+```
+
+#### ビット幅変換
+
+整数としての意味的な変換。結果はいずれも `Value.bits` または `Value.wide`。
+
+```zig
+sext:  struct { dst: u32, src: u32, from: IntWidth, to: IntWidth },  // 符号拡張
+zext:  struct { dst: u32, src: u32, from: IntWidth, to: IntWidth },  // ゼロ拡張
+trunc: struct { dst: u32, src: u32, from: IntWidth, to: IntWidth },  // 切り捨て
+```
+
+#### 数値解釈の変換（bits の再解釈）
+
+同じビット列を「整数↔浮動小数点」として意味変換する。
+
+```zig
+// bits を整数として解釈し f64 に変換 → 結果は Value.bits（f64 ビットパターン）
+itof: struct { dst: u32, src: u32, width: IntWidth, signed: bool },
+
+// bits を f64 として解釈し整数に変換 → 結果は Value.bits（整数ビットパターン）
+ftoi: struct { dst: u32, src: u32, width: IntWidth, signed: bool },
+
+// bits を単純に再解釈するだけ（意味の変換なし、LLVM の bitcast 相当）
+// → load_bits で直接ビットパターンを指定するだけでよいため opcode 不要
 ```
 
 #### 浮動小数点演算
 
+`bits` タグの値を f64 ビットパターンとして解釈して演算する。結果も `Value.bits`。
+
 ```zig
+pub const FCmpPred = enum { oeq, one, olt, ole, ogt, oge, ord, uno };
+
 fadd: struct { dst: u32, lhs: u32, rhs: u32 },
 fsub: struct { dst: u32, lhs: u32, rhs: u32 },
 fmul: struct { dst: u32, lhs: u32, rhs: u32 },
 fdiv: struct { dst: u32, lhs: u32, rhs: u32 },
 frem: struct { dst: u32, lhs: u32, rhs: u32 },
-fcmp_eq:  struct { dst: u32, lhs: u32, rhs: u32 }, // 結果は inl/inr
-fcmp_lt:  struct { dst: u32, lhs: u32, rhs: u32 },
-fcmp_le:  struct { dst: u32, lhs: u32, rhs: u32 },
-fcmp_gt:  struct { dst: u32, lhs: u32, rhs: u32 },
-fcmp_ge:  struct { dst: u32, lhs: u32, rhs: u32 },
-```
-
-#### 型変換
-
-```zig
-int_to_float: struct { dst: u32, src: u32 },   // i64 → f64
-float_to_int: struct { dst: u32, src: u32 },   // f64 → i64 (truncate)
-load_float:   struct { dst: u32, val: u64 },   // f64 定数ロード (ビットパターン)
+fcmp: struct { dst: u32, lhs: u32, rhs: u32, pred: FCmpPred },  // 結果は inl/inr
 ```
 
 ### 1-3. VM 実行ループへの追加
 
-各 opcode の実装例:
+#### bigint ヘルパー関数
+
+```zig
+fn limbCount(width: IntWidth) usize {
+    return (@as(usize, width) + 63) / 64;
+}
+
+/// 上位リムの余分なビットをゼロにする（演算後に必ず呼ぶ）
+fn maskTopLimb(limbs: []u64, width: IntWidth) void {
+    const top = (width - 1) / 64;
+    const used = @as(u6, @intCast((width - 1) % 64 + 1));
+    const mask = if (used == 64) ~@as(u64, 0)
+                 else (@as(u64, 1) << used) - 1;
+    limbs[top] &= mask;
+}
+
+/// リムに符号拡張を適用する（符号付き演算前に使用）
+fn signExtendLimbs(limbs: []u64, width: IntWidth) void {
+    const top = (width - 1) / 64;
+    const bit = @as(u6, @intCast((width - 1) % 64));
+    const sign = (limbs[top] >> bit) & 1;
+    if (sign == 1) {
+        // 上位ビットを 1 で埋める
+        const mask = ~((@as(u64, 1) << (bit + 1)) - 1);
+        limbs[top] |= mask;
+        for (top + 1..limbs.len) |i| limbs[i] = ~@as(u64, 0);
+    }
+}
+
+/// 多倍長加算（キャリー伝搬）
+fn bigintAdd(allocator: Allocator, lhs: []const u64, rhs: []const u64, width: IntWidth) ![]u64 {
+    const n = limbCount(width);
+    const dst = try allocator.alloc(u64, n);
+    var carry: u1 = 0;
+    for (0..n) |i| {
+        const r = @addWithOverflow(lhs[i], rhs[i]);
+        const r2 = @addWithOverflow(r[0], carry);
+        dst[i] = r2[0];
+        carry = r[1] | r2[1];
+    }
+    maskTopLimb(dst, width);
+    return dst;
+}
+
+/// 演算難度ごとの実装優先度
+/// add/sub/and/or/xor/shl/lshr : 低（キャリー/ボロー伝搬）
+/// ashr                         : 中（符号ビット伝搬）
+/// mul                          : 中（スクールブック法 O(n²)）
+/// sdiv/udiv/srem/urem          : 高（Knuth Algorithm D 等）→ 後期フェーズで実装
+```
+
+#### `ibin` opcode の実装例
+
+```zig
+.ibin => |o| {
+    // width ≤ 64: bits タグ、> 64: wide タグで分岐
+    if (o.width <= 64) {
+        const l = regs[o.lhs].bits;
+        const r = regs[o.rhs].bits;
+        const mask = if (o.width == 64) ~@as(u64, 0)
+                     else (@as(u64, 1) << @intCast(o.width)) - 1;
+        const raw: u64 = switch (o.op) {
+            .add  => l +% r,
+            .sub  => l -% r,
+            .mul  => l *% r,
+            .and_ => l  & r,
+            .or_  => l  | r,
+            .xor_ => l  ^ r,
+            .lshr => l >> @intCast(r & 63),
+            .shl  => l << @intCast(r & 63),
+            .ashr => blk: {
+                const sl: i64 = signExtend64(l, o.width);
+                break :blk @bitCast(sl >> @intCast(r & 63));
+            },
+            .sdiv => blk: {
+                const sl: i64 = signExtend64(l, o.width);
+                const sr: i64 = signExtend64(r, o.width);
+                break :blk @bitCast(@divTrunc(sl, sr));
+            },
+            .udiv => l / r,
+            .srem => blk: {
+                const sl: i64 = signExtend64(l, o.width);
+                const sr: i64 = signExtend64(r, o.width);
+                break :blk @bitCast(@rem(sl, sr));
+            },
+            .urem => l % r,
+        };
+        regs[o.dst] = .{ .bits = raw & mask };
+    } else {
+        // width > 64: wide タグ（多倍長演算）
+        const result = try bigintBinOp(self.allocator, regs[o.lhs].wide,
+                                       regs[o.rhs].wide, o.op, o.width);
+        regs[o.dst].deinit(self.allocator);
+        regs[o.dst] = .{ .wide = result };
+    }
+},
+```
+
+#### `fadd` / `icmp` の実装例
+
+`bits` タグの値を opcode の意図に従って解釈する。型タグは参照しない。
 
 ```zig
 .fadd => |a| {
-    const lf: f64 = @bitCast(regs[a.lhs].float);
-    const rf: f64 = @bitCast(regs[a.rhs].float);
-    regs[a.dst] = .{ .float = @bitCast(lf + rf) };
+    // bits を f64 ビットパターンとして解釈
+    const lf: f64 = @bitCast(regs[a.lhs].bits);
+    const rf: f64 = @bitCast(regs[a.rhs].bits);
+    regs[a.dst] = .{ .bits = @bitCast(lf + rf) };
 },
-.icmp_slt => |a| {
-    const l: i64 = @bitCast(regs[a.lhs].int);
-    const r: i64 = @bitCast(regs[a.rhs].int);
-    if (l < r) {
-        const v = try self.allocator.create(Value);
-        v.* = .unit;
-        regs[a.dst] = .{ .inl = v };
-    } else {
-        const v = try self.allocator.create(Value);
-        v.* = .unit;
-        regs[a.dst] = .{ .inr = v };
+.icmp => |a| {
+    const cond: bool = switch (a.pred) {
+        .slt => signExtend64(regs[a.lhs].bits, a.width) <
+                signExtend64(regs[a.rhs].bits, a.width),
+        .ult => regs[a.lhs].bits < regs[a.rhs].bits,
+        .eq  => regs[a.lhs].bits == regs[a.rhs].bits,
+        // ...
+    };
+    const v = try self.allocator.create(Value);
+    v.* = .unit;
+    regs[a.dst] = if (cond) .{ .inl = v } else .{ .inr = v };
+},
+```
+
+#### `deinit` への `wide` 追加
+
+```zig
+pub fn deinit(self: Value, allocator: Allocator) void {
+    switch (self) {
+        .wide => |limbs| allocator.free(limbs),
+        // ...既存...
     }
-},
+}
 ```
 
 ---
@@ -203,38 +375,42 @@ load_float:   struct { dst: u32, val: u64 },   // f64 定数ロード (ビット
 新 opcode 用のバイトコードオペコードを割り当て、`loadFromFile` のデコードテーブルを拡張する。
 
 ```
-0x11  icmp_eq   dst, lhs, rhs
-0x12  icmp_ne   dst, lhs, rhs
-0x13  icmp_slt  dst, lhs, rhs
-0x14  icmp_sle  dst, lhs, rhs
-0x15  icmp_sgt  dst, lhs, rhs
-0x16  icmp_sge  dst, lhs, rhs
-0x17  icmp_ult  dst, lhs, rhs
-0x18  icmp_ule  dst, lhs, rhs
-0x19  div       dst, lhs, rhs
-0x1A  udiv      dst, lhs, rhs
-0x1B  rem       dst, lhs, rhs
-0x1C  urem      dst, lhs, rhs
-0x1D  and_op    dst, lhs, rhs
-0x1E  or_op     dst, lhs, rhs
-0x1F  xor_op    dst, lhs, rhs
-0x20  shl       dst, lhs, rhs
-0x21  lshr      dst, lhs, rhs
-0x22  ashr      dst, lhs, rhs
-0x23  fadd      dst, lhs, rhs
-0x24  fsub      dst, lhs, rhs
-0x25  fmul      dst, lhs, rhs
-0x26  fdiv      dst, lhs, rhs
-0x27  frem      dst, lhs, rhs
-0x28  fcmp_eq   dst, lhs, rhs
-0x29  fcmp_lt   dst, lhs, rhs
-0x2A  fcmp_le   dst, lhs, rhs
-0x2B  fcmp_gt   dst, lhs, rhs
-0x2C  fcmp_ge   dst, lhs, rhs
-0x2D  int_to_float  dst, src
-0x2E  float_to_int  dst, src
-0x2F  load_float    dst, val(u64 8バイト)
+; --- 任意ビット幅整数演算 ---
+; ibin の op フィールドは別途 u8 でエンコード（IBinOp の序数）
+0x11  ibin          dst(u32), lhs(u32), rhs(u32), op(u8), width(u16)
+
+; icmp の pred フィールドは u8 でエンコード（ICmpPred の序数）
+0x12  icmp          dst(u32), lhs(u32), rhs(u32), pred(u8), width(u16)
+
+; ビット列定数ロード（width ≤ 64、int/float 共用）
+0x13  load_bits     dst(u32), val(u64), width(u16)
+
+; ビット列定数ロード（width > 64）: limb_count = ceil(width/64) 個の u64 が続く
+0x14  load_wide     dst(u32), width(u16), limb_count(u32), limbs(u64 × limb_count)
+
+; ビット幅変換
+0x15  sext          dst(u32), src(u32), from(u16), to(u16)
+0x16  zext          dst(u32), src(u32), from(u16), to(u16)
+0x17  trunc         dst(u32), src(u32), from(u16), to(u16)
+
+; 数値解釈変換（bits を整数↔f64 として変換）
+0x18  itof          dst(u32), src(u32), width(u16), signed(u8)
+0x19  ftoi          dst(u32), src(u32), width(u16), signed(u8)
+
+; --- 浮動小数点演算（bits を f64 ビットパターンとして解釈）---
+; fcmp の pred フィールドは u8 でエンコード（FCmpPred の序数）
+0x20  fadd          dst(u32), lhs(u32), rhs(u32)
+0x21  fsub          dst(u32), lhs(u32), rhs(u32)
+0x22  fmul          dst(u32), lhs(u32), rhs(u32)
+0x23  fdiv          dst(u32), lhs(u32), rhs(u32)
+0x24  frem          dst(u32), lhs(u32), rhs(u32)
+0x25  fcmp          dst(u32), lhs(u32), rhs(u32), pred(u8)
 ```
+
+エンコードのポイント:
+- `width` は u16（2バイト）でエンコードし、最大65535ビットを表現可能
+- `load_bigint` は可変長のため `limb_count` フィールドを持つ
+- 既存の `0x01`〜`0x10` は変更なし（後方互換）
 
 ---
 
@@ -264,18 +440,26 @@ LLVM IR テキスト
 
 #### 完全対応
 
-| LLVM IR | Romanesco Op |
-|---|---|
-| `add/sub/mul nsw i64 %a, %b` | `add/sub/mul` |
-| `sdiv/udiv i64 %a, %b` | `div/udiv` |
-| `srem/urem i64 %a, %b` | `rem/urem` |
-| `and/or/xor i64 %a, %b` | `and_op/or_op/xor_op` |
-| `shl/lshr/ashr i64 %a, %b` | `shl/lshr/ashr` |
-| `fadd/fsub/fmul/fdiv double %a, %b` | `fadd/fsub/fmul/fdiv` |
-| `icmp slt/sle/eq/... i64 %a, %b` | `icmp_slt/...` |
-| `fcmp olt/ole/oeq/... double %a, %b` | `fcmp_lt/...` |
-| `br i1 %c, label %t, label %f` | `case_op` (after icmp result) |
-| `br label %bb` | 次ブロックへの無条件ジャンプ |
+| LLVM IR | Romanesco Op | 備考 |
+|---|---|---|
+| `add/sub/mul nsw iN %a, %b` | `ibin { op, width=N }` | N=64 なら既存 `add/sub/mul` も可 |
+| `sdiv/udiv iN %a, %b` | `ibin { op=.sdiv/.udiv, width=N }` | |
+| `srem/urem iN %a, %b` | `ibin { op=.srem/.urem, width=N }` | |
+| `and/or/xor iN %a, %b` | `ibin { op=.and_/.or_/.xor_, width=N }` | |
+| `shl/lshr/ashr iN %a, %b` | `ibin { op=.shl/.lshr/.ashr, width=N }` | |
+| `fadd/fsub/fmul/fdiv double` | `fadd/fsub/fmul/fdiv` | |
+| `icmp slt/eq/ult/... iN %a, %b` | `icmp { pred, width=N }` | |
+| `fcmp olt/oeq/... double` | `fcmp { pred }` | |
+| `sext iN %x to iM` | `sext { from=N, to=M }` | |
+| `zext iN %x to iM` | `zext { from=N, to=M }` | |
+| `trunc iN %x to iM` | `trunc { from=N, to=M }` | |
+| `sitofp iN %x to double` | `itof { width=N, signed=true }` | bits→f64 |
+| `uitofp iN %x to double` | `itof { width=N, signed=false }` | |
+| `fptosi double %x to iN` | `ftoi { width=N, signed=true }` | f64→bits |
+| `fptoui double %x to iN` | `ftoi { width=N, signed=false }` | |
+| `bitcast double %x to i64` | opcode 不要 | bits は既に同じ表現 |
+| `br i1 %c, label %t, label %f` | `case_op` | icmp 結果（inl/inr）を scrutinee に |
+| `br label %bb` | 次ブロックへの無条件ジャンプ | |
 | `ret i64 %v` | `ret` |
 | `ret void` | `load_const .unit` + `ret` |
 | `call i64 @f(%a, %b)` | `call` |
@@ -510,3 +694,7 @@ decompiler を lifter に統合することを改めて検討する。それま�
 - **FPU 非搭載環境でのパフォーマンス**: ソフトウェア float は自動で機能するが低速。
   FPU なし環境で float 演算を多用する場合は、固定小数点数への手動変換や
   float 命令の使用を制限するリンターの導入を検討する
+- **bigint の sdiv/udiv/srem/urem**: Knuth Algorithm D 等の実装が必要で複雑度が高い。
+  フェーズ1では add/sub/mul/and/or/xor/shl/lshr/ashr のみ実装し、除算は後期フェーズとする
+- **width > 64 の bigint パフォーマンス**: ヒープ確保が演算ごとに発生するため低速。
+  アリーナアロケータの活用や、スタック上に小リム数を確保する最適化を将来検討する

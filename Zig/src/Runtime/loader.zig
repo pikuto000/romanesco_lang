@@ -6,23 +6,16 @@ const Op = vm.Op;
 
 pub const LoadedProgram = struct {
     allocator: Allocator,
+    arena: *std.heap.ArenaAllocator,
     constants: []Value,
     blocks: []const []const Op,
 
     pub fn deinit(self: *LoadedProgram) void {
         for (self.constants) |v| v.deinit(self.allocator);
         self.allocator.free(self.constants);
-        for (self.blocks) |block| {
-            for (block) |op| {
-                switch (op) {
-                    .load_const => |lc| lc.val.deinit(self.allocator),
-                    .make_closure => |mc| self.allocator.free(mc.captures),
-                    .call => |c| self.allocator.free(c.args),
-                    else => {},
-                }
-            }
-            self.allocator.free(block);
-        }
+        // Note: individual blocks and nested ops are allocated in arena
+        self.arena.deinit();
+        self.allocator.destroy(self.arena);
         self.allocator.free(self.blocks);
     }
 
@@ -72,16 +65,21 @@ pub const BytecodeLoader = struct {
                 5 => constants[i] = .unit,
                 6 => {
                     const val = try reader.readInt(u64, .little);
-                    constants[i] = .{ .int = val };
+                    constants[i] = .{ .bits = val };
                 },
                 else => return error.UnsupportedConstantType,
             }
         }
 
         // 3. Code Blocks
+        const arena = try self.allocator.create(std.heap.ArenaAllocator);
+        arena.* = std.heap.ArenaAllocator.init(self.allocator);
+        errdefer { arena.deinit(); self.allocator.destroy(arena); }
+        const aa = arena.allocator();
+
         const block_count = try reader.readInt(u32, .little);
         const blocks_mut = try self.allocator.alloc([]Op, block_count);
-        errdefer self.allocator.free(blocks_mut);
+        defer self.allocator.free(blocks_mut);
 
         const RawOp = struct {
             opcode: u8,
@@ -158,6 +156,59 @@ pub const BytecodeLoader = struct {
                         ro.u2 = try reader.readInt(u32, .little);
                         ro.u3 = try reader.readInt(u32, .little);
                     },
+                    0x11, 0x12 => { // ibin/icmp: dst, lhs, rhs, op/pred(u8), width(u16)
+                        ro.u1 = try reader.readInt(u32, .little);
+                        ro.u2 = try reader.readInt(u32, .little);
+                        ro.u3 = try reader.readInt(u32, .little);
+                        const b1 = try reader.readByte();
+                        const w = try reader.readInt(u16, .little);
+                        ro.u4 = (@as(u32, b1) << 16) | w;
+                    },
+                    0x13 => { // load_bits: dst, val(u64), width(u16)
+                        ro.u1 = try reader.readInt(u32, .little);
+                        const val = try reader.readInt(u64, .little);
+                        ro.u2 = @as(u32, @truncate(val));
+                        ro.u3 = @as(u32, @truncate(val >> 32));
+                        ro.u4 = try reader.readInt(u16, .little);
+                    },
+                    0x14 => { // load_wide: dst, width(u16), limb_count, limbs
+                        ro.u1 = try reader.readInt(u32, .little);
+                        const w = try reader.readInt(u16, .little);
+                        const limb_count = try reader.readInt(u32, .little);
+                        ro.u2 = (@as(u32, w) << 16) | (limb_count & 0xFFFF); // Simplified packing
+                        const limbs = try self.allocator.alloc(u32, limb_count * 2); // Store u64 as 2x u32
+                        for (0..limb_count) |k| {
+                            const l = try reader.readInt(u64, .little);
+                            limbs[k * 2] = @as(u32, @truncate(l));
+                            limbs[k * 2 + 1] = @as(u32, @truncate(l >> 32));
+                        }
+                        ro.arr = limbs;
+                    },
+                    0x15, 0x16, 0x17 => { // sext/zext/trunc: dst, src, from(u16), to(u16)
+                        ro.u1 = try reader.readInt(u32, .little);
+                        ro.u2 = try reader.readInt(u32, .little);
+                        const from = try reader.readInt(u16, .little);
+                        const to = try reader.readInt(u16, .little);
+                        ro.u3 = (@as(u32, from) << 16) | to;
+                    },
+                    0x18, 0x19 => { // itof/ftoi: dst, src, width(u16), signed(u8)
+                        ro.u1 = try reader.readInt(u32, .little);
+                        ro.u2 = try reader.readInt(u32, .little);
+                        const w = try reader.readInt(u16, .little);
+                        const s = try reader.readByte();
+                        ro.u3 = (@as(u32, w) << 8) | s;
+                    },
+                    0x20, 0x21, 0x22, 0x23, 0x24 => { // fadd..frem: dst, lhs, rhs
+                        ro.u1 = try reader.readInt(u32, .little);
+                        ro.u2 = try reader.readInt(u32, .little);
+                        ro.u3 = try reader.readInt(u32, .little);
+                    },
+                    0x25 => { // fcmp: dst, lhs, rhs, pred(u8)
+                        ro.u1 = try reader.readInt(u32, .little);
+                        ro.u2 = try reader.readInt(u32, .little);
+                        ro.u3 = try reader.readInt(u32, .little);
+                        ro.u4 = try reader.readByte();
+                    },
                     else => return error.UnknownOpcode,
                 }
                 raw_ops[j] = ro;
@@ -166,7 +217,7 @@ pub const BytecodeLoader = struct {
 
         // Pass 2: Allocate Op arrays for each block
         for (0..block_count) |i| {
-            blocks_mut[i] = try self.allocator.alloc(Op, raw_blocks[i].ops.len);
+            blocks_mut[i] = try aa.alloc(Op, raw_blocks[i].ops.len);
         }
 
         // Pass 3: Finalize Op structures and patch pointers
@@ -177,11 +228,11 @@ pub const BytecodeLoader = struct {
                 switch (ro.opcode) {
                     0x01 => blocks_mut[i][j] = .{ .move = .{ .dst = ro.u1, .src = ro.u2 } },
                     0x02 => {
-                        const val = try constants[ro.u2].clone(self.allocator);
+                        const val = try constants[ro.u2].clone(aa);
                         blocks_mut[i][j] = .{ .load_const = .{ .dst = ro.u1, .val = val } };
                     },
                     0x03 => {
-                        const caps = try self.allocator.dupe(u32, ro.arr);
+                        const caps = try aa.dupe(u32, ro.arr);
                         blocks_mut[i][j] = .{ .make_closure = .{
                             .dst = ro.u1,
                             .body = blocks_mut[ro.u2],
@@ -191,11 +242,11 @@ pub const BytecodeLoader = struct {
                         } };
                     },
                     0x04 => {
-                        const args = try self.allocator.dupe(u32, ro.arr);
+                        const call_args = try aa.dupe(u32, ro.arr);
                         blocks_mut[i][j] = .{ .call = .{
                             .dst = ro.u1,
                             .func = ro.u2,
-                            .args = args,
+                            .args = call_args,
                         } };
                     },
                     0x05 => blocks_mut[i][j] = .{ .ret = .{ .src = ro.u1 } },
@@ -210,11 +261,79 @@ pub const BytecodeLoader = struct {
                         .inl_branch = blocks_mut[ro.u3],
                         .inr_branch = blocks_mut[ro.u4],
                     } },
-                    0x0C => blocks_mut[i][j] = .{ .add = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
-                    0x0D => blocks_mut[i][j] = .{ .sub = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
-                    0x0E => blocks_mut[i][j] = .{ .mul = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
-                    0x0F => blocks_mut[i][j] = .{ .borrow = .{ .dst = ro.u1, .src = ro.u2 } },
-                    0x10 => blocks_mut[i][j] = .{ .free = .{ .reg = ro.u1 } },
+                    0x11 => blocks_mut[i][j] = .{ .ibin = .{
+                        .dst = ro.u1,
+                        .lhs = ro.u2,
+                        .rhs = ro.u3,
+                        .op = @enumFromInt(@as(u8, @intCast(ro.u4 >> 16))),
+                        .width = @as(u16, @intCast(ro.u4 & 0xFFFF)),
+                    } },
+                    0x12 => blocks_mut[i][j] = .{ .icmp = .{
+                        .dst = ro.u1,
+                        .lhs = ro.u2,
+                        .rhs = ro.u3,
+                        .pred = @enumFromInt(@as(u8, @intCast(ro.u4 >> 16))),
+                        .width = @as(u16, @intCast(ro.u4 & 0xFFFF)),
+                    } },
+                    0x13 => blocks_mut[i][j] = .{ .load_bits = .{
+                        .dst = ro.u1,
+                        .val = (@as(u64, ro.u3) << 32) | ro.u2,
+                        .width = @as(u16, @intCast(ro.u4)),
+                    } },
+                    0x14 => {
+                        const width = @as(u16, @intCast(ro.u2 >> 16));
+                        const limb_count = ro.arr.len / 2;
+                        const limbs = try aa.alloc(u64, limb_count);
+                        for (0..limb_count) |k| {
+                            limbs[k] = (@as(u64, ro.arr[k * 2 + 1]) << 32) | ro.arr[k * 2];
+                        }
+                        blocks_mut[i][j] = .{ .load_wide = .{
+                            .dst = ro.u1,
+                            .width = width,
+                            .limbs = limbs,
+                        } };
+                    },
+                    0x15 => blocks_mut[i][j] = .{ .sext = .{
+                        .dst = ro.u1,
+                        .src = ro.u2,
+                        .from = @as(u16, @intCast(ro.u3 >> 16)),
+                        .to = @as(u16, @intCast(ro.u3 & 0xFFFF)),
+                    } },
+                    0x16 => blocks_mut[i][j] = .{ .zext = .{
+                        .dst = ro.u1,
+                        .src = ro.u2,
+                        .from = @as(u16, @intCast(ro.u3 >> 16)),
+                        .to = @as(u16, @intCast(ro.u3 & 0xFFFF)),
+                    } },
+                    0x17 => blocks_mut[i][j] = .{ .trunc = .{
+                        .dst = ro.u1,
+                        .src = ro.u2,
+                        .from = @as(u16, @intCast(ro.u3 >> 16)),
+                        .to = @as(u16, @intCast(ro.u3 & 0xFFFF)),
+                    } },
+                    0x18 => blocks_mut[i][j] = .{ .itof = .{
+                        .dst = ro.u1,
+                        .src = ro.u2,
+                        .width = @as(u16, @intCast(ro.u3 >> 8)),
+                        .signed = (ro.u3 & 0xFF) != 0,
+                    } },
+                    0x19 => blocks_mut[i][j] = .{ .ftoi = .{
+                        .dst = ro.u1,
+                        .src = ro.u2,
+                        .width = @as(u16, @intCast(ro.u3 >> 8)),
+                        .signed = (ro.u3 & 0xFF) != 0,
+                    } },
+                    0x20 => blocks_mut[i][j] = .{ .fadd = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
+                    0x21 => blocks_mut[i][j] = .{ .fsub = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
+                    0x22 => blocks_mut[i][j] = .{ .fmul = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
+                    0x23 => blocks_mut[i][j] = .{ .fdiv = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
+                    0x24 => blocks_mut[i][j] = .{ .frem = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
+                    0x25 => blocks_mut[i][j] = .{ .fcmp = .{
+                        .dst = ro.u1,
+                        .lhs = ro.u2,
+                        .rhs = ro.u3,
+                        .pred = @enumFromInt(@as(u8, @intCast(ro.u4))),
+                    } },
                     else => unreachable,
                 }
             }
@@ -224,10 +343,10 @@ pub const BytecodeLoader = struct {
         for (0..block_count) |i| {
             blocks[i] = blocks_mut[i];
         }
-        self.allocator.free(blocks_mut);
 
         return LoadedProgram{
             .allocator = self.allocator,
+            .arena = arena,
             .constants = constants,
             .blocks = blocks,
         };
@@ -282,7 +401,7 @@ test "BytecodeLoader: Roundtrip test" {
     defer prog.deinit();
 
     try std.testing.expectEqual(@as(usize, 1), prog.constants.len);
-    try std.testing.expectEqual(@as(u64, 42), prog.constants[0].int);
+    try std.testing.expectEqual(@as(u64, 42), prog.constants[0].bits);
     try std.testing.expectEqual(@as(usize, 1), prog.blocks.len);
     try std.testing.expectEqual(@as(usize, 2), prog.blocks[0].len);
 
@@ -290,5 +409,5 @@ test "BytecodeLoader: Roundtrip test" {
     var vm_inst = vm.VM.init(allocator);
     const result = try vm_inst.run(prog.mainCode());
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 42), result.int);
+    try std.testing.expectEqual(@as(u64, 42), result.bits);
 }

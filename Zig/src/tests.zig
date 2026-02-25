@@ -13,9 +13,9 @@
 // ============================================================
 
 const std = @import("std");
-const vm_mod = @import("vm.zig");
-const opt_mod = @import("optimizer.zig");
-const ana_mod = @import("analyzer.zig");
+const vm_mod = @import("Runtime/vm.zig");
+const opt_mod = @import("Runtime/optimizer.zig");
+const ana_mod = @import("Runtime/analyzer.zig");
 
 const VM = vm_mod.VM;
 const Op = vm_mod.Op;
@@ -41,13 +41,13 @@ test "命題論理: A → A (恒等)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = id_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 0 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 42 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 42 } } },
         .{ .call = .{ .dst = 2, .func = 0, .args = &[_]u32{1} } },
         .{ .ret = .{ .src = 2 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 42), result.int);
+    try std.testing.expectEqual(@as(u64, 42), result.bits);
 }
 
 // A ∧ B → A (第一射影: π₁ — 積の普遍性)
@@ -65,15 +65,15 @@ test "命題論理: A ∧ B → A (第一射影)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = fst_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 1 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 10 } } }, // A = 10
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 20 } } }, // B = 20
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 10 } } }, // A = 10
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 20 } } }, // B = 20
         .{ .make_pair = .{ .dst = 3, .fst = 1, .snd = 2 } },     // (A, B)
         .{ .call = .{ .dst = 4, .func = 0, .args = &[_]u32{3} } },
         .{ .ret = .{ .src = 4 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 10), result.int); // Aを得る
+    try std.testing.expectEqual(@as(u64, 10), result.bits); // Aを得る
 }
 
 // A ∧ B → B (第二射影: π₂ — 積の普遍性)
@@ -91,15 +91,15 @@ test "命題論理: A ∧ B → B (第二射影)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = snd_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 2 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 10 } } },
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 20 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 10 } } },
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 20 } } },
         .{ .make_pair = .{ .dst = 3, .fst = 1, .snd = 2 } },
         .{ .call = .{ .dst = 4, .func = 0, .args = &[_]u32{3} } },
         .{ .ret = .{ .src = 4 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 20), result.int); // Bを得る
+    try std.testing.expectEqual(@as(u64, 20), result.bits); // Bを得る
 }
 
 // A → A ∧ A (対角射: Δ = ⟨id, id⟩ — 積の普遍性の双対)
@@ -118,7 +118,7 @@ test "命題論理: A → A ∧ A (対角写像)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = diag_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 3 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 7 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 7 } } },
         .{ .call = .{ .dst = 2, .func = 0, .args = &[_]u32{1} } },
         // 結果はペア (7, 7) → π₁を確認
         .{ .proj1 = .{ .dst = 3, .src = 2 } },
@@ -126,7 +126,7 @@ test "命題論理: A → A ∧ A (対角写像)" {
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 7), result.int);
+    try std.testing.expectEqual(@as(u64, 7), result.bits);
 }
 
 // (A → B) → (B → C) → (A → C) (射の合成: g ∘ f)
@@ -159,13 +159,13 @@ test "命題論理: 関数合成 (A→B)→(B→C)→(A→C)" {
 
     // f(x) = x + 1
     const f_body = &[_]Op{
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 1 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 1 } } },
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },
         .{ .ret = .{ .src = 2 } },
     };
     // g(x) = x * 2
     const g_body = &[_]Op{
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 2 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 2 } } },
         .{ .mul = .{ .dst = 2, .lhs = 0, .rhs = 1 } },
         .{ .ret = .{ .src = 2 } },
     };
@@ -181,13 +181,13 @@ test "命題論理: 関数合成 (A→B)→(B→C)→(A→C)" {
         // compose(f)(g)
         .{ .call = .{ .dst = 4, .func = 3, .args = &[_]u32{2} } },
         // compose(f)(g)(3) = g(f(3)) = g(4) = 8
-        .{ .load_const = .{ .dst = 5, .val = .{ .int = 3 } } },
+        .{ .load_const = .{ .dst = 5, .val = .{ .bits = 3 } } },
         .{ .call = .{ .dst = 6, .func = 4, .args = &[_]u32{5} } },
         .{ .ret = .{ .src = 6 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 8), result.int);
+    try std.testing.expectEqual(@as(u64, 8), result.bits);
 }
 
 // A ∨ B → C (余積の普遍射: [f, g])
@@ -200,12 +200,12 @@ test "命題論理: A ∨ B → C (case分析)" {
     // case(inl(5)): left branch returns x+1 = 6
     // case(inr(5)): right branch returns x*2 = 10
     const inl_branch = &[_]Op{
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 1 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 1 } } },
         .{ .add = .{ .dst = 2, .lhs = 2, .rhs = 1 } }, // dst=2に値が入る
         .{ .ret = .{ .src = 2 } },
     };
     const inr_branch = &[_]Op{
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 2 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 2 } } },
         .{ .mul = .{ .dst = 2, .lhs = 2, .rhs = 1 } },
         .{ .ret = .{ .src = 2 } },
     };
@@ -213,27 +213,27 @@ test "命題論理: A ∨ B → C (case分析)" {
     // Left injection: inl(5) → case → 6
     {
         const code = &[_]Op{
-            .{ .load_const = .{ .dst = 0, .val = .{ .int = 5 } } },
+            .{ .load_const = .{ .dst = 0, .val = .{ .bits = 5 } } },
             .{ .make_inl = .{ .dst = 1, .src = 0 } },
             .{ .case_op = .{ .dst = 2, .scrutinee = 1, .inl_branch = inl_branch, .inr_branch = inr_branch } },
             .{ .ret = .{ .src = 2 } },
         };
         const result = try machine.run(code);
         defer result.deinit(allocator);
-        try std.testing.expectEqual(@as(u64, 6), result.int);
+        try std.testing.expectEqual(@as(u64, 6), result.bits);
     }
 
     // Right injection: inr(5) → case → 10
     {
         const code = &[_]Op{
-            .{ .load_const = .{ .dst = 0, .val = .{ .int = 5 } } },
+            .{ .load_const = .{ .dst = 0, .val = .{ .bits = 5 } } },
             .{ .make_inr = .{ .dst = 1, .src = 0 } },
             .{ .case_op = .{ .dst = 2, .scrutinee = 1, .inl_branch = inl_branch, .inr_branch = inr_branch } },
             .{ .ret = .{ .src = 2 } },
         };
         const result = try machine.run(code);
         defer result.deinit(allocator);
-        try std.testing.expectEqual(@as(u64, 10), result.int);
+        try std.testing.expectEqual(@as(u64, 10), result.bits);
     }
 }
 
@@ -255,13 +255,13 @@ test "線形論理: A ⊸ A (線形恒等)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = linear_id_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 5 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 99 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 99 } } },
         .{ .call = .{ .dst = 2, .func = 0, .args = &[_]u32{1} } },
         .{ .ret = .{ .src = 2 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 99), result.int);
+    try std.testing.expectEqual(@as(u64, 99), result.bits);
 }
 
 // (A ⊗ B) ⊸ (A ⊗ B) (テンソル積の恒等写像)
@@ -276,8 +276,8 @@ test "線形論理: (A ⊗ B) ⊸ (A ⊗ B) (テンソル恒等)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = tensor_id_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 6 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 3 } } },
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 7 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 3 } } },
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 7 } } },
         .{ .make_pair = .{ .dst = 3, .fst = 1, .snd = 2 } },
         .{ .call = .{ .dst = 4, .func = 0, .args = &[_]u32{3} } },
         // π₁を確認
@@ -286,7 +286,7 @@ test "線形論理: (A ⊗ B) ⊸ (A ⊗ B) (テンソル恒等)" {
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 3), result.int);
+    try std.testing.expectEqual(@as(u64, 3), result.bits);
 }
 
 // A ⊗ B ⊸ B ⊗ A (テンソル積の対称性: σ_{A,B})
@@ -306,8 +306,8 @@ test "線形論理: A ⊗ B ⊸ B ⊗ A (テンソル交換)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = swap_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 7 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 100 } } }, // A = 100
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 200 } } }, // B = 200
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 100 } } }, // A = 100
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 200 } } }, // B = 200
         .{ .make_pair = .{ .dst = 3, .fst = 1, .snd = 2 } },      // (A, B) = (100, 200)
         .{ .call = .{ .dst = 4, .func = 0, .args = &[_]u32{3} } },
         // 結果は (B, A) = (200, 100) → π₁ = 200
@@ -316,7 +316,7 @@ test "線形論理: A ⊗ B ⊸ B ⊗ A (テンソル交換)" {
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 200), result.int); // Bが先頭
+    try std.testing.expectEqual(@as(u64, 200), result.bits); // Bが先頭
 }
 
 // !A → A (Bang除去: 必然から存在)
@@ -334,13 +334,13 @@ test "線形論理: !A → A (Bang除去)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = bang_elim_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 8 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 55 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 55 } } },
         .{ .call = .{ .dst = 2, .func = 0, .args = &[_]u32{1} } },
         .{ .ret = .{ .src = 2 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 55), result.int);
+    try std.testing.expectEqual(@as(u64, 55), result.bits);
 }
 
 // A ⊗ B → A ∧ B (テンソルから積へのマッピング)
@@ -361,8 +361,8 @@ test "線形論理: A ⊗ B → A ∧ B (テンソルから積)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = tensor_to_prod_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 9 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 11 } } },
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 22 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 11 } } },
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 22 } } },
         .{ .make_pair = .{ .dst = 3, .fst = 1, .snd = 2 } },
         .{ .call = .{ .dst = 4, .func = 0, .args = &[_]u32{3} } },
         // 結果の第2要素を確認
@@ -371,7 +371,7 @@ test "線形論理: A ⊗ B → A ∧ B (テンソルから積)" {
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 22), result.int);
+    try std.testing.expectEqual(@as(u64, 22), result.bits);
 }
 
 // ============================================================
@@ -388,14 +388,14 @@ test "HoTT: concat(refl(x), p) = p (左単位元)" {
     // refl(x) = 0 (同一性パス)、concat = 加算
     // concat(0, p) = p
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 0 } } }, // refl(x) = 0
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 7 } } }, // p = 7
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 0 } } }, // refl(x) = 0
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 7 } } }, // p = 7
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },          // concat(refl, p) = 0 + 7
         .{ .ret = .{ .src = 2 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 7), result.int); // = p
+    try std.testing.expectEqual(@as(u64, 7), result.bits); // = p
 }
 
 // concat(p, refl(y)) = p (右単位元)
@@ -405,14 +405,14 @@ test "HoTT: concat(p, refl(y)) = p (右単位元)" {
     var machine = VM.init(allocator);
 
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 13 } } }, // p = 13
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 0 } } },  // refl(y) = 0
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 13 } } }, // p = 13
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 0 } } },  // refl(y) = 0
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },           // concat(p, refl) = 13 + 0
         .{ .ret = .{ .src = 2 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 13), result.int); // = p
+    try std.testing.expectEqual(@as(u64, 13), result.bits); // = p
 }
 
 // パスの結合法則: concat(concat(p, q), r) = concat(p, concat(q, r))
@@ -423,17 +423,17 @@ test "HoTT: パス結合の結合法則" {
 
     // concat = 加算 → 加算の結合法則 (p+q)+r = p+(q+r)
     const code_left = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 2 } } }, // p
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 3 } } }, // q
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 5 } } }, // r
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 2 } } }, // p
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 3 } } }, // q
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 5 } } }, // r
         .{ .add = .{ .dst = 3, .lhs = 0, .rhs = 1 } },          // p+q
         .{ .add = .{ .dst = 4, .lhs = 3, .rhs = 2 } },          // (p+q)+r
         .{ .ret = .{ .src = 4 } },
     };
     const code_right = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 2 } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 3 } } },
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 5 } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 2 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 3 } } },
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 5 } } },
         .{ .add = .{ .dst = 3, .lhs = 1, .rhs = 2 } },          // q+r
         .{ .add = .{ .dst = 4, .lhs = 0, .rhs = 3 } },          // p+(q+r)
         .{ .ret = .{ .src = 4 } },
@@ -443,7 +443,7 @@ test "HoTT: パス結合の結合法則" {
     defer left.deinit(allocator);
     const right = try machine.run(code_right);
     defer right.deinit(allocator);
-    try std.testing.expectEqual(left.int, right.int); // 両辺が等しい
+    try std.testing.expectEqual(left.bits, right.bits); // 両辺が等しい
 }
 
 // inv(inv(p)) = p (逆パスの逆は元のパス)
@@ -456,13 +456,13 @@ test "HoTT: inv(inv(p)) = p (逆パスの逆)" {
     // inv(p) = -p (u64補数)、inv(inv(p)) = -(-p) = p
     // u64では: inv(p) = 0 - p
     const inv_body = &[_]Op{
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 0 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 0 } } },
         .{ .sub = .{ .dst = 2, .lhs = 1, .rhs = 0 } }, // 0 - p = -p (wrap)
         .{ .ret = .{ .src = 2 } },
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = inv_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 20 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 42 } } },  // p = 42
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 42 } } },  // p = 42
         // inv(p)
         .{ .borrow = .{ .dst = 2, .src = 0 } },                   // invをコピー
         .{ .call = .{ .dst = 3, .func = 2, .args = &[_]u32{1} } }, // inv(p)
@@ -472,7 +472,7 @@ test "HoTT: inv(inv(p)) = p (逆パスの逆)" {
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 42), result.int); // = p
+    try std.testing.expectEqual(@as(u64, 42), result.bits); // = p
 }
 
 // ∀x:S1. P(base) → P(x) (HIT: 円S1の帰納法)
@@ -492,15 +492,15 @@ test "HoTT: HIT S1帰納法 (base点から全点への性質伝播)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = s1_ind_body, .captures = &[_]u32{}, .arity = 1, .block_idx = 21 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 999 } } }, // P(base) = 999
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 3 } } },   // loop_count = 3
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 999 } } }, // P(base) = 999
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 3 } } },   // loop_count = 3
         .{ .make_pair = .{ .dst = 3, .fst = 1, .snd = 2 } },      // x = (P(base), 3)
         .{ .call = .{ .dst = 4, .func = 0, .args = &[_]u32{3} } },
         .{ .ret = .{ .src = 4 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 999), result.int); // P(base)が伝播
+    try std.testing.expectEqual(@as(u64, 999), result.bits); // P(base)が伝播
 }
 
 // ============================================================
@@ -516,14 +516,14 @@ test "帰納法: plus(n, 0) = n" {
 
     const n: u64 = 17;
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = n } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 0 } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = n } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 0 } } },
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } }, // plus(n, 0)
         .{ .ret = .{ .src = 2 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(n, result.int);
+    try std.testing.expectEqual(n, result.bits);
 }
 
 // plus(0, n) = n (左零元)
@@ -534,14 +534,14 @@ test "帰納法: plus(0, n) = n" {
 
     const n: u64 = 23;
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 0 } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = n } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 0 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = n } } },
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } }, // plus(0, n)
         .{ .ret = .{ .src = 2 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(n, result.int);
+    try std.testing.expectEqual(n, result.bits);
 }
 
 // plus(n, S(m)) = S(plus(n, m)) (後者の計算則)
@@ -554,18 +554,18 @@ test "帰納法: plus(n, S(m)) = S(plus(n, m))" {
     const m: u64 = 3;
     // 左辺: plus(n, S(m)) = n + (m + 1)
     const code_lhs = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = n } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = m } } },
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 1 } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = n } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = m } } },
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 1 } } },
         .{ .add = .{ .dst = 3, .lhs = 1, .rhs = 2 } }, // S(m) = m + 1
         .{ .add = .{ .dst = 4, .lhs = 0, .rhs = 3 } }, // n + S(m)
         .{ .ret = .{ .src = 4 } },
     };
     // 右辺: S(plus(n, m)) = (n + m) + 1
     const code_rhs = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = n } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = m } } },
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 1 } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = n } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = m } } },
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 1 } } },
         .{ .add = .{ .dst = 3, .lhs = 0, .rhs = 1 } }, // plus(n, m)
         .{ .add = .{ .dst = 4, .lhs = 3, .rhs = 2 } }, // S(plus(n, m))
         .{ .ret = .{ .src = 4 } },
@@ -574,7 +574,7 @@ test "帰納法: plus(n, S(m)) = S(plus(n, m))" {
     defer lhs.deinit(allocator);
     const rhs = try machine.run(code_rhs);
     defer rhs.deinit(allocator);
-    try std.testing.expectEqual(lhs.int, rhs.int);
+    try std.testing.expectEqual(lhs.bits, rhs.bits);
 }
 
 // plus(n, m) = plus(m, n) (交換法則) — 具体例で検証
@@ -586,14 +586,14 @@ test "帰納法: plus(n, m) = plus(m, n) (加算交換法則)" {
     const n: u64 = 11;
     const m: u64 = 7;
     const code_nm = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = n } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = m } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = n } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = m } } },
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },
         .{ .ret = .{ .src = 2 } },
     };
     const code_mn = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = m } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = n } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = m } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = n } } },
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },
         .{ .ret = .{ .src = 2 } },
     };
@@ -601,7 +601,7 @@ test "帰納法: plus(n, m) = plus(m, n) (加算交換法則)" {
     defer r_nm.deinit(allocator);
     const r_mn = try machine.run(code_mn);
     defer r_mn.deinit(allocator);
-    try std.testing.expectEqual(r_nm.int, r_mn.int);
+    try std.testing.expectEqual(r_nm.bits, r_mn.bits);
 }
 
 // plus(plus(n, m), k) = plus(n, plus(m, k)) (結合法則)
@@ -614,17 +614,17 @@ test "帰納法: plus(plus(n, m), k) = plus(n, plus(m, k)) (加算結合法則)"
     const m: u64 = 4;
     const k: u64 = 5;
     const code_left = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = n } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = m } } },
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = k } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = n } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = m } } },
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = k } } },
         .{ .add = .{ .dst = 3, .lhs = 0, .rhs = 1 } }, // plus(n, m)
         .{ .add = .{ .dst = 4, .lhs = 3, .rhs = 2 } }, // plus(plus(n,m), k)
         .{ .ret = .{ .src = 4 } },
     };
     const code_right = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = n } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = m } } },
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = k } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = n } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = m } } },
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = k } } },
         .{ .add = .{ .dst = 3, .lhs = 1, .rhs = 2 } }, // plus(m, k)
         .{ .add = .{ .dst = 4, .lhs = 0, .rhs = 3 } }, // plus(n, plus(m,k))
         .{ .ret = .{ .src = 4 } },
@@ -633,7 +633,7 @@ test "帰納法: plus(plus(n, m), k) = plus(n, plus(m, k)) (加算結合法則)"
     defer r_left.deinit(allocator);
     const r_right = try machine.run(code_right);
     defer r_right.deinit(allocator);
-    try std.testing.expectEqual(r_left.int, r_right.int);
+    try std.testing.expectEqual(r_left.bits, r_right.bits);
 }
 
 // append(xs, nil) = xs の算術的検証
@@ -646,14 +646,14 @@ test "帰納法: append(xs, nil) = xs" {
     // append(xs, nil): xs の長さに 0 を加える
     // 長さが保存されることを確認
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 5 } } }, // xs.len = 5
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 0 } } }, // nil.len = 0
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 5 } } }, // xs.len = 5
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 0 } } }, // nil.len = 0
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },          // append(xs, nil).len
         .{ .ret = .{ .src = 2 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 5), result.int); // xs.lenと同じ
+    try std.testing.expectEqual(@as(u64, 5), result.bits); // xs.lenと同じ
 }
 
 // ============================================================
@@ -667,8 +667,8 @@ test "オプティマイザ: 定数畳み込み (3 + 4 → 7)" {
     var opt = Optimizer.init(allocator);
 
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 3 } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 4 } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 3 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 4 } } },
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },
         .{ .ret = .{ .src = 2 } },
     };
@@ -688,7 +688,7 @@ test "オプティマイザ: 定数畳み込み (3 + 4 → 7)" {
     var machine = VM.init(allocator);
     const result = try machine.run(optimized);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 7), result.int);
+    try std.testing.expectEqual(@as(u64, 7), result.bits);
 }
 
 // 定数畳み込み: 乗算
@@ -697,8 +697,8 @@ test "オプティマイザ: 定数畳み込み (5 * 6 → 30)" {
     var opt = Optimizer.init(allocator);
 
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 5 } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 6 } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 5 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 6 } } },
         .{ .mul = .{ .dst = 2, .lhs = 0, .rhs = 1 } },
         .{ .ret = .{ .src = 2 } },
     };
@@ -717,7 +717,7 @@ test "オプティマイザ: 定数畳み込み (5 * 6 → 30)" {
     var machine = VM.init(allocator);
     const result = try machine.run(optimized);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 30), result.int);
+    try std.testing.expectEqual(@as(u64, 30), result.bits);
 }
 
 // 不要コード除去: 使われない定数ロードが削除される
@@ -728,8 +728,8 @@ test "オプティマイザ: 不要コード除去 (dead load削除)" {
 
     // reg[0]は使われない (dead)、reg[1]のみ使用
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 999 } } }, // dead
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 42 } } },  // used
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 999 } } }, // dead
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 42 } } },  // used
         .{ .ret = .{ .src = 1 } },
     };
     const optimized = try opt.optimize(code);
@@ -751,7 +751,7 @@ test "オプティマイザ: 不要コード除去 (dead load削除)" {
     var machine = VM.init(allocator);
     const result = try machine.run(optimized);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 42), result.int);
+    try std.testing.expectEqual(@as(u64, 42), result.bits);
 }
 
 // 多段定数畳み込み: (2 + 3) * 4 → 20
@@ -760,10 +760,10 @@ test "オプティマイザ: 多段定数畳み込み ((2+3)*4 → 20)" {
     var opt = Optimizer.init(allocator);
 
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 2 } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 3 } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 2 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 3 } } },
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },           // 2+3=5
-        .{ .load_const = .{ .dst = 3, .val = .{ .int = 4 } } },
+        .{ .load_const = .{ .dst = 3, .val = .{ .bits = 4 } } },
         .{ .mul = .{ .dst = 4, .lhs = 2, .rhs = 3 } },           // 5*4=20
         .{ .ret = .{ .src = 4 } },
     };
@@ -782,7 +782,7 @@ test "オプティマイザ: 多段定数畳み込み ((2+3)*4 → 20)" {
     var machine = VM.init(allocator);
     const result = try machine.run(optimized);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 20), result.int);
+    try std.testing.expectEqual(@as(u64, 20), result.bits);
 }
 
 // ============================================================
@@ -796,9 +796,9 @@ test "アナライザ: ビット幅推論 (小整数 → 小ビット幅)" {
     var ana = RangeAnalyzer.init(allocator);
 
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 1 } } },   // 1 bit
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 255 } } },  // 8 bits
-        .{ .load_const = .{ .dst = 2, .val = .{ .int = 65535 } } }, // 16 bits
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 1 } } },   // 1 bit
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 255 } } },  // 8 bits
+        .{ .load_const = .{ .dst = 2, .val = .{ .bits = 65535 } } }, // 16 bits
         .{ .add = .{ .dst = 3, .lhs = 0, .rhs = 1 } },             // max(1,8)+1 = 9 bits
         .{ .ret = .{ .src = 3 } },
     };
@@ -817,8 +817,8 @@ test "アナライザ: ビット幅推論 (乗算のビット幅拡大)" {
     var ana = RangeAnalyzer.init(allocator);
 
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 15 } } },  // 4 bits
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 7 } } },   // 3 bits
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 15 } } },  // 4 bits
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 7 } } },   // 3 bits
         .{ .mul = .{ .dst = 2, .lhs = 0, .rhs = 1 } },             // 4+3=7 bits
         .{ .ret = .{ .src = 2 } },
     };
@@ -837,8 +837,8 @@ test "アナライザ: エスケープ解析 (ret レジスタはエスケープ
     var ana = RangeAnalyzer.init(allocator);
 
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 1 } } }, // local only
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 2 } } }, // returned → escapes
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 1 } } }, // local only
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 2 } } }, // returned → escapes
         .{ .ret = .{ .src = 1 } },
     };
     var result = try ana.analyze(code, null, 0);
@@ -855,8 +855,8 @@ test "アナライザ: エスケープ解析 (クロージャキャプチャは�
 
     const dummy_body = &[_]Op{ .{ .ret = .{ .src = 0 } } };
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 10 } } }, // captured → escapes
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 20 } } }, // local only
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 10 } } }, // captured → escapes
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 20 } } }, // local only
         .{ .make_closure = .{ .dst = 2, .body = dummy_body, .captures = &[_]u32{0}, .arity = 1, .block_idx = 99 } },
         .{ .ret = .{ .src = 2 } },
     };
@@ -895,15 +895,15 @@ test "統合: カリー化 (A×B→C) ↔ (A→B→C)" {
     };
     const code = &[_]Op{
         .{ .make_closure = .{ .dst = 0, .body = outer, .captures = &[_]u32{}, .arity = 1, .block_idx = 51 } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 10 } } }, // a = 10
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 10 } } }, // a = 10
         .{ .call = .{ .dst = 2, .func = 0, .args = &[_]u32{1} } }, // curry(f)(10)
-        .{ .load_const = .{ .dst = 3, .val = .{ .int = 5 } } },  // b = 5
+        .{ .load_const = .{ .dst = 3, .val = .{ .bits = 5 } } },  // b = 5
         .{ .call = .{ .dst = 4, .func = 2, .args = &[_]u32{3} } }, // curry(f)(10)(5) = 15
         .{ .ret = .{ .src = 4 } },
     };
     const result = try machine.run(code);
     defer result.deinit(allocator);
-    try std.testing.expectEqual(@as(u64, 15), result.int);
+    try std.testing.expectEqual(@as(u64, 15), result.bits);
 }
 
 // オプティマイザ + VM の一貫性テスト
@@ -915,12 +915,12 @@ test "統合: オプティマイザ後もVMの実行結果が一致" {
 
     // 複雑な定数式: (10 + 5) * 2 - 3 = 27
     const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .int = 10 } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .int = 5 } } },
+        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 10 } } },
+        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 5 } } },
         .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },           // 10+5=15
-        .{ .load_const = .{ .dst = 3, .val = .{ .int = 2 } } },
+        .{ .load_const = .{ .dst = 3, .val = .{ .bits = 2 } } },
         .{ .mul = .{ .dst = 4, .lhs = 2, .rhs = 3 } },           // 15*2=30
-        .{ .load_const = .{ .dst = 5, .val = .{ .int = 3 } } },
+        .{ .load_const = .{ .dst = 5, .val = .{ .bits = 3 } } },
         .{ .sub = .{ .dst = 6, .lhs = 4, .rhs = 5 } },           // 30-3=27
         .{ .ret = .{ .src = 6 } },
     };
@@ -943,8 +943,8 @@ test "統合: オプティマイザ後もVMの実行結果が一致" {
     const r_after = try machine.run(optimized);
     defer r_after.deinit(allocator);
 
-    try std.testing.expectEqual(r_before.int, r_after.int);
-    try std.testing.expectEqual(@as(u64, 27), r_after.int);
+    try std.testing.expectEqual(r_before.bits, r_after.bits);
+    try std.testing.expectEqual(@as(u64, 27), r_after.bits);
     // 最適化で命令数が削減されることを確認
     try std.testing.expect(optimized.len <= code.len);
 }

@@ -16,12 +16,14 @@ const vm = @import("vm.zig");
 const Op = vm.Op;
 const Value = vm.Value;
 const loader = @import("loader.zig");
+const ir_parser = @import("ir_parser.zig");
 
 pub const DecompileError = error{
     InvalidIR,
     UnsupportedPattern,
     OutOfMemory,
     MissingEntryPoint,
+    ParseError,
 };
 
 // ============================================================
@@ -168,7 +170,8 @@ const FuncBodyParser = struct {
         self.call_args.deinit(self.allocator);
     }
 
-    pub fn processLine(self: *FuncBodyParser, line: []const u8) !void {
+    pub fn processInstruction(self: *FuncBodyParser, insn: ir_parser.Instruction) !void {
+        const line = insn.raw;
         if (line.len == 0) return;
         const a = self.allocator;
 
@@ -503,100 +506,67 @@ const FuncBodyParser = struct {
 // モジュールパーサー
 // ============================================================
 
-fn findFuncEnd(lines: []const []const u8, define_line: usize) usize {
-    var i = define_line + 1;
-    while (i < lines.len) : (i += 1) {
-        if (std.mem.eql(u8, lines[i], "}")) return i;
-    }
-    return lines.len;
-}
-
 const ModuleParser = struct {
     allocator: Allocator,
-    lines: [][]const u8,
 
-    fn init(allocator: Allocator, ir_text: []const u8) !ModuleParser {
-        var list = std.ArrayList([]const u8){};
-        errdefer list.deinit(allocator);
-        var iter = std.mem.splitScalar(u8, ir_text, '\n');
-        while (iter.next()) |raw| {
-            try list.append(allocator, std.mem.trim(u8, raw, " \t\r"));
-        }
-        return .{
-            .allocator = allocator,
-            .lines = try list.toOwnedSlice(allocator),
-        };
+    fn init(allocator: Allocator) ModuleParser {
+        return .{ .allocator = allocator };
     }
 
-    fn deinit(self: *ModuleParser) void {
-        self.allocator.free(self.lines);
-    }
-
-    fn parse(self: *ModuleParser) !loader.LoadedProgram {
+    fn parse(self: *ModuleParser, ir_text: []const u8) !loader.LoadedProgram {
         const a = self.allocator;
+        var parser = ir_parser.IRParser.init(a);
+        var mod = try parser.parse(ir_text);
+        defer mod.deinit(a);
 
         var case_fixups = std.ArrayList(CaseFixup){};
         defer case_fixups.deinit(a);
         var closure_fixups = std.ArrayList(ClosureFixup){};
         defer closure_fixups.deinit(a);
 
-        const FuncInfo = struct {
-            idx: u32,
-            body_start: usize,
-            body_end: usize,
-        };
-        var funcs = std.ArrayList(FuncInfo){};
-        defer funcs.deinit(a);
-
         var max_idx: u32 = 0;
-        var has_entry = false;
-
-        {
-            var li: usize = 0;
-            while (li < self.lines.len) : (li += 1) {
-                const line = self.lines[li];
-                if (!std.mem.startsWith(u8, line, "define ")) continue;
-                if (has(line, "@rt_") or has(line, "@printf") or
-                    has(line, "@malloc") or has(line, "@free") or
-                    has(line, "@exit"))
-                {
-                    li = findFuncEnd(self.lines, li);
-                    continue;
-                }
-                const body_start = li + 1;
-                const body_end = findFuncEnd(self.lines, li);
-
-                if (has(line, "@__block_")) {
-                    const blk = uintAfter(line, "@__block_") orelse {
-                        li = body_end;
-                        continue;
-                    };
-                    if (blk > max_idx) max_idx = blk;
-                    try funcs.append(a, .{ .idx = blk, .body_start = body_start, .body_end = body_end });
-                } else if (!has_entry) {
-                    try funcs.append(a, .{ .idx = 0, .body_start = body_start, .body_end = body_end });
-                    has_entry = true;
-                }
-                li = body_end;
+        for (mod.functions) |func| {
+            if (std.mem.startsWith(u8, func.name, "__block_")) {
+                const blk = std.fmt.parseInt(u32, func.name[8..], 10) catch continue;
+                if (blk > max_idx) max_idx = blk;
             }
         }
-
-        if (funcs.items.len == 0) return error.MissingEntryPoint;
 
         const num_blocks = max_idx + 1;
         const raw_blocks = try a.alloc(?[]Op, num_blocks);
         defer a.free(raw_blocks);
         for (raw_blocks) |*b| b.* = null;
 
-        for (funcs.items) |fi| {
-            if (fi.idx >= num_blocks) continue;
-            var parser = FuncBodyParser.init(a, fi.idx, &case_fixups, &closure_fixups);
-            defer parser.deinit();
-            for (self.lines[fi.body_start..fi.body_end]) |line| {
-                try parser.processLine(line);
+        var has_entry = false;
+        for (mod.functions) |func| {
+            if (func.is_declare) continue;
+            if (std.mem.startsWith(u8, func.name, "rt_")) continue;
+
+            var blk_idx: u32 = 0;
+            var is_target = false;
+
+            if (std.mem.startsWith(u8, func.name, "__block_")) {
+                blk_idx = std.fmt.parseInt(u32, func.name[8..], 10) catch continue;
+                is_target = true;
+            } else if (!has_entry) {
+                blk_idx = 0;
+                has_entry = true;
+                is_target = true;
             }
-            raw_blocks[fi.idx] = try parser.ops.toOwnedSlice(a);
+
+            if (is_target and blk_idx < num_blocks) {
+                var fb_parser = FuncBodyParser.init(a, blk_idx, &case_fixups, &closure_fixups);
+                defer fb_parser.deinit();
+                for (func.blocks) |block| {
+                    for (block.instructions) |insn| {
+                        try fb_parser.processInstruction(insn);
+                    }
+                }
+                raw_blocks[blk_idx] = try fb_parser.ops.toOwnedSlice(a);
+            }
         }
+
+        if (!has_entry) return error.MissingEntryPoint;
 
         for (raw_blocks) |*rb| {
             if (rb.* == null) rb.* = try a.alloc(Op, 0);
@@ -641,11 +611,11 @@ pub const Decompiler = struct {
     }
 
     pub fn decompile(self: *Decompiler, ir_text: []const u8) DecompileError!loader.LoadedProgram {
-        var mod = ModuleParser.init(self.allocator, ir_text) catch return error.OutOfMemory;
-        defer mod.deinit();
-        return mod.parse() catch |err| switch (err) {
+        var mod = ModuleParser.init(self.allocator);
+        return mod.parse(ir_text) catch |err| switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             error.MissingEntryPoint => error.MissingEntryPoint,
+            else => error.InvalidIR,
         };
     }
 };

@@ -90,4 +90,19 @@ pub const AOTCompiler = struct {
             else => return error.CompilationFailed,
         }
     }
+
+    /// 外部 LLVM IR を Lifter でバイトコード化し、AOT コンパイルする
+    pub fn liftAndCompile(
+        self: *AOTCompiler,
+        ir_text: []const u8,
+        output_path: []const u8,
+        cpu: vm.CpuFeatures,
+    ) !void {
+        const lifter = @import("lifter.zig");
+        var l = lifter.Lifter.init(self.allocator);
+        var prog = try l.lift(ir_text);
+        defer prog.deinit();
+
+        try self.compile(prog, null, output_path, cpu);
+    }
 };

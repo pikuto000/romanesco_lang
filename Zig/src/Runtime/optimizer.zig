@@ -66,9 +66,9 @@ pub const Optimizer = struct {
                 .add => |a| {
                     if (constants.get(a.lhs)) |l| {
                         if (constants.get(a.rhs)) |r| {
-                            if (l == .int and r == .int) {
-                                const res = l.int +% r.int;
-                                const val = Value{ .int = res };
+                            if (l == .bits and r == .bits) {
+                                const res = l.bits +% r.bits;
+                                const val = Value{ .bits = res };
                                 try constants.put(a.dst, val);
                                 try new_ops.append(self.allocator, Op{ .load_const = .{ .dst = a.dst, .val = val } });
                                 changed = true;
@@ -81,9 +81,9 @@ pub const Optimizer = struct {
                 .sub => |s| {
                     if (constants.get(s.lhs)) |l| {
                         if (constants.get(s.rhs)) |r| {
-                            if (l == .int and r == .int) {
-                                const res = l.int -% r.int;
-                                const val = Value{ .int = res };
+                            if (l == .bits and r == .bits) {
+                                const res = l.bits -% r.bits;
+                                const val = Value{ .bits = res };
                                 try constants.put(s.dst, val);
                                 try new_ops.append(self.allocator, Op{ .load_const = .{ .dst = s.dst, .val = val } });
                                 changed = true;
@@ -96,13 +96,45 @@ pub const Optimizer = struct {
                 .mul => |m| {
                     if (constants.get(m.lhs)) |l| {
                         if (constants.get(m.rhs)) |r| {
-                            if (l == .int and r == .int) {
-                                const res = l.int *% r.int;
-                                const val = Value{ .int = res };
+                            if (l == .bits and r == .bits) {
+                                const res = l.bits *% r.bits;
+                                const val = Value{ .bits = res };
                                 try constants.put(m.dst, val);
                                 try new_ops.append(self.allocator, Op{ .load_const = .{ .dst = m.dst, .val = val } });
                                 changed = true;
                                 continue;
+                            }
+                        }
+                    }
+                    try new_ops.append(self.allocator, op);
+                },
+                .ibin => |o| {
+                    if (o.width <= 64) {
+                        if (constants.get(o.lhs)) |l| {
+                            if (constants.get(o.rhs)) |r| {
+                                if (l == .bits and r == .bits) {
+                                    // Simple constant folding for ibin
+                                    const lv = l.bits;
+                                    const rv = r.bits;
+                                    const mask = if (o.width >= 64) ~@as(u64, 0) else (@as(u64, 1) << @intCast(o.width)) - 1;
+                                    const res = switch (o.op) {
+                                        .add => lv +% rv,
+                                        .sub => lv -% rv,
+                                        .mul => lv *% rv,
+                                        .and_ => lv & rv,
+                                        .or_ => lv | rv,
+                                        .xor_ => lv ^ rv,
+                                        else => {
+                                            try new_ops.append(self.allocator, op);
+                                            continue;
+                                        },
+                                    };
+                                    const val = Value{ .bits = res & mask };
+                                    try constants.put(o.dst, val);
+                                    try new_ops.append(self.allocator, Op{ .load_const = .{ .dst = o.dst, .val = val } });
+                                    changed = true;
+                                    continue;
+                                }
                             }
                         }
                     }
@@ -142,6 +174,22 @@ pub const Optimizer = struct {
                 .borrow => |b| try used.put(b.src, {}),
                 .free => |f| try used.put(f.reg, {}),
                 .load_const => {}, 
+                // Lifter ops
+                .ibin => |o| { try used.put(o.lhs, {}); try used.put(o.rhs, {}); },
+                .icmp => |o| { try used.put(o.lhs, {}); try used.put(o.rhs, {}); },
+                .load_bits => {},
+                .load_wide => {},
+                .sext => |o| try used.put(o.src, {}),
+                .zext => |o| try used.put(o.src, {}),
+                .trunc => |o| try used.put(o.src, {}),
+                .itof => |o| try used.put(o.src, {}),
+                .ftoi => |o| try used.put(o.src, {}),
+                .fadd => |o| { try used.put(o.lhs, {}); try used.put(o.rhs, {}); },
+                .fsub => |o| { try used.put(o.lhs, {}); try used.put(o.rhs, {}); },
+                .fmul => |o| { try used.put(o.lhs, {}); try used.put(o.rhs, {}); },
+                .fdiv => |o| { try used.put(o.lhs, {}); try used.put(o.rhs, {}); },
+                .frem => |o| { try used.put(o.lhs, {}); try used.put(o.rhs, {}); },
+                .fcmp => |o| { try used.put(o.lhs, {}); try used.put(o.rhs, {}); },
             }
         }
 
@@ -179,6 +227,45 @@ pub const Optimizer = struct {
                         try new_ops.append(self.allocator, op);
                     }
                 },
+                .ibin => |o| {
+                    if (!used.contains(o.dst)) {
+                        changed = true;
+                    } else {
+                        try new_ops.append(self.allocator, op);
+                    }
+                },
+                .icmp => |o| {
+                    if (!used.contains(o.dst)) {
+                        changed = true;
+                    } else {
+                        try new_ops.append(self.allocator, op);
+                    }
+                },
+                .load_bits => |o| {
+                    if (!used.contains(o.dst)) {
+                        changed = true;
+                    } else {
+                        try new_ops.append(self.allocator, op);
+                    }
+                },
+                .load_wide => |o| {
+                    if (!used.contains(o.dst)) {
+                        changed = true;
+                    } else {
+                        try new_ops.append(self.allocator, op);
+                    }
+                },
+                .sext => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
+                .zext => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
+                .trunc => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
+                .itof => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
+                .ftoi => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
+                .fadd => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
+                .fsub => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
+                .fmul => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
+                .fdiv => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
+                .frem => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
+                .fcmp => |o| if (!used.contains(o.dst)) { changed = true; } else { try new_ops.append(self.allocator, op); },
                 else => try new_ops.append(self.allocator, op),
             }
         }
