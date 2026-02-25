@@ -175,7 +175,8 @@ pub const RangeAnalyzer = struct {
         var processed_escapes = std.AutoHashMap(u32, void).init(self.allocator);
         defer processed_escapes.deinit();
 
-        while (worklist.pop()) |reg| {
+        while (worklist.items.len > 0) {
+            const reg = worklist.pop().?;
             if (!processed_escapes.contains(reg)) {
                 try processed_escapes.put(reg, {});
                 try escapes.put(reg, {});

@@ -42,8 +42,46 @@ pub const Optimizer = struct {
 
         // Register Allocation (Re-numbering)、最終結果のみ self.allocator にコピー
         const allocated = try self.allocateRegisters(current_code, aa);
-        return try self.allocator.dupe(Op, allocated);
+        const final = try self.allocator.alloc(Op, allocated.len);
+        for (allocated, 0..) |op, i| {
+            final[i] = try self.deepCloneOp(op, self.allocator);
+        }
+        return final;
         // arena.deinit() で中間状態はすべて解放
+    }
+
+    fn deepCloneOp(self: *Optimizer, op: Op, allocator: Allocator) !Op {
+        _ = self;
+        return switch (op) {
+            .make_closure => |o| .{ .make_closure = .{
+                .dst = o.dst,
+                .body = o.body, // body pointers are assumed to be persistent from LoadedProgram
+                .captures = try allocator.dupe(u32, o.captures),
+                .arity = o.arity,
+                .block_idx = o.block_idx,
+            } },
+            .call => |o| .{ .call = .{
+                .dst = o.dst,
+                .func = o.func,
+                .args = try allocator.dupe(u32, o.args),
+            } },
+            .load_const => |o| .{ .load_const = .{
+                .dst = o.dst,
+                .val = try o.val.clone(allocator),
+            } },
+            .load_wide => |o| .{ .load_wide = .{
+                .dst = o.dst,
+                .limbs = try allocator.dupe(u64, o.limbs),
+                .width = o.width,
+            } },
+            .case_op => |o| .{ .case_op = .{
+                .dst = o.dst,
+                .scrutinee = o.scrutinee,
+                .inl_branch = o.inl_branch,
+                .inr_branch = o.inr_branch,
+            } },
+            else => op,
+        };
     }
 
     const FoldResult = struct { code: []Op, changed: bool };
@@ -319,7 +357,7 @@ pub const Optimizer = struct {
         const map_reg = struct {
             fn call(m: *std.AutoHashMap(u32, u32), fp: *std.ArrayList(u32), na: *u32, old: u32, alloc: Allocator) !u32 {
                 if (m.get(old)) |new| return new;
-                const new = if (fp.pop()) |val| val else blk: {
+                const new = if (fp.items.len > 0) fp.pop().? else blk: {
                     const val = na.*;
                     na.* += 1;
                     break :blk val;

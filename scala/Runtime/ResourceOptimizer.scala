@@ -34,10 +34,28 @@ class ResourceOptimizer(val logic: ResourceLogic = new OmniResourceLogic()):
 
       op match
         case Op.LoadConst(dst, _) => checkOverwrite(dst)
+        case Op.LoadBits(dst, _, _) => checkOverwrite(dst)
+        case Op.LoadWide(dst, _, _) => checkOverwrite(dst)
         case Op.Move(dst, src) => checkOverwrite(dst); checkInput(src)
         case Op.MakePair(dst, fst, snd) => checkOverwrite(dst); checkInput(fst); checkInput(snd)
         case Op.Proj1(dst, src) => checkOverwrite(dst); checkInput(src)
         case Op.Proj2(dst, src) => checkOverwrite(dst); checkInput(src)
+        case Op.Add(dst, l, r) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.Sub(dst, l, r) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.Mul(dst, l, r) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.IBin(dst, l, r, _, _) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.ICmp(dst, l, r, _, _) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.FAdd(dst, l, r) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.FSub(dst, l, r) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.FMul(dst, l, r) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.FDiv(dst, l, r) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.FRem(dst, l, r) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.FCmp(dst, l, r, _) => checkOverwrite(dst); checkInput(l); checkInput(r)
+        case Op.SExt(dst, src, _, _) => checkOverwrite(dst); checkInput(src)
+        case Op.ZExt(dst, src, _, _) => checkOverwrite(dst); checkInput(src)
+        case Op.Trunc(dst, src, _, _) => checkOverwrite(dst); checkInput(src)
+        case Op.Itof(dst, src, _, _) => checkOverwrite(dst); checkInput(src)
+        case Op.Ftoi(dst, src, _, _) => checkOverwrite(dst); checkInput(src)
         case Op.Return(src) =>
           // Returnの直前に、返り値以外の全レジスタを Free する
           for ((reg, rid) <- regsBefore if reg != src && lostRids.contains(rid)) {

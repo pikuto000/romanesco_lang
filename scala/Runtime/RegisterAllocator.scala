@@ -55,23 +55,72 @@ class RegisterAllocator:
           val d = defineReg(dst)
           if (d == s) None else Some(Op.Move(d, s))
 
-        case Op.LoadConst(dst, v) =>
-          Some(Op.LoadConst(defineReg(dst), v))
+        case Op.LoadConst(dst, v) => Some(Op.LoadConst(defineReg(dst), v))
+        case Op.LoadBits(dst, v, w) => Some(Op.LoadBits(defineReg(dst), v, w))
+        case Op.LoadWide(dst, l, w) => Some(Op.LoadWide(defineReg(dst), l, w))
 
         case Op.Add(dst, l, r) =>
           val nl = getMapped(l); val nr = getMapped(r)
           releaseIfLast(l, pc); releaseIfLast(r, pc)
           Some(Op.Add(defineReg(dst), nl, nr))
-
         case Op.Sub(dst, l, r) =>
           val nl = getMapped(l); val nr = getMapped(r)
           releaseIfLast(l, pc); releaseIfLast(r, pc)
           Some(Op.Sub(defineReg(dst), nl, nr))
-
         case Op.Mul(dst, l, r) =>
           val nl = getMapped(l); val nr = getMapped(r)
           releaseIfLast(l, pc); releaseIfLast(r, pc)
           Some(Op.Mul(defineReg(dst), nl, nr))
+
+        case Op.IBin(dst, l, r, ot, w) =>
+          val nl = getMapped(l); val nr = getMapped(r)
+          releaseIfLast(l, pc); releaseIfLast(r, pc)
+          Some(Op.IBin(defineReg(dst), nl, nr, ot, w))
+        case Op.ICmp(dst, l, r, p, w) =>
+          val nl = getMapped(l); val nr = getMapped(r)
+          releaseIfLast(l, pc); releaseIfLast(r, pc)
+          Some(Op.ICmp(defineReg(dst), nl, nr, p, w))
+
+        case Op.FAdd(dst, l, r) =>
+          val nl = getMapped(l); val nr = getMapped(r)
+          releaseIfLast(l, pc); releaseIfLast(r, pc)
+          Some(Op.FAdd(defineReg(dst), nl, nr))
+        case Op.FSub(dst, l, r) =>
+          val nl = getMapped(l); val nr = getMapped(r)
+          releaseIfLast(l, pc); releaseIfLast(r, pc)
+          Some(Op.FSub(defineReg(dst), nl, nr))
+        case Op.FMul(dst, l, r) =>
+          val nl = getMapped(l); val nr = getMapped(r)
+          releaseIfLast(l, pc); releaseIfLast(r, pc)
+          Some(Op.FMul(defineReg(dst), nl, nr))
+        case Op.FDiv(dst, l, r) =>
+          val nl = getMapped(l); val nr = getMapped(r)
+          releaseIfLast(l, pc); releaseIfLast(r, pc)
+          Some(Op.FDiv(defineReg(dst), nl, nr))
+        case Op.FRem(dst, l, r) =>
+          val nl = getMapped(l); val nr = getMapped(r)
+          releaseIfLast(l, pc); releaseIfLast(r, pc)
+          Some(Op.FRem(defineReg(dst), nl, nr))
+        case Op.FCmp(dst, l, r, p) =>
+          val nl = getMapped(l); val nr = getMapped(r)
+          releaseIfLast(l, pc); releaseIfLast(r, pc)
+          Some(Op.FCmp(defineReg(dst), nl, nr, p))
+
+        case Op.SExt(dst, src, f, t) =>
+          val ns = getMapped(src); releaseIfLast(src, pc)
+          Some(Op.SExt(defineReg(dst), ns, f, t))
+        case Op.ZExt(dst, src, f, t) =>
+          val ns = getMapped(src); releaseIfLast(src, pc)
+          Some(Op.ZExt(defineReg(dst), ns, f, t))
+        case Op.Trunc(dst, src, f, t) =>
+          val ns = getMapped(src); releaseIfLast(src, pc)
+          Some(Op.Trunc(defineReg(dst), ns, f, t))
+        case Op.Itof(dst, src, w, s) =>
+          val ns = getMapped(src); releaseIfLast(src, pc)
+          Some(Op.Itof(defineReg(dst), ns, w, s))
+        case Op.Ftoi(dst, src, w, s) =>
+          val ns = getMapped(src); releaseIfLast(src, pc)
+          Some(Op.Ftoi(defineReg(dst), ns, w, s))
 
         case Op.MakePair(dst, f, s) =>
           val nf = getMapped(f); val ns = getMapped(s)
@@ -145,6 +194,19 @@ class RegisterAllocator:
         case Op.Add(_, l, r) => lastUse(l) = pc; lastUse(r) = pc
         case Op.Sub(_, l, r) => lastUse(l) = pc; lastUse(r) = pc
         case Op.Mul(_, l, r) => lastUse(l) = pc; lastUse(r) = pc
+        case Op.IBin(_, l, r, _, _) => lastUse(l) = pc; lastUse(r) = pc
+        case Op.ICmp(_, l, r, _, _) => lastUse(l) = pc; lastUse(r) = pc
+        case Op.FAdd(_, l, r) => lastUse(l) = pc; lastUse(r) = pc
+        case Op.FSub(_, l, r) => lastUse(l) = pc; lastUse(r) = pc
+        case Op.FMul(_, l, r) => lastUse(l) = pc; lastUse(r) = pc
+        case Op.FDiv(_, l, r) => lastUse(l) = pc; lastUse(r) = pc
+        case Op.FRem(_, l, r) => lastUse(l) = pc; lastUse(r) = pc
+        case Op.FCmp(_, l, r, _) => lastUse(l) = pc; lastUse(r) = pc
+        case Op.SExt(_, s, _, _) => lastUse(s) = pc
+        case Op.ZExt(_, s, _, _) => lastUse(s) = pc
+        case Op.Trunc(_, s, _, _) => lastUse(s) = pc
+        case Op.Itof(_, s, _, _) => lastUse(s) = pc
+        case Op.Ftoi(_, s, _, _) => lastUse(s) = pc
         case Op.Call(_, f, args) => lastUse(f) = pc; args.foreach(lastUse(_) = pc)
         case Op.Proj1(_, src) => lastUse(src) = pc
         case Op.Proj2(_, src) => lastUse(src) = pc

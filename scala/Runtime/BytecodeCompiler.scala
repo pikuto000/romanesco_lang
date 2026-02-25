@@ -17,6 +17,7 @@ class BytecodeCompiler:
   private val optimizer = new ResourceOptimizer(new OmniResourceLogic())
   private val registerAllocator = new RegisterAllocator()
   private val bytecodeOptimizer = new BytecodeOptimizer()
+  private val rangeAnalyzer = new RangeAnalyzer()
 
   private def freshReg(): Int =
     val r = regCounter
@@ -39,14 +40,26 @@ class BytecodeCompiler:
     val finalReg = compileRecursive(tree, ops)
     ops += Op.Return(finalReg)
     
-    // 1. バイトコードレベルの命令削減（定数畳み込み、DCE等）
-    val optimizedInstructions = bytecodeOptimizer.optimize(ops.toArray)
+    finalizeCode(ops.toArray, Map.empty)
+
+  private def finalizeCode(code: Array[Op], initialMapping: Map[Int, Int]): Array[Op] =
+    // 1. バイトコードレベルの命令削減（定数畳み込み等）
+    val optimized = bytecodeOptimizer.optimize(code)
+
+    // 2. 範囲解析を行い、演算をビット幅付きの命令(IBin)に変換する
+    val rangeResult = rangeAnalyzer.analyze(optimized)
+    val typed = optimized.map {
+      case Op.Add(d, l, r) => Op.IBin(d, l, r, IBinOp.Add, rangeResult.bitWidth(d))
+      case Op.Sub(d, l, r) => Op.IBin(d, l, r, IBinOp.Sub, rangeResult.bitWidth(d))
+      case Op.Mul(d, l, r) => Op.IBin(d, l, r, IBinOp.Mul, rangeResult.bitWidth(d))
+      case other => other
+    }
     
-    // 2. ResourceOptimizer を適用し、必要な Free 命令を自動挿入する。
-    val withFreeOps = optimizer.optimize(optimizedInstructions)
+    // 3. ResourceOptimizer を適用し、必要な Free 命令を自動挿入する。
+    val withFreeOps = optimizer.optimize(typed)
     
-    // 3. 最後にレジスタの再割り当てを行い、使用レジスタ数を最小化する。
-    val finalOps = registerAllocator.allocate(withFreeOps)
+    // 4. 最後にレジスタの再割り当てを行い、使用レジスタ数を最小化する。
+    val finalOps = registerAllocator.allocate(withFreeOps, initialMapping)
     finalOps
 
   private def compileRecursive(
@@ -133,6 +146,29 @@ class BytecodeCompiler:
             
           resultReg
 
+        case "Call" =>
+          val funcReg = compileRecursive(branches(0), ops)
+          val argRegs = branches.tail.map(compileRecursive(_, ops))
+          val dst = freshReg()
+          ops += Op.Call(dst, funcReg, argRegs.toArray)
+          dst
+
+        case "Case" =>
+          val scrutReg = compileRecursive(branches(0), ops)
+          
+          val inlOps = mutable.ArrayBuffer[Op]()
+          val inlRes = compileRecursive(branches(1), inlOps)
+          inlOps += Op.Return(inlRes)
+          
+          val inrOps = mutable.ArrayBuffer[Op]()
+          val inrRes = compileRecursive(branches(2), inrOps)
+          inrOps += Op.Return(inrRes)
+          
+          val dst = freshReg()
+          // Caseの各ブランチも個別に最適化・型付けする
+          ops += Op.Case(dst, scrutReg, finalizeCode(inlOps.toArray, Map.empty), finalizeCode(inrOps.toArray, Map.empty))
+          dst
+
         case "Lambda" =>
           val argName = args.head
           val savedCounter = regCounter
@@ -148,15 +184,20 @@ class BytecodeCompiler:
           val bodyRes = compileRecursive(branches(0), bodyOps)
           bodyOps += Op.Return(bodyRes)
           
-          // 関数内部も個別に最適化する
-          val optimizedBody = optimizer.optimize(bodyOps.toArray)
+          val captures = savedEnv.values.map(_._1).toArray
           
           regCounter = savedCounter
           env.clear()
           env ++= savedEnv
           
           val dst = freshReg()
-          ops += Op.MakeClosure(dst, optimizedBody, savedEnv.values.map(_._1).toArray, 1)
+          // 引数レジスタも初期マッピングに含める
+          val initialMapping = mutable.Map[Int, Int]()
+          captures.zipWithIndex.foreach { (old, i) => initialMapping(old) = i }
+          initialMapping(argReg) = captures.length
+          
+          // 関数内部も一括処理
+          ops += Op.MakeClosure(dst, finalizeCode(bodyOps.toArray, initialMapping.toMap), captures, 1)
           dst
 
         case _ =>

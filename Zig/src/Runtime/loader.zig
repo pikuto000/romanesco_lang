@@ -261,6 +261,11 @@ pub const BytecodeLoader = struct {
                         .inl_branch = blocks_mut[ro.u3],
                         .inr_branch = blocks_mut[ro.u4],
                     } },
+                    0x0C => blocks_mut[i][j] = .{ .add = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
+                    0x0D => blocks_mut[i][j] = .{ .sub = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
+                    0x0E => blocks_mut[i][j] = .{ .mul = .{ .dst = ro.u1, .lhs = ro.u2, .rhs = ro.u3 } },
+                    0x0F => blocks_mut[i][j] = .{ .borrow = .{ .dst = ro.u1, .src = ro.u2 } },
+                    0x10 => blocks_mut[i][j] = .{ .free = .{ .reg = ro.u1 } },
                     0x11 => blocks_mut[i][j] = .{ .ibin = .{
                         .dst = ro.u1,
                         .lhs = ro.u2,

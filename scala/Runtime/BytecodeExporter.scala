@@ -44,9 +44,12 @@ class BytecodeExporter:
           case Value.Unit =>
             out.writeByte(5) // Tag: Unit
           case Value.Atom(n: Int) =>
-            out.writeByte(6) // Tag: Int
+            out.writeByte(6) // Tag: Bits (Legacy Int)
             writeLongLE(out, n.toLong)
           case Value.Atom(n: Long) =>
+            out.writeByte(6)
+            writeLongLE(out, n)
+          case Value.Bits(n, _) =>
             out.writeByte(6)
             writeLongLE(out, n)
           case _ =>
@@ -131,11 +134,50 @@ class BytecodeExporter:
       case Op.Free(reg) =>
         out.writeByte(0x10); writeIntLE(out, reg)
 
+      case Op.IBin(dst, l, r, op_type, w) =>
+        out.writeByte(0x11); writeIntLE(out, dst); writeIntLE(out, l); writeIntLE(out, r)
+        out.writeByte(op_type.ordinal); writeInt16LE(out, w)
+      case Op.ICmp(dst, l, r, pred, w) =>
+        out.writeByte(0x12); writeIntLE(out, dst); writeIntLE(out, l); writeIntLE(out, r)
+        out.writeByte(pred.ordinal); writeInt16LE(out, w)
+      case Op.LoadBits(dst, v, w) =>
+        out.writeByte(0x13); writeIntLE(out, dst); writeLongLE(out, v); writeInt16LE(out, w)
+      case Op.LoadWide(dst, limbs, w) =>
+        out.writeByte(0x14); writeIntLE(out, dst); writeInt16LE(out, w)
+        writeIntLE(out, limbs.length)
+        for l <- limbs do writeLongLE(out, l)
+      case Op.SExt(dst, src, f, t) =>
+        out.writeByte(0x15); writeIntLE(out, dst); writeIntLE(out, src); writeInt16LE(out, f); writeInt16LE(out, t)
+      case Op.ZExt(dst, src, f, t) =>
+        out.writeByte(0x16); writeIntLE(out, dst); writeIntLE(out, src); writeInt16LE(out, f); writeInt16LE(out, t)
+      case Op.Trunc(dst, src, f, t) =>
+        out.writeByte(0x17); writeIntLE(out, dst); writeIntLE(out, src); writeInt16LE(out, f); writeInt16LE(out, t)
+      case Op.Itof(dst, src, w, s) =>
+        out.writeByte(0x18); writeIntLE(out, dst); writeIntLE(out, src); writeInt16LE(out, w); out.writeByte(if (s) 1 else 0)
+      case Op.Ftoi(dst, src, w, s) =>
+        out.writeByte(0x19); writeIntLE(out, dst); writeIntLE(out, src); writeInt16LE(out, w); out.writeByte(if (s) 1 else 0)
+      case Op.FAdd(dst, l, r) =>
+        out.writeByte(0x20); writeIntLE(out, dst); writeIntLE(out, l); writeIntLE(out, r)
+      case Op.FSub(dst, l, r) =>
+        out.writeByte(0x21); writeIntLE(out, dst); writeIntLE(out, l); writeIntLE(out, r)
+      case Op.FMul(dst, l, r) =>
+        out.writeByte(0x22); writeIntLE(out, dst); writeIntLE(out, l); writeIntLE(out, r)
+      case Op.FDiv(dst, l, r) =>
+        out.writeByte(0x23); writeIntLE(out, dst); writeIntLE(out, l); writeIntLE(out, r)
+      case Op.FRem(dst, l, r) =>
+        out.writeByte(0x24); writeIntLE(out, dst); writeIntLE(out, l); writeIntLE(out, r)
+      case Op.FCmp(dst, l, r, pred) =>
+        out.writeByte(0x25); writeIntLE(out, dst); writeIntLE(out, l); writeIntLE(out, r); out.writeByte(pred.ordinal)
+
   private def writeIntLE(out: DataOutputStream, v: Int): Unit =
     out.writeByte(v & 0xFF)
     out.writeByte((v >> 8) & 0xFF)
     out.writeByte((v >> 16) & 0xFF)
     out.writeByte((v >> 24) & 0xFF)
+
+  private def writeInt16LE(out: DataOutputStream, v: Int): Unit =
+    out.writeByte(v & 0xFF)
+    out.writeByte((v >> 8) & 0xFF)
 
   private def writeLongLE(out: DataOutputStream, v: Long): Unit =
     for i <- 0 until 8 do

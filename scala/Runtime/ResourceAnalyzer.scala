@@ -46,6 +46,12 @@ class ResourceAnalyzer:
         case Op.LoadConst(dst, _) =>
           val (s, rid) = state.alloc(ResourceKind.Atom, Set.empty, idx)
           s.setReg(dst, rid)
+        case Op.LoadBits(dst, _, _) =>
+          val (s, rid) = state.alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
+        case Op.LoadWide(dst, _, _) =>
+          val (s, rid) = state.alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
         case Op.Free(reg) => state.clearReg(reg)
         case Op.Move(dst, src) =>
           val rid = state.getReg(src)
@@ -57,7 +63,6 @@ class ResourceAnalyzer:
           val (s, rid) = state.clearReg(fst).clearReg(snd).alloc(ResourceKind.PairStruct, Set(fId, sId).filter(_>=0), idx)
           s.setReg(dst, rid)
         case Op.Proj1(dst, src) =>
-          // 解析上の簡易化: Proj1/2 はペアを分解し、片方を dst に、もう片方を src に戻す
           val res = for { pId <- state.getReg(src); r <- state.resources.get(pId) if r.initialChildren.size >= 2 } yield (r.initialChildren.toList.sorted)
           val s2 = state.clearReg(src)
           res.map(ids => s2.setReg(dst, ids(0)).setReg(src, ids(1))).getOrElse(s2)
@@ -74,6 +79,50 @@ class ResourceAnalyzer:
         case Op.Mul(dst, l, r) =>
           val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
           s.setReg(dst, rid)
+        case Op.IBin(dst, l, r, _, _) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
+        case Op.ICmp(dst, l, r, _, _) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
+        case Op.FAdd(dst, l, r) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
+        case Op.FSub(dst, l, r) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
+        case Op.FMul(dst, l, r) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
+        case Op.FDiv(dst, l, r) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
+        case Op.FRem(dst, l, r) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
+        case Op.FCmp(dst, l, r, _) =>
+          val (s, rid) = state.clearReg(l).clearReg(r).alloc(ResourceKind.Atom, Set.empty, idx)
+          s.setReg(dst, rid)
+        case Op.SExt(dst, src, _, _) =>
+          val rid = state.getReg(src)
+          val s2 = state.clearReg(src)
+          rid.map(s2.setReg(dst, _)).getOrElse(s2)
+        case Op.ZExt(dst, src, _, _) =>
+          val rid = state.getReg(src)
+          val s2 = state.clearReg(src)
+          rid.map(s2.setReg(dst, _)).getOrElse(s2)
+        case Op.Trunc(dst, src, _, _) =>
+          val rid = state.getReg(src)
+          val s2 = state.clearReg(src)
+          rid.map(s2.setReg(dst, _)).getOrElse(s2)
+        case Op.Itof(dst, src, _, _) =>
+          val rid = state.getReg(src)
+          val s2 = state.clearReg(src)
+          rid.map(s2.setReg(dst, _)).getOrElse(s2)
+        case Op.Ftoi(dst, src, _, _) =>
+          val rid = state.getReg(src)
+          val s2 = state.clearReg(src)
+          rid.map(s2.setReg(dst, _)).getOrElse(s2)
         case Op.Borrow(dst, src) => state.getReg(src).map(state.setReg(dst, _)).getOrElse(state)
         case Op.Return(src) =>
           val returnedRid = state.getReg(src)
@@ -83,7 +132,6 @@ class ResourceAnalyzer:
             case None => others
           }
           garbage ++= trueLeaks
-          // リークしたものを「ここで失われた」として記録
           lostAt(idx) = trueLeaks
           state.copy(regs = Map.empty)
         case _ => state
