@@ -30,7 +30,7 @@ pub const DecompileError = error{
 // 文字列ユーティリティ
 // ============================================================
 
-fn uintAfter(line: []const u8, prefix: []const u8) ?u32 {
+pub fn uintAfter(line: []const u8, prefix: []const u8) ?u32 {
     const pos = std.mem.indexOf(u8, line, prefix) orelse return null;
     return parseUintPrefix(line[pos + prefix.len ..]);
 }
@@ -53,7 +53,7 @@ fn i64After(line: []const u8, prefix: []const u8) ?i64 {
 }
 
 /// "getelementptr %Value, ptr %regs, i32 N" → N
-fn gepReg(line: []const u8) ?u32 {
+pub fn gepReg(line: []const u8) ?u32 {
     return uintAfter(line, "getelementptr %Value, ptr %regs, i32 ");
 }
 
@@ -635,134 +635,3 @@ pub const Decompiler = struct {
 // テスト
 // ============================================================
 
-test "uintAfter / gepReg basic" {
-    try std.testing.expectEqual(@as(?u32, 5), uintAfter("ptr %r_5, i64 42", "ptr %r_"));
-    try std.testing.expectEqual(@as(?u32, 42), uintAfter("i64 42)", "i64 "));
-    try std.testing.expectEqual(@as(?u32, null), uintAfter("foo", "bar"));
-    try std.testing.expectEqual(
-        @as(?u32, 3),
-        gepReg("  %lhs_ptr_3 = getelementptr %Value, ptr %regs, i32 3"),
-    );
-}
-
-test "Decompiler: load_const int + ret" {
-    const allocator = std.testing.allocator;
-    const ir =
-        \\define dllexport i64 @main(ptr %external_regs) {
-        \\entry:
-        \\  %regs = alloca %Value, i32 1
-        \\  %r_ptr_0 = getelementptr %Value, ptr %regs, i32 0
-        \\  call void @rt_init_unit(ptr %r_ptr_0)
-        \\  br label %body
-        \\deopt_exit:
-        \\  %deopt_val = or i64 0, 2147483648
-        \\  ret i64 %deopt_val
-        \\body:
-        \\  %r_0 = getelementptr %Value, ptr %regs, i32 0
-        \\  call void @rt_make_int(ptr %r_0, i64 99)
-        \\  %ret_ptr_0 = getelementptr %Value, ptr %regs, i32 0
-        \\  %v0 = call i64 @rt_get_int(ptr %ret_ptr_0)
-        \\  ret i64 %v0
-        \\  unreachable
-        \\}
-    ;
-    var d = Decompiler.init(allocator);
-    var prog = try d.decompile(ir);
-    defer prog.deinit();
-    const code = prog.mainCode();
-    try std.testing.expectEqual(@as(usize, 2), code.len);
-    try std.testing.expectEqual(@as(u32, 0), code[0].load_const.dst);
-    try std.testing.expectEqual(@as(u64, 99), code[0].load_const.val.bits);
-    try std.testing.expectEqual(@as(u32, 0), code[1].ret.src);
-}
-
-test "Decompiler: add op" {
-    const allocator = std.testing.allocator;
-    const ir =
-        \\define dllexport i64 @main(ptr %external_regs) {
-        \\entry:
-        \\  %regs = alloca %Value, i32 3
-        \\  br label %body
-        \\deopt_exit:
-        \\  %deopt_val = or i64 0, 2147483648
-        \\  ret i64 %deopt_val
-        \\body:
-        \\  %r_0 = getelementptr %Value, ptr %regs, i32 0
-        \\  call void @rt_make_int(ptr %r_0, i64 10)
-        \\  %r_1 = getelementptr %Value, ptr %regs, i32 1
-        \\  call void @rt_make_int(ptr %r_1, i64 20)
-        \\  %lhs_ptr_0 = getelementptr %Value, ptr %regs, i32 0
-        \\  %rhs_ptr_1 = getelementptr %Value, ptr %regs, i32 1
-        \\  %v10 = call i64 @rt_get_int(ptr %lhs_ptr_0)
-        \\  %v11 = call i64 @rt_get_int(ptr %rhs_ptr_1)
-        \\  %v12 = add i64 %v10, %v11
-        \\  %dst_ptr_2 = getelementptr %Value, ptr %regs, i32 2
-        \\  call void @rt_make_int(ptr %dst_ptr_2, i64 %v12)
-        \\  %ret_ptr_2 = getelementptr %Value, ptr %regs, i32 2
-        \\  %v20 = call i64 @rt_get_int(ptr %ret_ptr_2)
-        \\  ret i64 %v20
-        \\  unreachable
-        \\}
-    ;
-    var d = Decompiler.init(allocator);
-    var prog = try d.decompile(ir);
-    defer prog.deinit();
-    const code = prog.mainCode();
-    try std.testing.expectEqual(@as(usize, 4), code.len);
-    try std.testing.expectEqual(@as(u64, 10), code[0].load_const.val.bits);
-    try std.testing.expectEqual(@as(u64, 20), code[1].load_const.val.bits);
-    try std.testing.expectEqual(@as(u32, 2), code[2].add.dst);
-    try std.testing.expectEqual(@as(u32, 0), code[2].add.lhs);
-    try std.testing.expectEqual(@as(u32, 1), code[2].add.rhs);
-    try std.testing.expectEqual(@as(u32, 2), code[3].ret.src);
-}
-
-test "Decompiler: make_pair + proj1" {
-    const allocator = std.testing.allocator;
-    const ir =
-        \\define dllexport i64 @main(ptr %external_regs) {
-        \\entry:
-        \\  %regs = alloca %Value, i32 3
-        \\  br label %body
-        \\deopt_exit:
-        \\  %deopt_val = or i64 0, 2147483648
-        \\  ret i64 %deopt_val
-        \\body:
-        \\  %r_0 = getelementptr %Value, ptr %regs, i32 0
-        \\  call void @rt_make_int(ptr %r_0, i64 7)
-        \\  %r_1 = getelementptr %Value, ptr %regs, i32 1
-        \\  call void @rt_make_unit(ptr %r_1)
-        \\  %f_ptr_0 = getelementptr %Value, ptr %regs, i32 0
-        \\  %s_ptr_1 = getelementptr %Value, ptr %regs, i32 1
-        \\  %v0 = load %Value, ptr %f_ptr_0
-        \\  %v1 = load %Value, ptr %s_ptr_1
-        \\  %dst_ptr_2 = getelementptr %Value, ptr %regs, i32 2
-        \\  call void @rt_make_pair(ptr %dst_ptr_2, %Value %v0, %Value %v1)
-        \\  call void @rt_init_unit(ptr %f_ptr_0)
-        \\  call void @rt_init_unit(ptr %s_ptr_1)
-        \\  %src_ptr_2 = getelementptr %Value, ptr %regs, i32 2
-        \\  %v2 = load %Value, ptr %src_ptr_2
-        \\  %v3 = call %Value @rt_proj1(ptr %src_ptr_2, %Value %v2)
-        \\  %dst_ptr_0 = getelementptr %Value, ptr %regs, i32 0
-        \\  store %Value %v3, ptr %dst_ptr_0
-        \\  %ret_ptr_0 = getelementptr %Value, ptr %regs, i32 0
-        \\  %v4 = load %Value, ptr %ret_ptr_0
-        \\  ret %Value %v4
-        \\  unreachable
-        \\}
-    ;
-    var d = Decompiler.init(allocator);
-    var prog = try d.decompile(ir);
-    defer prog.deinit();
-    const code = prog.mainCode();
-    // load_const 7, load_const unit, make_pair 2←0,1, proj1 0←2, ret 0
-    try std.testing.expectEqual(@as(usize, 5), code.len);
-    try std.testing.expectEqual(@as(u64, 7), code[0].load_const.val.bits);
-    try std.testing.expect(code[1].load_const.val == .unit);
-    try std.testing.expectEqual(@as(u32, 2), code[2].make_pair.dst);
-    try std.testing.expectEqual(@as(u32, 0), code[2].make_pair.fst);
-    try std.testing.expectEqual(@as(u32, 1), code[2].make_pair.snd);
-    try std.testing.expectEqual(@as(u32, 0), code[3].proj1.dst);
-    try std.testing.expectEqual(@as(u32, 2), code[3].proj1.src);
-    try std.testing.expectEqual(@as(u32, 0), code[4].ret.src);
-}

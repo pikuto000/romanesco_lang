@@ -185,35 +185,3 @@ pub const SpeculativeExecutor = struct {
     }
 };
 
-test "SpeculativeExecutor Tiered demo" {
-    const allocator = std.testing.allocator;
-    var executor = SpeculativeExecutor.init(allocator);
-    defer executor.deinit(); 
-    
-    const code = &[_]Op{
-        .{ .load_const = .{ .dst = 0, .val = .{ .bits = 10 } } },
-        .{ .load_const = .{ .dst = 1, .val = .{ .bits = 32 } } },
-        .{ .add = .{ .dst = 2, .lhs = 0, .rhs = 1 } },
-        .{ .ret = .{ .src = 2 } },
-    };
-
-    var i: usize = 0;
-    while (i < 30) : (i += 1) {
-        const res = try executor.execute(&[_][]const Op{code}, code);
-        defer res.deinit(allocator);
-        try std.testing.expectEqual(@as(u64, 42), res.bits);
-    }
-}
-
-// test "SpeculativeExecutor Deoptimization" {
-//     const allocator = std.testing.allocator;
-//     var executor = SpeculativeExecutor.init(allocator);
-//     defer executor.deinit(); 
-//     
-//     const type_code = &[_]Op{
-//         .{ .add = .{ .dst = 1, .lhs = 0, .rhs = 0 } },
-//         .{ .ret = .{ .src = 1 } },
-//     };
-//
-//     // ... rest of test ...
-// }
