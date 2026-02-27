@@ -295,7 +295,8 @@ case class ProverConfig(
     excludeTrivialLemmas: Boolean = true,
     enabledDomains: Option[Set[String]] = None,
     pluginPacks: List[PluginPack] = Nil,       // 空ならデフォルト全パック
-    disabledPlugins: Set[String] = Set.empty
+    disabledPlugins: Set[String] = Set.empty,
+    lemmaFiles: List[String] = Nil              // 起動時に読み込む補題ファイル
 )
 
 object ProverConfig {

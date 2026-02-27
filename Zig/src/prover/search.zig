@@ -140,11 +140,20 @@ pub const ProverEngine = struct {
     /// 動的に統合された規則リスト
     all_rules: []const CatRule,
 
+    /// 証明中に生成された補題を蓄積
+    generated_lemmas: std.ArrayList(CatRule),
+
     /// 初期化
     pub fn init(config: ProverConfig, plugins: []const Plugin, arena: Allocator, gpa: Allocator) ProverEngine {
+        const lemma_manager_mod = @import("lemma_manager.zig");
         var rules_list: std.ArrayList(CatRule) = .{};
         // 設定からの基本ルール
         rules_list.appendSlice(arena, config.rules) catch {};
+        // 補題ファイルから読み込んだルール
+        for (config.lemma_files) |path| {
+            const file_lemmas = lemma_manager_mod.loadLemmas(path, arena) catch continue;
+            rules_list.appendSlice(arena, file_lemmas) catch {};
+        }
         // 各プラグインからのルール
         for (plugins) |p| {
             // 静的ルール
@@ -167,6 +176,7 @@ pub const ProverEngine = struct {
             .path_goals = .{},
             .path_hashes = .{},
             .all_rules = rules_list.toOwnedSlice(arena) catch &.{},
+            .generated_lemmas = .{},
         };
     }
 
@@ -176,12 +186,24 @@ pub const ProverEngine = struct {
         self.lemma_cache.deinit();
         self.path_goals.deinit(self.gpa);
         self.path_hashes.deinit(self.gpa);
+        self.generated_lemmas.deinit(self.gpa);
     }
 
     /// キャッシュのリセット
     pub fn resetCaches(self: *ProverEngine) void {
         self.failure_cache.clearRetainingCapacity();
         self.lemma_cache.clearRetainingCapacity();
+    }
+
+    /// 蓄積された生成補題をファイルに保存
+    pub fn saveLemmas(self: *ProverEngine, path: []const u8) !void {
+        const lemma_manager_mod = @import("lemma_manager.zig");
+        try lemma_manager_mod.saveLemmas(path, self.generated_lemmas.items, self.arena);
+    }
+
+    /// 蓄積された生成補題の一覧を返す
+    pub fn getGeneratedLemmas(self: *ProverEngine) []const CatRule {
+        return self.generated_lemmas.items;
     }
 
     /// フレッシュメタ変数の生成
@@ -248,6 +270,12 @@ pub const ProverEngine = struct {
             );
 
             if (findSuccess(search_tree)) |node| {
+                // 証明成功時に補題を生成
+                if (self.config.generate_lemmas) {
+                    if (self.generateLemma(goal_expr, node.rule_name)) |lemma| {
+                        self.generated_lemmas.append(self.gpa, lemma) catch {};
+                    }
+                }
                 return .{ .success = .{
                     .tree = .{ .leaf = .{ .goal = goal_expr, .rule_name = node.rule_name } },
                     .search_tree = search_tree,
@@ -260,6 +288,56 @@ pub const ProverEngine = struct {
             .reason = "No proof found",
             .depth = max_depth,
         } };
+    }
+
+    /// 証明成功時に補題ルールを生成する
+    fn generateLemma(self: *ProverEngine, goal: *const Expr, rule_name: []const u8) ?CatRule {
+        // 自明な補題を除外
+        if (self.config.exclude_trivial_lemmas) {
+            switch (goal.*) {
+                .var_, .sym => return null,
+                .app => |a| {
+                    // a = a 形式
+                    if (a.head.* == .sym and std.mem.eql(u8, a.head.sym, "=") and a.args.len == 2) {
+                        if (a.args[0].eql(a.args[1])) return null;
+                    }
+                },
+                else => {},
+            }
+        }
+
+        const should_generate = switch (self.config.lemma_mode) {
+            .all => true,
+            .equality_only => blk: {
+                if (goal.* == .app) {
+                    const head = goal.app.head;
+                    if (head.* == .sym) {
+                        break :blk std.mem.eql(u8, head.sym, "=") or std.mem.eql(u8, head.sym, "path");
+                    }
+                }
+                break :blk false;
+            },
+            .induction_only => std.mem.indexOf(u8, rule_name, "induction") != null,
+            .manual_only => false,
+        };
+
+        if (!should_generate) return null;
+
+        // Var を収集して universals にする
+        var vars: std.ArrayList(*const Expr) = .{};
+        collectVarsFromExpr(goal, &vars, self.arena);
+
+        // 補題名を生成
+        var name_buf: [64]u8 = undefined;
+        const name = std.fmt.bufPrint(&name_buf, "lemma-{d}", .{goal.hash()}) catch "lemma-auto";
+        const name_owned = self.arena.dupe(u8, name) catch return null;
+
+        return CatRule{
+            .name = name_owned,
+            .lhs = goal,
+            .rhs = goal,
+            .universals = vars.items,
+        };
     }
 
     /// 探索の本体
@@ -556,4 +634,24 @@ fn applyVarSubst(e: *const Expr, var_subst: *const std.StringHashMap(*const Expr
         },
         else => e,
     };
+}
+
+/// Exprから全Varノードを収集する（補題のuniversals用）
+fn collectVarsFromExpr(e: *const Expr, result: *std.ArrayList(*const Expr), arena_alloc: Allocator) void {
+    switch (e.*) {
+        .var_ => {
+            // 重複チェック
+            for (result.items) |existing| {
+                if (existing.* == .var_ and std.mem.eql(u8, existing.var_, e.var_)) return;
+            }
+            result.append(arena_alloc, e) catch {};
+        },
+        .app => |a| {
+            collectVarsFromExpr(a.head, result, arena_alloc);
+            for (a.args) |arg| {
+                collectVarsFromExpr(arg, result, arena_alloc);
+            }
+        },
+        else => {},
+    }
 }

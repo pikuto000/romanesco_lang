@@ -377,6 +377,7 @@ pub const ProverConfig = struct {
     generate_lemmas: bool = true,
     lemma_mode: LemmaGenerationMode = .equality_only,
     exclude_trivial_lemmas: bool = true,
+    lemma_files: []const []const u8 = &.{}, // 起動時に読み込む補題ファイル
 };
 
 // ==========================================
