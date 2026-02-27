@@ -135,7 +135,12 @@ object Repl:
         println(s"Saved ${sessionLemmas.size} session lemmas to $filename")
         Right(s)
       case "load" :: filename :: Nil =>
-        val newLemmas = LemmaManager.loadLemmas(filename)
+        val f = new java.io.File(filename)
+        val newLemmas = if (f.isDirectory) {
+          LemmaManager.loadAllFromDir(filename)
+        } else {
+          LemmaManager.loadLemmas(filename)
+        }
         loadedLemmas = loadedLemmas ++ newLemmas
         println(s"Loaded ${newLemmas.size} lemmas from $filename")
         Right(s)

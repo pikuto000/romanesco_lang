@@ -6,16 +6,24 @@
 package romanesco.Solver.core
 
 import java.io.{File, PrintWriter}
+import java.nio.file.{Files, Paths}
 import scala.io.Source
 import romanesco.Solver.TestParser
 
 object LemmaManager {
+
+  /** ディレクトリが存在しなければ作成する */
+  def ensureDir(dir: String): Unit =
+    Files.createDirectories(Paths.get(dir))
 
   /** 補題をテキストファイルに保存します。
     * フォーマット: name\tlhs\trhs\tuniv1,univ2,...
     * '#' で始まる行はコメントとして扱われます。
     */
   def saveLemmas(file: String, lemmas: List[CatRule]): Unit = {
+    val parent = new File(file).getParentFile
+    if (parent != null) ensureDir(parent.getPath)
+
     val writer = new PrintWriter(new File(file))
     try {
       writer.println("# Romanesco 補題ファイル")
@@ -70,6 +78,30 @@ object LemmaManager {
         Nil
     } finally {
       source.close()
+    }
+  }
+
+  /** ディレクトリ内の全 .txt ファイルから補題を読み込む */
+  def loadAllFromDir(dir: String): List[CatRule] = {
+    val d = new File(dir)
+    if (!d.isDirectory) return Nil
+    d.listFiles()
+      .filter(f => f.isFile && f.getName.endsWith(".txt"))
+      .sortBy(_.getName)
+      .flatMap(f => loadLemmas(f.getPath))
+      .toList
+  }
+
+  /** ディレクトリに補題を保存する（既存ファイルの補題とマージし重複排除） */
+  def saveToDir(dir: String, lemmas: List[CatRule]): Unit = {
+    if (lemmas.isEmpty) return
+    ensureDir(dir)
+    val autoFile = new File(dir, "auto.txt").getPath
+    val existing = loadLemmas(autoFile)
+    val existingNames = existing.map(_.name).toSet
+    val newLemmas = lemmas.filterNot(l => existingNames.contains(l.name))
+    if (newLemmas.nonEmpty) {
+      saveLemmas(autoFile, existing ++ newLemmas)
     }
   }
 }

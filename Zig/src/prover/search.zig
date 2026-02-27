@@ -154,6 +154,11 @@ pub const ProverEngine = struct {
             const file_lemmas = lemma_manager_mod.loadLemmas(path, arena) catch continue;
             rules_list.appendSlice(arena, file_lemmas) catch {};
         }
+        // 補題ディレクトリから読み込み
+        if (config.lemma_dir) |dir| {
+            const dir_lemmas = lemma_manager_mod.loadAllFromDir(dir, arena) catch &[_]CatRule{};
+            rules_list.appendSlice(arena, dir_lemmas) catch {};
+        }
         // 各プラグインからのルール
         for (plugins) |p| {
             // 静的ルール
@@ -274,6 +279,11 @@ pub const ProverEngine = struct {
                 if (self.config.generate_lemmas) {
                     if (self.generateLemma(goal_expr, node.rule_name)) |lemma| {
                         self.generated_lemmas.append(self.gpa, lemma) catch {};
+                        // ディレクトリ指定があれば自動保存
+                        if (self.config.lemma_dir) |dir| {
+                            const lm = @import("lemma_manager.zig");
+                            lm.saveToDir(dir, &[_]CatRule{lemma}, self.arena) catch {};
+                        }
                     }
                 }
                 return .{ .success = .{
