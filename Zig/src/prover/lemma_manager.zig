@@ -1,7 +1,8 @@
 // ==========================================
 // lemma_manager.zig
 // 補題の保存・読み込み (LemmaManager.scala移植)
-// 形式: タブ区切り name\tlhs\trhs\n
+// 形式: タブ区切り name\tlhs\trhs\tuniv1,univ2,...
+// '#' で始まる行はコメント
 // ==========================================
 
 const std = @import("std");
@@ -18,18 +19,30 @@ pub const LemmaManagerError = error{
 };
 
 /// 補題ルールをファイルに保存（タブ区切りテキスト）
+/// 形式: name\tlhs\trhs\tuniv1,univ2,...
 pub fn saveLemmas(path: []const u8, rules: []const CatRule, arena: Allocator) !void {
     // まずメモリ上に出力バッファを構築
     var buf: std.ArrayList(u8) = .{};
     defer buf.deinit(arena);
 
+    // ヘッダーコメント
+    try buf.appendSlice(arena, "# Romanesco 補題ファイル\n");
+    try buf.appendSlice(arena, "# 形式: 名前<TAB>左辺<TAB>右辺<TAB>全称変数(カンマ区切り)\n");
+    try buf.append(arena, '\n');
+
     for (rules) |rule| {
-        // name\tlhs\trhs\n
+        // name\tlhs\trhs\tuniv1,univ2,...\n
         try buf.appendSlice(arena, rule.name);
         try buf.append(arena, '\t');
         try writeExprTo(&buf, rule.lhs, arena);
         try buf.append(arena, '\t');
         try writeExprTo(&buf, rule.rhs, arena);
+        // universals
+        try buf.append(arena, '\t');
+        for (rule.universals, 0..) |u, i| {
+            if (i > 0) try buf.append(arena, ',');
+            try writeExprTo(&buf, u, arena);
+        }
         try buf.append(arena, '\n');
     }
 
@@ -40,6 +53,7 @@ pub fn saveLemmas(path: []const u8, rules: []const CatRule, arena: Allocator) !v
 }
 
 /// 補題ルールをファイルから読み込み
+/// '#' で始まる行はコメントとしてスキップ
 pub fn loadLemmas(path: []const u8, arena: Allocator) ![]CatRule {
     var file = std.fs.cwd().openFile(path, .{}) catch return error.FileNotFound;
     defer file.close();
@@ -53,12 +67,15 @@ pub fn loadLemmas(path: []const u8, arena: Allocator) ![]CatRule {
         if (line.len == 0) continue;
         const trimmed = std.mem.trim(u8, line, " \t\r");
         if (trimmed.len == 0) continue;
+        // コメント行をスキップ
+        if (trimmed[0] == '#') continue;
 
-        // タブで3分割: name, lhs, rhs
+        // タブで分割: name, lhs, rhs, [universals]
         var parts = std.mem.splitScalar(u8, trimmed, '\t');
         const name_part = parts.next() orelse continue;
         const lhs_part = parts.next() orelse continue;
         const rhs_part = parts.next() orelse continue;
+        const univs_part = parts.next(); // optional
 
         const name = try arena.dupe(u8, std.mem.trim(u8, name_part, " "));
         const lhs_str = std.mem.trim(u8, lhs_part, " ");
@@ -67,10 +84,26 @@ pub fn loadLemmas(path: []const u8, arena: Allocator) ![]CatRule {
         const lhs = parser_mod.parse(lhs_str, arena) catch continue;
         const rhs = parser_mod.parse(rhs_str, arena) catch continue;
 
+        // universals をパース
+        var universals: std.ArrayList(*const Expr) = .{};
+        if (univs_part) |up| {
+            const univs_trimmed = std.mem.trim(u8, up, " \r");
+            if (univs_trimmed.len > 0) {
+                var univ_iter = std.mem.splitScalar(u8, univs_trimmed, ',');
+                while (univ_iter.next()) |u_str| {
+                    const ut = std.mem.trim(u8, u_str, " ");
+                    if (ut.len == 0) continue;
+                    const u_expr = parser_mod.parse(ut, arena) catch continue;
+                    try universals.append(arena, u_expr);
+                }
+            }
+        }
+
         try rules.append(arena, .{
             .name = name,
             .lhs = lhs,
             .rhs = rhs,
+            .universals = universals.items,
         });
     }
 
@@ -127,10 +160,12 @@ test "saveLemmas and loadLemmas roundtrip" {
     const a = try expr_mod.sym(arena, "A");
     const b = try expr_mod.sym(arena, "B");
     const impl = try expr_mod.sym(arena, "→");
+    const x = try expr_mod.var_(arena, "x");
     const rule = CatRule{
         .name = "test-rule",
         .lhs = try expr_mod.app2(arena, impl, a, b),
         .rhs = b,
+        .universals = &[_]*const Expr{x},
     };
 
     // 一時ファイルに保存
@@ -142,6 +177,25 @@ test "saveLemmas and loadLemmas roundtrip" {
         // ファイルシステムエラーはテストとして容認
         return;
     };
+    if (loaded.len > 0) {
+        try std.testing.expectEqualStrings("test-rule", loaded[0].name);
+        try std.testing.expect(loaded[0].universals.len == 1);
+    }
+}
+
+test "loadLemmas skips comment lines" {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    // コメント付きの補題ファイルを書く
+    const tmp_path = "/tmp/test_lemmas_comments.txt";
+    const content = "# これはコメントです\n# もう一つのコメント\n\ntest-rule\tA\tB\t\n";
+    const file = std.fs.cwd().createFile(tmp_path, .{}) catch return;
+    defer file.close();
+    file.writeAll(content) catch return;
+
+    const loaded = loadLemmas(tmp_path, arena) catch return;
     if (loaded.len > 0) {
         try std.testing.expectEqualStrings("test-rule", loaded[0].name);
     }

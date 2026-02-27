@@ -30,6 +30,20 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     (ProofTree, Subst, List[(String, Expr)])
   ]()
 
+  // 補題ファイルから読み込んだ規則
+  private val fileLemmas: List[CatRule] =
+    config.lemmaFiles.flatMap(LemmaManager.loadLemmas)
+
+  // 証明中に生成された補題を蓄積
+  private val generatedLemmas = mutable.ListBuffer[CatRule]()
+
+  /** 蓄積された生成補題をファイルに保存 */
+  def saveLemmas(file: String): Unit =
+    LemmaManager.saveLemmas(file, generatedLemmas.toList)
+
+  /** 蓄積された生成補題の一覧 */
+  def getGeneratedLemmas: List[CatRule] = generatedLemmas.toList
+
   // 全てのロジックをプラグインとして管理
   private val plugins: List[LogicPlugin] = initializePlugins(config)
 
@@ -79,14 +93,14 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
   private lazy val backwardRuleIndex = {
     val allRules =
       (if (config.classical) config.rules ++ StandardRules.classical
-      else config.rules) ++ plugins.flatMap(_.providedRules)
+      else config.rules) ++ fileLemmas ++ plugins.flatMap(_.providedRules)
     allRules.groupBy(_.rhs.headSymbol)
   }
 
   private lazy val forwardRuleIndex = {
     val allRules =
       (if (config.classical) config.rules ++ StandardRules.classical
-      else config.rules) ++ plugins.flatMap(_.providedRules)
+      else config.rules) ++ fileLemmas ++ plugins.flatMap(_.providedRules)
     allRules.groupBy(_.lhs.headSymbol)
   }
 
@@ -136,7 +150,7 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     }
   }
 
-  def normalize(e: Expr): Expr = Rewriter.normalize(e, config.rules ++ dynamicRules.values.toList)
+  def normalize(e: Expr): Expr = Rewriter.normalize(e, config.rules ++ fileLemmas ++ dynamicRules.values.toList)
 
   def checkDeadline(): Unit = {
     if (System.currentTimeMillis() > deadline) throw new TimeoutException()
@@ -187,7 +201,12 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
 
         result match {
           case Some((proof, fullTree)) =>
-            Right(ProofResult(proof, None, Some(fullTree)))
+            // 証明成功時に補題を生成
+            val lemma = if (config.generateLemmas) {
+              generateLemma(goal, startGoal.context, proof)
+            } else None
+            lemma.foreach(generatedLemmas += _)
+            Right(ProofResult(proof, lemma, Some(fullTree)))
           case None => Left(FailTrace(startGoal, "No proof found", 0))
         }
       } catch {
@@ -202,6 +221,67 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
       }: ${goal.toString.take(80)}")
 
     res
+  }
+
+  /** 証明成功時に補題ルールを生成する */
+  private def generateLemma(
+      goal: Expr,
+      context: List[(String, Expr)],
+      proof: ProofTree
+  ): Option[CatRule] = {
+    import LemmaGenerationMode._
+
+    // 自明な補題を除外
+    def isTrivial(e: Expr): Boolean = e match {
+      case Expr.Var(_) | Expr.Sym(_) => true
+      case Expr.App(Expr.Sym("="), List(a, b)) if a == b => true
+      case _ => false
+    }
+
+    if (config.excludeTrivialLemmas && isTrivial(goal)) return None
+
+    val shouldGenerate = config.lemmaMode match {
+      case All => true
+      case EqualityOnly => goal match {
+        case Expr.App(Expr.Sym("="), _) => true
+        case Expr.App(Expr.Sym("path"), _) => true
+        case _ => false
+      }
+      case InductionOnly => proof match {
+        case ProofTree.Node(_, r, _) => r.contains("induction")
+        case ProofTree.Leaf(_, r) => r.contains("induction")
+      }
+      case ManualOnly => false
+    }
+
+    if (!shouldGenerate) return None
+
+    // Var を収集
+    def collectVars(e: Expr): Set[String] = e match {
+      case Expr.Var(n) => Set(n)
+      case Expr.App(h, args) => collectVars(h) ++ args.flatMap(collectVars)
+      case _ => Set.empty
+    }
+
+    // コンテキストの仮定を前提とした補題を構築
+    val goalVars = collectVars(goal)
+    val relevantContext = context.filter { case (_, ty) =>
+      collectVars(ty).exists(goalVars.contains)
+    }
+
+    val lemmaRhs = goal
+    val lemmaLhs = if (relevantContext.isEmpty) {
+      goal
+    } else {
+      relevantContext.foldRight(goal) { case ((_, hyp), acc) =>
+        Expr.App(Expr.Sym("→"), List(hyp, acc))
+      }
+    }
+
+    val universals = goalVars.toList.map(Expr.Var(_))
+    val name = s"lemma-${goal.toString.take(40).hashCode.abs}"
+
+    Some(CatRule(name, lemmaLhs, lemmaRhs, universals))
   }
 
   protected[core] def findSuccess(tree: Tree[SearchNode]): Option[SearchNode] =
