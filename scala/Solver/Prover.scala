@@ -30,9 +30,14 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
     (ProofTree, Subst, List[(String, Expr)])
   ]()
 
-  // 補題ファイルから読み込んだ規則
-  private val fileLemmas: List[CatRule] =
-    config.lemmaFiles.flatMap(LemmaManager.loadLemmas)
+  // 補題ファイル・ディレクトリから読み込んだ規則
+  private val fileLemmas: List[CatRule] = {
+    val fromFiles = config.lemmaFiles.flatMap(LemmaManager.loadLemmas)
+    val fromDir = config.lemmaDir.map(LemmaManager.loadAllFromDir).getOrElse(Nil)
+    val all = fromFiles ++ fromDir
+    if (all.nonEmpty) println(s"  [lemma] ${all.size} 個の補題をファイルから読み込みました")
+    all
+  }
 
   // 証明中に生成された補題を蓄積
   private val generatedLemmas = mutable.ListBuffer[CatRule]()
@@ -205,7 +210,11 @@ final class Prover(val config: ProverConfig = ProverConfig.default)
             val lemma = if (config.generateLemmas) {
               generateLemma(goal, startGoal.context, proof)
             } else None
-            lemma.foreach(generatedLemmas += _)
+            lemma.foreach { l =>
+              generatedLemmas += l
+              // ディレクトリ指定があれば自動保存
+              config.lemmaDir.foreach(dir => LemmaManager.saveToDir(dir, List(l)))
+            }
             Right(ProofResult(proof, lemma, Some(fullTree)))
           case None => Left(FailTrace(startGoal, "No proof found", 0))
         }

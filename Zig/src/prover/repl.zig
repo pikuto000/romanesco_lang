@@ -109,17 +109,29 @@ pub const Repl = struct {
             return true;
         }
 
-        // "load <filename>"
+        // "load <filename_or_dir>"
         if (std.mem.startsWith(u8, input, "load ")) {
             const filename = std.mem.trim(u8, input[5..], " \t");
             if (filename.len == 0) {
-                try writer.writeAll("Usage: load <filename>\n");
+                try writer.writeAll("Usage: load <filename_or_dir>\n");
                 return true;
             }
-            const new_lemmas = lemma_manager.loadLemmas(filename, self.arena) catch |err| {
-                try writer.print("読み込み失敗: {}\n", .{err});
-                return true;
+            // ディレクトリかファイルか判定して読み込み
+            const is_dir = blk: {
+                var dir = std.fs.cwd().openDir(filename, .{}) catch break :blk false;
+                dir.close();
+                break :blk true;
             };
+            const new_lemmas = if (is_dir)
+                lemma_manager.loadAllFromDir(filename, self.arena) catch |err| {
+                    try writer.print("読み込み失敗: {}\n", .{err});
+                    return true;
+                }
+            else
+                lemma_manager.loadLemmas(filename, self.arena) catch |err| {
+                    try writer.print("読み込み失敗: {}\n", .{err});
+                    return true;
+                };
             self.loaded_lemmas.appendSlice(self.arena, new_lemmas) catch {};
             try writer.print("{d} 個の補題を {s} から読み込みました\n", .{ new_lemmas.len, filename });
             return true;

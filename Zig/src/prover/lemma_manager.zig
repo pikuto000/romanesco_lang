@@ -18,6 +18,13 @@ pub const LemmaManagerError = error{
     FileNotFound,
 };
 
+/// ディレクトリが存在しなければ作成する
+pub fn ensureDir(path: []const u8) void {
+    std.fs.cwd().makeDir(path) catch |err| {
+        if (err != error.PathAlreadyExists) return;
+    };
+}
+
 /// 補題ルールをファイルに保存（タブ区切りテキスト）
 /// 形式: name\tlhs\trhs\tuniv1,univ2,...
 pub fn saveLemmas(path: []const u8, rules: []const CatRule, arena: Allocator) !void {
@@ -108,6 +115,56 @@ pub fn loadLemmas(path: []const u8, arena: Allocator) ![]CatRule {
     }
 
     return rules.items;
+}
+
+/// ディレクトリ内の全 .txt ファイルから補題を読み込む
+pub fn loadAllFromDir(dir_path: []const u8, arena: Allocator) ![]CatRule {
+    var dir = std.fs.cwd().openDir(dir_path, .{ .iterate = true }) catch return &.{};
+    defer dir.close();
+
+    var all_rules: std.ArrayList(CatRule) = .{};
+    var iter = dir.iterate();
+    while (iter.next() catch null) |entry| {
+        if (entry.kind != .file) continue;
+        if (!std.mem.endsWith(u8, entry.name, ".txt")) continue;
+
+        // dir_path/entry.name のパスを構築
+        const full_path = try std.fmt.allocPrint(arena, "{s}/{s}", .{ dir_path, entry.name });
+        const file_rules = loadLemmas(full_path, arena) catch continue;
+        try all_rules.appendSlice(arena, file_rules);
+    }
+
+    return all_rules.items;
+}
+
+/// ディレクトリに補題を保存する（既存ファイルの補題とマージし重複排除）
+pub fn saveToDir(dir_path: []const u8, rules: []const CatRule, arena: Allocator) !void {
+    if (rules.len == 0) return;
+    ensureDir(dir_path);
+
+    const auto_path = try std.fmt.allocPrint(arena, "{s}/auto.txt", .{dir_path});
+
+    // 既存の補題を読み込み
+    const existing = loadLemmas(auto_path, arena) catch &[_]CatRule{};
+
+    // 重複排除: 既存の名前を集める
+    var existing_names = std.StringHashMap(void).init(arena);
+    for (existing) |e| {
+        existing_names.put(e.name, {}) catch {};
+    }
+
+    // 新規補題のみフィルタ
+    var merged: std.ArrayList(CatRule) = .{};
+    try merged.appendSlice(arena, existing);
+    for (rules) |rule| {
+        if (!existing_names.contains(rule.name)) {
+            try merged.append(arena, rule);
+        }
+    }
+
+    if (merged.items.len > existing.len) {
+        try saveLemmas(auto_path, merged.items, arena);
+    }
 }
 
 /// Exprを文字列としてArrayList(u8)に書き出す（parser.parseで読み直せる形式）

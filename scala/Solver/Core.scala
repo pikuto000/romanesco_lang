@@ -296,7 +296,8 @@ case class ProverConfig(
     enabledDomains: Option[Set[String]] = None,
     pluginPacks: List[PluginPack] = Nil,       // 空ならデフォルト全パック
     disabledPlugins: Set[String] = Set.empty,
-    lemmaFiles: List[String] = Nil              // 起動時に読み込む補題ファイル
+    lemmaFiles: List[String] = Nil,             // 起動時に読み込む補題ファイル
+    lemmaDir: Option[String] = None             // 補題ディレクトリ（自動読み込み・保存先）
 )
 
 object ProverConfig {
