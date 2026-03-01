@@ -2,14 +2,6 @@ package PROTO.romanesco.Solver.core
 import scala.quoted._
 import scala.annotation.tailrec
 
-type UInt = Int
-object UInt {
-  inline def apply(integer: UInt): UInt = if (integer < 0)
-    throw new IllegalArgumentException("UInt must be positive")
-  else integer
-}
-//=====================================================================================================
-
 /** Romanesco Lang 用・純粋カリー化 Expr by Grok (null完全排除・精神衛生最強) */
 final class Expr[T] private (
     val tag: Option[
